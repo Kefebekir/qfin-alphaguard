@@ -37,7 +37,7 @@ def generate_prices(config: Config) -> pl.DataFrame:
                 {"date": dates, "ticker": [ticker] * n_days, "close": prices[:, i]}
             )
         )
-    return pl.concat(frames)
+    return pl.concat(frames).sort(["ticker", "date"])
 
 
 if __name__ == "__main__":
