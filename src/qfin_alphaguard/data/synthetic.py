@@ -1,6 +1,7 @@
 """Generate synthetic price data for testing without network access."""
 
 from datetime import date
+
 import numpy as np
 import polars as pl
 
