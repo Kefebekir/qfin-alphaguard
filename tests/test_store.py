@@ -4,8 +4,8 @@ from qfin_alphaguard.data.synthetic import generate_prices
 
 
 def test_roundtrip_preserves_data(tmp_path):
-    df=generate_prices(Config())
-    path = write_prices(df, tmp_path /"nested"/"prices.parquet")
+    df = generate_prices(Config())
+    path = write_prices(df, tmp_path / "nested" / "prices.parquet")
 
     assert path.exists()
     assert read_prices(path).equals(df)
