@@ -10,4 +10,4 @@ wheels/
 .venv
 
 # Pipeline outputs
-data/
+/data/
