@@ -15,8 +15,8 @@ works today and what does not.
 | Stage | State |
 | --- | --- |
 | Project skeleton, tests, CI | done |
-| Data layer (ingest, validation, storage, SQL) | in progress |
-| Docker + scheduled cloud run | planned |
+| Data layer (ingest, validation, storage, SQL) | done |
+| Docker + scheduled cloud run | in progress |
 | Expected returns and covariance | planned |
 | Mean-variance optimizer with cardinality constraint | planned |
 | Guard rules and walk-forward backtest | planned |
@@ -50,6 +50,16 @@ Two things I care about more than the results:
   where error mitigation underperformed the unmitigated baseline, and reporting that
   was more useful than hiding it.
 
+## Known limitations
+
+- **Survivorship bias.** The ticker list contains companies that still exist and
+  are large today. Companies that were large in 2015 but later failed are not
+  included, so any backtest on this universe will look better than it would have
+  in real time.
+- **Synthetic calendar.** Generated data includes market holidays; real data does
+  not. This only affects tests, not results.
+
+  
 ## Getting started
 
 Requires [uv](https://docs.astral.sh/uv/).
@@ -59,6 +69,12 @@ git clone https://github.com/Kefebekir/qfin-alphaguard.git
 cd qfin-alphaguard
 uv sync
 uv run pytest
+
+# run the pipeline on generated data (no network needed)
+uv run qfin --synthetic
+
+# run it on real market data
+uv run qfin
 ```
 
 ## Tech
