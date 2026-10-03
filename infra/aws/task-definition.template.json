@@ -1,0 +1,32 @@
+{
+  "family": "qfin-alphaguard",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "256",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/qfin-execution-role",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/qfin-task-role",
+  "containerDefinitions": [
+    {
+      "name": "qfin",
+      "image": "ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/qfin-alphaguard:latest",
+      "essential": true,
+      "command": ["--s3-bucket", "qfin-alphaguard-kefebekir"],
+      "environment": [
+        { "name": "AWS_REGION", "value": "eu-north-1" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/qfin-alphaguard",
+          "awslogs-region": "eu-north-1",
+          "awslogs-stream-prefix": "qfin"
+        }
+      }
+    }
+  ]
+}

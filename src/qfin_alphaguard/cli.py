@@ -1,6 +1,7 @@
 """Command line entry point:load,validate and store price data."""
 
 import argparse
+from datetime import UTC, datetime
 
 from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.ingest import load_prices
@@ -22,9 +23,20 @@ def main(argv: list[str] | None = None) -> int:
         "--s3-bucket",
         help="also upload the result to this S3 bucket",
     )
+    parser.add_argument(
+        "--end-date",
+        help="last date to download (YYYY-MM-DD); default to today for real data",
+    )
     args = parser.parse_args(argv)
 
-    config = Config(synthetic=args.synthetic)
+    if args.end_date:
+        end_date = args.end_date
+    elif args.synthetic:
+        end_date = Config().end_date
+    else:
+        end_date = datetime.now(UTC).date().isoformat()
+
+    config = Config(synthetic=args.synthetic, end_date=end_date)
 
     df = load_prices(config)
     print(f"Load {len(df)} rows for {df['ticker'].n_unique()} tickers")
