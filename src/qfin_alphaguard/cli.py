@@ -4,7 +4,7 @@ import argparse
 
 from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.ingest import load_prices
-from qfin_alphaguard.data.store import prices_path, upload_to_s3,write_prices
+from qfin_alphaguard.data.store import prices_path, upload_to_s3, write_prices
 from qfin_alphaguard.data.validate import validate_prices
 
 
@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     path = write_prices(df, prices_path(config))
     print(f"wrote {path}")
     if args.s3_bucket:
-        uri=upload_to_s3(path,args.s3_bucket)
+        uri = upload_to_s3(path, args.s3_bucket)
         print(f"uploaded {uri}")
     return 0
 
