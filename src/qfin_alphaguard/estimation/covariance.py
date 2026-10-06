@@ -15,3 +15,15 @@ def ledoit_wolf_covariance(returns: np.ndarray) -> tuple[np.ndarray, float]:
     """Ledoit wolf shrunk covariance , annualized, and the shrinkage intesity."""
     model = LedoitWolf().fit(returns)
     return model.covariance_ * TRADING_DAYS, float(model.shrinkage_)
+
+
+def ewma_covariance(returns: np.ndarray, halflife: float = 63) -> np.ndarray:
+    """Exponentially weighted covariance, annualised. Recent days count more."""
+    n_days = returns.shape[0]
+    decay = 0.5 ** (1 / halflife)
+    weights = decay ** np.arange(n_days - 1, -1, -1)
+    weights /= weights.sum()
+
+    mean = weights @ returns
+    centred = returns - mean
+    return (centred.T * weights) @ centred * TRADING_DAYS
