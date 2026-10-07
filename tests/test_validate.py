@@ -33,7 +33,7 @@ def test_non_positive_prices_has_error():
     assert any(i.check == "positive_prices" for i in report.issues)
 
 
-def test_constant_series_has_flagged():
+def test_constant_series_is_flagged():
     df = pl.DataFrame(
         {
             "date": [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],

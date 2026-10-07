@@ -11,6 +11,6 @@ def test_load_prices_synthetic():
     assert dict(df.schema) == EXPECTED_SCHEMA
 
 
-def test_load_prices_network():
+def test_load_prices_is_sorted_by_ticker_then_date():
     df = load_prices(Config(synthetic=True))
     assert df.equals(df.sort(["ticker", "date"]))

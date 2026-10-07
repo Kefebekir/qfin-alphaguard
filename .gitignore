@@ -11,5 +11,10 @@ wheels/
 
 # Pipeline outputs
 /data/
+/logs/
+
+# Secrets (API keys, account details) never go into git
+.env
+.env.*
 
 scratch.py

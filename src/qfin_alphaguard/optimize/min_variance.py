@@ -5,12 +5,12 @@ import numpy as np
 
 
 def min_variance_weights(cov: np.ndarray, max_weight: float = 0.20) -> np.ndarray:
-    """weights that minimise portfolio variance.
+    """Weights that minimise portfolio variance.
     Fully invested, no short selling and no single asset can exceed max_weight."""
 
     n = cov.shape[0]
     if max_weight * n < 1:
-        raise ValueError(f"max_weight {max_weight} is too low for {n} assests.")
+        raise ValueError(f"max_weight {max_weight} is too low for {n} assets.")
 
     w = cp.Variable(n)
     objective = cp.Minimize(cp.quad_form(w, cp.psd_wrap(cov)))
@@ -26,5 +26,5 @@ def min_variance_weights(cov: np.ndarray, max_weight: float = 0.20) -> np.ndarra
 
 
 def portfolio_volatility(weights: np.ndarray, cov: np.ndarray) -> float:
-    """annualized volalality of a porfolio,given an annualized covariance."""
+    """Annualised volatility of a portfolio, given an annualised covariance."""
     return float(np.sqrt(weights @ cov @ weights))

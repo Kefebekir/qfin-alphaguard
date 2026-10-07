@@ -1,49 +1,77 @@
-﻿# QFin-AlphaGuard
+# QFin-AlphaGuard
 
-A portfolio construction system that picks which assets to hold, decides how much
-of each to hold, checks that decision against a set of explicit risk rules, and
-tests the whole thing on historical data without looking ahead.
+A trading system for US equities. A nightly job builds a target portfolio, an
+intraday engine decides every minute when to execute the changes, and every order
+is checked against explicit risk rules before it reaches the broker.
 
-The asset selection step is also written as a QUBO problem, so classical and
-quantum solvers can be run on the same formulation and compared.
-
-I am rebuilding this from scratch in the open. The section below says exactly what
-works today and what does not.
+The goal is net profit after costs and tax, measured against simple alternatives
+an investor could buy instead. I am building it in the open; the status table says
+exactly what works today and what does not.
 
 ## Status
 
 | Stage | State |
 | --- | --- |
 | Project skeleton, tests, CI | done |
-| Data layer (ingest, validation, storage, SQL) | done |
-| Docker + scheduled cloud run | done |
-| Expected returns and covariance | in progress |
-| Mean-variance optimizer with cardinality constraint | planned |
-| Guard rules and walk-forward backtest | planned |
-| QUBO formulation and solver comparison | planned |
-| Machine-learned return forecasts | planned |
+| Data layer: daily prices, validation, Parquet, DuckDB | done |
+| Docker image and scheduled AWS run | done |
+| Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
+| Phase 0: event types, risk configuration, repository skeleton | in progress |
+| Phase 1: event-driven backtester with costs and Guard rules | planned |
+| Phase 2: ML forecasts and intraday execution timing | planned |
+| Phase 3: paper trading on Interactive Brokers | planned |
+| Phase 3b: small real-money trading with scaling and stop rules | planned |
+| Phase 4: C++ execution engine | planned |
+| Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
 Nothing below the "in progress" line exists yet.
 
-## Design
+## How it works
 
-Data flows through eight stages:
+The system runs three loops at three speeds:
 
-1. **Ingest** â€” equity prices from yfinance, macro series from FRED.
-2. **Validate** â€” missing data, liquidity, calendar alignment, survivorship bias.
-3. **Features** â€” log returns, rolling volatility, momentum, built point-in-time.
-4. **Estimate** â€” expected returns and a covariance matrix.
-5. **Select** â€” which K assets to hold, classically and as a QUBO.
-6. **Weight** â€” mean-variance weights for the selected assets.
-7. **Guard** â€” explicit rules on position size, turnover and drawdown. This is a
-   rule-based referee, not a model. It is meant to be readable and auditable.
-8. **Backtest** â€” walk-forward runs with transaction costs, reported against an
-   equal-weight benchmark.
+1. **Nightly, in Python.** Download and validate data, build features, estimate
+   returns and risk, optimise target weights and write a `daily_plan.json`.
+2. **Every one-minute bar, in the engine.** Update features, score each stock with
+   the intraday model and decide whether to send the next slice of the day's
+   rebalance or wait.
+3. **Every order, in Guard.** Check the order against `guard.yaml`: position and
+   order size limits, a price collar, no same-day reversals and a daily loss limit.
+   Guard is a rule-based referee, not a model, and its limits change only by hand.
+
+The universe is a small set of liquid US stocks. UK retail accounts cannot buy
+US-domiciled ETFs, so single stocks are used instead.
+
+### Design choices
+
+- **The intraday model times trades; it does not change targets.** Fewer, larger
+  trades keep commissions low and avoid same-day round trips. It also makes the
+  model's value measurable: execution price against arrival price, compared with
+  an equal-spaced schedule that uses no model.
+- **Research code never sits in the live path.** Training and optimisation run at
+  night and hand the engine a plan.
+- **The FPGA does not make live trading faster.** A round trip through a retail
+  broker takes tens to hundreds of milliseconds. The FPGA work is a lab pipeline
+  on replayed NASDAQ ITCH data, benchmarked against a C++ model, plus an optional
+  independent pre-trade risk gate.
+- **Quantum optimisation is research only.** A QUBO formulation of asset selection
+  will be compared with classical solvers offline. It is not part of the trading
+  system.
+
+## What counts as success
+
+- Net of costs and tax, beat an equal-weight buy-and-hold of the same stocks and an
+  S&P 500 UCITS ETF, at similar risk.
+- Evidence comes in layers: long out-of-sample walk-forward backtests first, then
+  paper trading to show the live system behaves like the backtest, then small real
+  money that grows only while live results stay inside the backtest's expected
+  range.
 
 Two things I care about more than the results:
 
-- **No look-ahead.** Every feature is built only from data available at that point
-  in time. This is enforced in code and covered by tests.
+- **No look-ahead.** Every decision may use only data available at that moment,
+  and the backtester fills an order no earlier than the next bar. Tests will cover
+  this as each module lands.
 - **Honest reporting.** If a method loses to the naive baseline, the README says so.
   I ran into this before on a
   [quantum hardware experiment](https://github.com/Kefebekir/quantum-hardware-noise-comparison)
@@ -56,10 +84,11 @@ Two things I care about more than the results:
   are large today. Companies that were large in 2015 but later failed are not
   included, so any backtest on this universe will look better than it would have
   in real time.
+- **Daily closes only.** The data layer stores daily close prices. The backtester
+  will need open, high, low and volume, and intraday bars.
 - **Synthetic calendar.** Generated data includes market holidays; real data does
   not. This only affects tests, not results.
 
-  
 ## Getting started
 
 Requires [uv](https://docs.astral.sh/uv/).
@@ -70,29 +99,36 @@ cd qfin-alphaguard
 uv sync
 uv run pytest
 
-# run the pipeline on generated data (no network needed)
+# run the data pipeline on generated data (no network needed)
 uv run qfin --synthetic
 
 # run it on real market data
 uv run qfin
 ```
+
 ## Deployment
 
-The pipeline runs on AWS every weekday morning:
+The data pipeline runs on AWS every weekday morning:
 
 - The Docker image is stored in **Amazon ECR**.
-- **EventBridge Scheduler** starts it as an **ECS Fargate** task at 06:45 London time, Tuesday to Saturday, so each run picks up the previous trading day's close.
-- The task downloads prices, validates them, and writes Parquet to **S3** (with versioning, so every day's file is kept).
+- **EventBridge Scheduler** starts it as an **ECS Fargate** task at 06:45 London
+  time, Tuesday to Saturday, so each run picks up the previous trading day's close.
+- The task downloads prices, validates them, and writes Parquet to **S3** (with
+  versioning, so every day's file is kept).
 - Logs go to **CloudWatch Logs**.
-- Each component has its own IAM role with the minimum permissions it needs: the task can only write under `data/` in one bucket, and the scheduler can only start this one task.
+- Each component has its own IAM role with the minimum permissions it needs: the
+  task can only write under `data/` in one bucket, and the scheduler can only start
+  this one task.
 
-IAM policies and the task definition template are in `infra/aws/`. 
+IAM policies and the task definition template are in `infra/aws/`.
 
 ## Tech
 
-Python 3.12, Polars, Parquet, DuckDB, NumPy, pytest, ruff, GitHub Actions.
+Python 3.12, Polars, Parquet, DuckDB, NumPy, scikit-learn, CVXPY, pytest, ruff,
+Docker, AWS (ECR, ECS Fargate, EventBridge Scheduler, S3), GitHub Actions.
+
+Planned: the Interactive Brokers API, C++20, and SystemVerilog on an Artix-7 FPGA.
 
 ## License
 
 MIT
-

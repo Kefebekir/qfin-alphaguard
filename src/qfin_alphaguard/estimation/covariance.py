@@ -7,12 +7,12 @@ TRADING_DAYS = 252
 
 
 def sample_covariance(returns: np.ndarray) -> np.ndarray:
-    """Plain sample covariance,annualized."""
+    """Plain sample covariance, annualised."""
     return np.cov(returns, rowvar=False) * TRADING_DAYS
 
 
 def ledoit_wolf_covariance(returns: np.ndarray) -> tuple[np.ndarray, float]:
-    """Ledoit wolf shrunk covariance , annualized, and the shrinkage intesity."""
+    """Ledoit-Wolf shrunk covariance, annualised, and the shrinkage intensity."""
     model = LedoitWolf().fit(returns)
     return model.covariance_ * TRADING_DAYS, float(model.shrinkage_)
 

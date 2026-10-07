@@ -6,7 +6,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Config:
-    # which assests to pull and over what window
+    # which assets to pull and over what window
     tickers: tuple[str, ...] = (
         "AAPL",
         "MSFT",

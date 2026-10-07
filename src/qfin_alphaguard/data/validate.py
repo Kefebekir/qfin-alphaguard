@@ -1,4 +1,4 @@
-"""Data quality checks.Reports problems but does not deciede what to do about them."""
+"""Data quality checks. Reports problems but does not decide what to do about them."""
 
 from dataclasses import dataclass
 
@@ -55,7 +55,7 @@ def _check_duplicate(df: pl.DataFrame) -> list[Issue]:
     return [
         Issue(
             check="duplicates",
-            detail=f"{n_duplicates} duplicate ticker/data rows",
+            detail=f"{n_duplicates} duplicate ticker/date rows",
             severity="error",
         )
     ]
