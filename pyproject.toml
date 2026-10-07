@@ -1,7 +1,7 @@
 [project]
 name = "qfin-alphaguard"
 version = "0.1.0"
-description = "Add your description here"
+description = "Trading system that builds a nightly portfolio plan, times its execution intraday and checks every order against explicit risk rules"
 readme = "README.md"
 authors = [
     { name = "Kutalp Efe Bekir", email = "kefebekir@gmail.com" }
@@ -19,8 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-qfin-alphaguard = "qfin_alphaguard:main"
-qfin="qfin_alphaguard.cli:main"
+qfin = "qfin_alphaguard.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.15,<0.13.0"]
@@ -31,3 +30,6 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

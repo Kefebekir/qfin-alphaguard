@@ -1,4 +1,4 @@
-﻿# QFin-AlphaGuard
+# QFin-AlphaGuard
 
 A portfolio construction system that picks which assets to hold, decides how much
 of each to hold, checks that decision against a set of explicit risk rules, and
@@ -29,15 +29,15 @@ Nothing below the "in progress" line exists yet.
 
 Data flows through eight stages:
 
-1. **Ingest** â€” equity prices from yfinance, macro series from FRED.
-2. **Validate** â€” missing data, liquidity, calendar alignment, survivorship bias.
-3. **Features** â€” log returns, rolling volatility, momentum, built point-in-time.
-4. **Estimate** â€” expected returns and a covariance matrix.
-5. **Select** â€” which K assets to hold, classically and as a QUBO.
-6. **Weight** â€” mean-variance weights for the selected assets.
-7. **Guard** â€” explicit rules on position size, turnover and drawdown. This is a
+1. **Ingest** — equity prices from yfinance, macro series from FRED.
+2. **Validate** — missing data, liquidity, calendar alignment, survivorship bias.
+3. **Features** — log returns, rolling volatility, momentum, built point-in-time.
+4. **Estimate** — expected returns and a covariance matrix.
+5. **Select** — which K assets to hold, classically and as a QUBO.
+6. **Weight** — mean-variance weights for the selected assets.
+7. **Guard** — explicit rules on position size, turnover and drawdown. This is a
    rule-based referee, not a model. It is meant to be readable and auditable.
-8. **Backtest** â€” walk-forward runs with transaction costs, reported against an
+8. **Backtest** — walk-forward runs with transaction costs, reported against an
    equal-weight benchmark.
 
 Two things I care about more than the results:

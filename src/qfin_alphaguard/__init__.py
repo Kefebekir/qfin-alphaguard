@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from qfin-alphaguard!")
+"""QFin-AlphaGuard: nightly portfolio plan, intraday execution timing, rule-based risk."""
