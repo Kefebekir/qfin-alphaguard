@@ -1,4 +1,4 @@
-"""Command line entry point:load,validate and store price data."""
+"""Command line entry point: load, validate and store price data."""
 
 import argparse
 from datetime import UTC, datetime
@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--end-date",
-        help="last date to download (YYYY-MM-DD); default to today for real data",
+        help="last date to download (YYYY-MM-DD); defaults to today for real data",
     )
     args = parser.parse_args(argv)
 
@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     config = Config(synthetic=args.synthetic, end_date=end_date)
 
     df = load_prices(config)
-    print(f"Load {len(df)} rows for {df['ticker'].n_unique()} tickers")
+    print(f"Loaded {len(df)} rows for {df['ticker'].n_unique()} tickers")
 
     report = validate_prices(df)
     for issue in report.issues:

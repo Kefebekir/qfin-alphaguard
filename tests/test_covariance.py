@@ -24,7 +24,7 @@ def test_sample_covariance_shape_and_symmetry():
     assert (np.diag(cov) > 0).all()
 
 
-def test_ledoit_wolf_is_no_worse_contditioned():
+def test_ledoit_wolf_is_no_worse_conditioned():
     matrix = _matrix()
     sample = sample_covariance(matrix)
     shrunk, delta = ledoit_wolf_covariance(matrix)

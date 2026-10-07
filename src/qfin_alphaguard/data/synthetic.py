@@ -9,7 +9,7 @@ from qfin_alphaguard.config import Config
 
 
 def generate_prices(config: Config) -> pl.DataFrame:
-    """Return daily close prices in long format:date,ticker,close."""
+    """Return daily close prices in long format: date, ticker, close."""
     rng = np.random.default_rng(config.seed)
     dates = pl.date_range(
         start=date.fromisoformat(config.start_date),
@@ -22,7 +22,7 @@ def generate_prices(config: Config) -> pl.DataFrame:
     n_days = len(dates)
     n_assets = len(config.tickers)
 
-    # One shared market factor and plus asset specific noise
+    # One shared market factor plus asset-specific noise
     market = rng.normal(0.0003, 0.01, size=n_days)
     idiosyncratic = rng.normal(0.0, 0.015, size=(n_days, n_assets))
     betas = rng.uniform(0.6, 1.4, size=n_assets)

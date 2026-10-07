@@ -1,4 +1,4 @@
-"""Run SQL against stored price data using DuckDB"""
+"""Run SQL against stored price data using DuckDB."""
 
 from pathlib import Path
 
@@ -25,7 +25,7 @@ def row_counts(path: Path) -> pl.DataFrame:
 
 
 def latest_closes(path: Path) -> pl.DataFrame:
-    """Most recent close price for each ticekr."""
+    """Most recent close price for each ticker."""
     return run_query(
         """SELECT ticker, max(date) AS date,arg_max(close,date) AS close FROM prices GROUP BY ticker ORDER BY ticker """,
         path,

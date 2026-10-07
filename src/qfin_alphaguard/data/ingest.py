@@ -1,4 +1,4 @@
-"""Load price data,either from the network or from the synthetic generator."""
+"""Load price data, either from the network or from the synthetic generator."""
 
 import polars as pl
 import yfinance as yf
@@ -8,7 +8,7 @@ from qfin_alphaguard.data.synthetic import generate_prices
 
 
 def load_prices(config: Config) -> pl.DataFrame:
-    """Return daily close prices in long format:date,ticker,close."""
+    """Return daily close prices in long format: date, ticker, close."""
     if config.synthetic:
         return generate_prices(config)
     return _download_prices(config)

@@ -30,7 +30,7 @@ def test_beats_equal_weight(cov):
     assert portfolio_volatility(w, cov) <= portfolio_volatility(equal, cov)
 
 
-def test_low_volatility_assest_gets_most_weight(cov):
+def test_low_volatility_asset_gets_most_weight(cov):
     w = min_variance_weights(cov, max_weight=0.3)
 
     assert w.argmax() == 0
