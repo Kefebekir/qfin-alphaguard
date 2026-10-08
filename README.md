@@ -16,15 +16,15 @@ exactly what works today and what does not.
 | Data layer: daily prices, validation, Parquet, DuckDB | done |
 | Docker image and scheduled AWS run | done |
 | Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
-| Phase 0: event types, risk configuration, repository skeleton | in progress |
-| Phase 1: event-driven backtester with costs and Guard rules | planned |
+| Phase 0: event types, risk configuration, repository skeleton | done |
+| Phase 1: event-driven backtester with costs and Guard rules | next |
 | Phase 2: ML forecasts and intraday execution timing | planned |
 | Phase 3: paper trading on Interactive Brokers | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
-Nothing below the "in progress" line exists yet.
+Nothing from Phase 1 onwards exists yet.
 
 ## How it works
 
