@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import polars as pl
 
+PRICE_COLUMNS = ("open", "high", "low", "close")
+
 
 @dataclass(frozen=True)
 class Issue:
@@ -23,11 +25,30 @@ class ValidationReport:
 
 def validate_prices(df: pl.DataFrame) -> ValidationReport:
     issues: list[Issue] = []
+    issues.extend(_check_missing_values(df))
     issues.extend(_check_equal_row_counts(df))
     issues.extend(_check_duplicate(df))
     issues.extend(_check_positive_prices(df))
+    issues.extend(_check_ohlc_consistency(df))
+    issues.extend(_check_volume(df))
     issues.extend(_check_constant_series(df))
     return ValidationReport(issues=tuple(issues))
+
+
+def _check_missing_values(df: pl.DataFrame) -> list[Issue]:
+    missing = df.filter(
+        pl.any_horizontal(pl.all().is_null())
+        | pl.any_horizontal(pl.col(PRICE_COLUMNS).is_nan())
+    )
+    if missing.is_empty():
+        return []
+    return [
+        Issue(
+            check="missing_values",
+            detail=f"{len(missing)} rows with an empty or NaN value",
+            severity="error",
+        )
+    ]
 
 
 def _check_equal_row_counts(df: pl.DataFrame) -> list[Issue]:
@@ -62,13 +83,47 @@ def _check_duplicate(df: pl.DataFrame) -> list[Issue]:
 
 
 def _check_positive_prices(df: pl.DataFrame) -> list[Issue]:
-    positive_prices = df.filter(pl.col("close") <= 0)
+    positive_prices = df.filter(pl.min_horizontal(PRICE_COLUMNS) <= 0)
     if len(positive_prices) == 0:
         return []
     return [
         Issue(
             check="positive_prices",
             detail=f"{len(positive_prices)} rows with non-positive prices",
+            severity="error",
+        )
+    ]
+
+
+def _check_ohlc_consistency(df: pl.DataFrame) -> list[Issue]:
+    # The same rule as the Bar event: low <= open, close <= high.
+    broken = df.filter(
+        (pl.col("low") > pl.min_horizontal("open", "close"))
+        | (pl.col("high") < pl.max_horizontal("open", "close"))
+    )
+    if broken.is_empty():
+        return []
+    first = broken.row(0, named=True)
+    return [
+        Issue(
+            check="ohlc_consistency",
+            detail=(
+                f"{len(broken)} rows where open or close is outside low..high, "
+                f"first {first['ticker']} on {first['date']}"
+            ),
+            severity="error",
+        )
+    ]
+
+
+def _check_volume(df: pl.DataFrame) -> list[Issue]:
+    negative = df.filter(pl.col("volume") < 0)
+    if negative.is_empty():
+        return []
+    return [
+        Issue(
+            check="volume",
+            detail=f"{len(negative)} rows with negative volume",
             severity="error",
         )
     ]
