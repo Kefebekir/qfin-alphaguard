@@ -6,7 +6,7 @@ week alongside university.
 
 ## Where we are
 
-**Phase 0, step 4 is next:** `guard.yaml` and its loader.
+**Phase 0, step 6 is next:** CLI subcommands.
 
 | Phase 0 step | State |
 | --- | --- |
@@ -14,9 +14,9 @@ week alongside university.
 | 2. Rewrite the README around the new plan | done, #1 |
 | 3. Event types in `events.py`, with tests | done, #2 |
 | `CLAUDE.md` with the working agreement | done, #3 |
-| 4. `guard.yaml` + `guard/config.py`: loader and validation; Efe writes the validation | next |
+| 4. `guard.yaml` + `guard/config.py`: loader and validation; Efe writes the validation | done, #5 |
 | 5. Architecture, roadmap and decision records in `docs/` | done, #4 |
-| 6. CLI subcommands (`qfin ingest`, `plan`, `backtest`); update the AWS task definition and the CI `docker run` step in the same commit | to do |
+| 6. CLI subcommands (`qfin ingest`, `plan`, `backtest`); update the AWS task definition and the CI `docker run` step in the same commit | next |
 
 Outside the code: open the IBKR live account early. The paper account is tied
 to it and approval can take time.

@@ -1,0 +1,15 @@
+# Risk limits for Guard. Change only by hand, through a commit; never from
+# code or a model. Every key is required and an unknown key is an error, so a
+# typo cannot switch a rule off.
+
+allow_short: false             # no short selling
+max_weight: 0.25               # one stock is at most 25% of the portfolio
+max_gross_exposure: 1.0        # no leverage
+max_order_usd: 2000            # largest single order
+price_collar_bps: 50           # limit price within 0.5% of the last price
+max_orders_per_min: 10         # stops order storms
+max_trades_per_symbol_day: 3   # at most 3 orders per stock per day
+no_same_day_reversal: true     # no opposite-direction order in a stock on the same day
+daily_loss_limit_pct: 2.0      # no new orders after a 2% intraday loss
+stale_data_sec: 15             # no trading on data older than 15 seconds
+live_trading: false            # set to true by hand for a live account

@@ -14,6 +14,7 @@ dependencies = [
     "numpy>=2.5.3",
     "polars>=1.44.2",
     "pyarrow>=25.0.1",
+    "pyyaml>=6.0.3",
     "scikit-learn>=1.9.1",
     "yfinance>=1.7.0",
 ]

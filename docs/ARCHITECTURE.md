@@ -116,8 +116,10 @@ send a child order when u_i,t ≥ θ(t)
 ## Risk file
 
 Only Efe changes this file, by hand and through a commit. The Python Guard,
-the C++ Guard and the FPGA gate all read the same file. (Added in Phase 0,
-step 4.)
+the C++ Guard and the FPGA gate all read the same file: `guard.yaml` at the
+repository root, loaded by `src/qfin_alphaguard/guard/config.py`. Every
+setting is required, an unknown or repeated setting is an error, and every
+value is checked for type and range before the engine may trade.
 
 ```yaml
 allow_short: false             # no short selling
