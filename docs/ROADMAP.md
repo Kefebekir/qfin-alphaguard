@@ -1,0 +1,215 @@
+# Roadmap
+
+Every phase ends with something that runs and an up-to-date README. A phase
+starts only after the previous gate is passed. Dates assume about ten hours a
+week alongside university.
+
+## Where we are
+
+**Phase 0, step 4 is next:** `guard.yaml` and its loader.
+
+| Phase 0 step | State |
+| --- | --- |
+| 1. Clean up template leftovers and encodings | done, #1 |
+| 2. Rewrite the README around the new plan | done, #1 |
+| 3. Event types in `events.py`, with tests | done, #2 |
+| `CLAUDE.md` with the working agreement | done, #3 |
+| 4. `guard.yaml` + `guard/config.py`: loader and validation; Efe writes the validation | next |
+| 5. Architecture, roadmap and decision records in `docs/` | done, #4 |
+| 6. CLI subcommands (`qfin ingest`, `plan`, `backtest`); update the AWS task definition and the CI `docker run` step in the same commit | to do |
+
+Outside the code: open the IBKR live account early. The paper account is tied
+to it and approval can take time.
+
+## Goal and evidence
+
+The goal is net profit after costs and tax, beating an equal-weight
+buy-and-hold of the same stocks and an S&P 500 UCITS ETF at similar risk.
+
+Showing that a result is not luck needs a t-statistic of about 2. With an
+annual Sharpe ratio SR over T years, t ≈ SR·√T, so T ≈ (2 / SR)²: about four
+years of live trading for a Sharpe of 1. Evidence therefore comes in layers:
+
+1. **Long out-of-sample walk-forward backtests**, costs included. This is the
+   main evidence.
+2. **Paper trading** shows the live system can earn what the backtest earns;
+   wrong fills, delays and data errors quietly destroy backtest profits.
+3. **Small real money** confirms live results stay inside the backtest's
+   expected range (the 5–95% band of same-length backtest periods), and
+   capital grows by rule:
+   - start with a small part of the planned capital;
+   - every three months, step up if the net result is inside the expected
+     range and Guard reported no incidents;
+   - stop and investigate if the drawdown exceeds 1.5 times the largest
+     backtest drawdown, or results fall below the range.
+
+The answer may be "no edge". The stop rules then end trading without a large
+loss, and the project keeps its engineering value.
+
+## Phases
+
+### Phase 0: Scope and skeleton (8–18 October 2026)
+
+Fix the decisions and build the skeleton (steps above).
+
+- Time scale: a nightly plan plus intraday timing on 1-minute bars.
+- Universe: 8–10 liquid US stocks (see `decisions/0004`).
+
+**Gate M0:** CI green; README describes the new design; `events.py` and
+`guard.yaml` tested.
+
+### Phase 1: Event-driven backtester (19 October – 6 December 2026)
+
+Run the nightly plan and intraday timing end to end on history, without ML.
+
+- [ ] Data: yfinance keeps all daily history but only 30 days of 1-minute bars
+      and 730 days of hourly bars. Build the intraday mechanism on hourly bars
+      first; use IBKR history for long 1-minute data.
+- [ ] Store OHLCV, not only closes: fills at the next bar's open need it.
+- [ ] Universe rule written down, and its survivorship bias stated in the report.
+- [ ] Exchange calendar with holidays and half days; all timestamps UTC.
+- [ ] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1.
+- [ ] Split- and dividend-adjusted prices.
+- [ ] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
+- [ ] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance; no
+      trade below `band_pct`.
+- [ ] Timing without ML: equal-spaced child orders.
+- [ ] Cost model: commission and FX for the chosen broker, plus spread and slippage.
+- [ ] Guard rules applied in the backtest too.
+- [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
+      buy-and-hold and equal-weight baselines.
+
+**Gate M1:** one command produces the same report from the same inputs every
+time; results after costs compared with the baselines.
+
+### Phase 2: Alpha AI v1 (7 December 2026 – 31 January 2027)
+
+Prove whether ML adds anything after costs. Slower during January exams.
+
+- [ ] Two targets: next-day return and volatility (for the optimiser); the
+      direction of the next 30 minutes (for timing).
+- [ ] Purged walk-forward: drop training samples whose target horizon overlaps
+      the test period, with an embargo before it.
+- [ ] Ridge and logistic regression first, then LightGBM; deep models only if
+      they beat both.
+- [ ] Feature parity test: batch and incremental calculations agree.
+- [ ] Model registry (version, training date, data range) and a
+      champion/challenger rule.
+- [ ] Health check: if the score distribution drifts, fall back to timing without ML.
+
+**Gate M2:** two reports. Nightly model: Sharpe after costs against the plan
+without ML. Intraday model: execution cost against equal-spaced timing. "ML
+adds nothing" is a valid result; that part then runs without ML.
+
+### Phase 3: Paper trading (February – May 2027)
+
+Prove the live system behaves like the backtest. Eight weeks cannot prove
+profit; this phase asks whether the system works correctly.
+
+- [ ] Always-on server, IB Gateway with IBC for automatic login and restarts,
+      alerts, and the `live_trading` lock.
+- [ ] IBKR paper account and `ib_async`.
+- [ ] Live data: 5-second bars into 1-minute bars (at most 60 new bar requests
+      per 10 minutes).
+- [ ] Order state machine: new → sent → acknowledged → partial → filled /
+      cancelled / rejected; a unique client order id per order.
+- [ ] Guard live: every rule, halt and kill switch.
+- [ ] Reconciliation at open and close: broker positions equal engine positions.
+- [ ] Chaos tests: lost connection, stale data, rejected orders; the system
+      stops safely.
+- [ ] Daily report: PnL, slippage, deviation from backtest.
+- [ ] At least 8 weeks of uninterrupted running (April–May).
+
+**Gate M3:** replaying the same days reproduces at least 95% of paper
+decisions; measured slippage stays inside the cost model; no manual fix needed
+for 8 weeks.
+
+### Phase 3b: Small real money and scaling (June 2027 onwards)
+
+- [ ] Broker and account type (ISA or general, cash or margin).
+- [ ] Starting capital: a small part of the plan, an amount Efe can afford to lose.
+- [ ] `live_trading: true` only in this phase, set by hand.
+- [ ] Monthly report: net return, difference from benchmarks, expected range,
+      slippage, Guard events.
+- [ ] Scaling and stop rules (above).
+
+**Gate M3b (end of November 2027):** six months of live results inside the
+expected range, no stop rule triggered; capital steps up one level.
+
+### Phase 4: C++ engine (June – September 2027)
+
+Move the live path to C++ and measure it. Moves to September–December if a
+summer internship takes priority.
+
+- [ ] C++20, CMake, GoogleTest; IBKR TWS API C++ client.
+- [ ] C++ copies of the features and Guard, reading the same `guard.yaml`.
+- [ ] ML inference through ONNX Runtime.
+- [ ] Golden test: a recorded trading day gives identical decisions in Python and C++.
+- [ ] Benchmark bar-to-decision latency: median, p99, p99.9.
+
+**Gate M4:** the C++ engine replaces the Python engine on the paper account,
+with identical decisions and a measured latency table.
+
+### Phase 5: FPGA (foundations November 2026 – March 2027; main work October 2027 – March 2028)
+
+- [ ] 5a Foundations, 1–2 hours a week: counter, FSM, UART, PC ↔ FPGA data.
+- [ ] 5b Risk gate: order size and position checks, approve or reject over UART.
+- [ ] 5c Streaming features: returns, EMA, variance; fixed-point error analysis.
+- [ ] 5d Ethernet/UDP receive, ITCH parser, top of book.
+- [ ] 5e Benchmark: the same ITCH file through C++ and the FPGA; latency,
+      throughput, jitter, resource use.
+- [ ] A cocotb testbench for every module, bit-exact against the C++ model.
+
+**Gate M5:** measurement table, resource report, README with the design and results.
+
+### Phase 6: Optional (April – June 2028)
+
+- [ ] `research/quantum`: classical solver against QAOA on the same problem and time budget.
+- [ ] Intraday tilt experiment, with separate, small capital.
+- [ ] Custom PCB.
+
+## Tests that prove the system works
+
+| Test | Proves | Phase |
+| --- | --- | --- |
+| Point-in-time | no feature sees the future | 1 |
+| Determinism | same data and settings give the same backtest output (hash) | 1 |
+| Rule violation | every Guard rule fires on a case that breaks it | 1 |
+| Feature parity | batch and incremental calculations agree | 2 |
+| Walk-forward | ML is measured only on unseen data | 2 |
+| Chaos | lost connection, stale data, rejects and partial fills stop the system safely | 3 |
+| Cost calibration | backtest slippage matches what paper trading measures | 3 |
+| Replay | a recorded live day gives the same decisions again | 3 |
+| Golden model (C++) | the C++ engine decides like the Python engine | 4 |
+| Golden model (FPGA) | FPGA output matches C++ bit for bit | 5 |
+
+**Benchmark rules.** Same input file and order; no timing on the warm-up run;
+at least 10⁶ messages; report median, p99, p99.9 and a histogram. On the CPU,
+pin the process to one core, use a monotonic clock, and record compiler
+settings and hardware. On the FPGA, count cycles on the board and report the
+PC ↔ board transfer time separately.
+
+## Risks
+
+| Risk | Sign | Mitigation |
+| --- | --- | --- |
+| Scope creep | new layers before a phase ends | no phase starts before its gate; see Out of scope |
+| No edge | after costs, results do not beat the benchmarks | no real money; stop rules |
+| Overfitting | great backtest, poor paper results | purged walk-forward, simple models, no-ML baseline |
+| Underestimated costs | gross profit, net loss | cost model from Phase 1; orders of at least 1,000 USD |
+| Account and regulatory rules | intraday and settlement limits | US stocks; no same-day reversals; check IBKR rules before Phase 3b |
+| Broker API limits | rate limits, market orders only on some brokers | start on IBKR; test any other broker on its demo first |
+| Data quality | missing bars, split errors | validation layer, stale-data rule |
+| Optimistic paper fills | good on paper, worse live | conservative cost model; re-measure slippage in the first live month |
+| Broker connection | Gateway drops, subscriptions to renew | IBC, halt, reconciliation at open and close |
+| University workload | pauses in January and May–June | passive work then: monitoring, reading, FPGA basics |
+| FPGA learning curve | weeks stuck in simulation | small modules, testbench first, start 5a early |
+
+## Out of scope
+
+- High-frequency trading, co-location and direct market access.
+- Leverage, short selling and options.
+- Same-day opposite-direction trades (intraday tilt); possible as a Phase 6 experiment.
+- An LLM layer.
+- Quantum optimisation in the live path; only offline research.
+- A custom PCB before Phase 6.
