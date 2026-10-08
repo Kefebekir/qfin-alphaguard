@@ -6,12 +6,15 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 2 is next:** the universe rule.
+**Phase 1, step 2b is next:** daily bars from EODHD for every S&P 500 member
+since 2015.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
 | 1. Daily OHLCV bars, split- and dividend-adjusted, with validation | Claude | done, #7 |
-| 2. Universe rule: 8–10 stocks, written down, survivorship bias stated (decision 0005) | Efe decides, Claude drafts | next |
+| 2a. Universe rule (decision 0005) and S&P 500 membership by date | Efe decided, Claude wrote | done, #8 |
+| 2b. Daily bars from EODHD for every member since 2015, stocks that left included | Claude | next |
+| 2c. Trading universe: the N most liquid members, chosen each 1 January | Claude; Efe sets N | to do |
 | 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | to do |
 | 4. Hourly bars (yfinance keeps 730 days) as `Bar` events | Claude | to do |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |

@@ -39,8 +39,10 @@ The system runs three loops at three speeds:
    order size limits, a price collar, no same-day reversals and a daily loss limit.
    Guard is a rule-based referee, not a model, and its limits change only by hand.
 
-The universe is a small set of liquid US stocks. UK retail accounts cannot buy
-US-domiciled ETFs, so single stocks are used instead.
+Research and the models use the S&P 500 as it was on each day, including
+companies that later left the index; the system trades the most liquid of these
+stocks. UK retail accounts cannot buy US-domiciled ETFs, so single stocks are
+used instead.
 
 ### Design choices
 

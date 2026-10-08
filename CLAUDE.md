@@ -54,7 +54,8 @@ Both ruff commands must pass before a commit.
   backtester and the live engine
 - `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that
   loads and checks them
-- `src/qfin_alphaguard/data/`: download, validation, Parquet and DuckDB
+- `src/qfin_alphaguard/data/`: download, validation, S&P 500 membership by date,
+  Parquet and DuckDB
 - `src/qfin_alphaguard/features/`, `estimation/`, `optimize/`: returns,
   covariance and the optimiser
 - `infra/aws/`: the nightly ECS Fargate job that runs `qfin`
