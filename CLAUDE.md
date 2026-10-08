@@ -10,6 +10,15 @@ intraday engine decides every minute when to execute the changes, and every
 order is checked against explicit risk rules (Guard) before it reaches the
 broker. `README.md` describes the design and the current status.
 
+## Plan and status
+
+- `docs/ROADMAP.md`: phases, gates and **where we are now**. Read its "Where
+  we are" section at the start of a session; update it when a step is done.
+- `docs/ARCHITECTURE.md`: the three loops, data flow, execution logic, the risk
+  file and the FPGA's role.
+- `docs/decisions/`: why the big choices were made. Add a new numbered record
+  instead of silently changing a decision.
+
 ## Working agreement
 
 Efe owns this project and must be able to explain every line of it in an

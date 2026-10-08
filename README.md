@@ -58,6 +58,9 @@ US-domiciled ETFs, so single stocks are used instead.
   will be compared with classical solvers offline. It is not part of the trading
   system.
 
+More detail: [architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md)
+and [decision records](docs/decisions/).
+
 ## What counts as success
 
 - Net of costs and tax, beat an equal-weight buy-and-hold of the same stocks and an
