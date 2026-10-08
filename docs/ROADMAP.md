@@ -6,7 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 0, step 6 is next:** CLI subcommands.
+**Phase 0 is done and Gate M0 is met.** Phase 1, the event-driven
+backtester, is next.
 
 | Phase 0 step | State |
 | --- | --- |
@@ -16,7 +17,7 @@ week alongside university.
 | `CLAUDE.md` with the working agreement | done, #3 |
 | 4. `guard.yaml` + `guard/config.py`: loader and validation; Efe writes the validation | done, #5 |
 | 5. Architecture, roadmap and decision records in `docs/` | done, #4 |
-| 6. CLI subcommands (`qfin ingest`, `plan`, `backtest`); update the AWS task definition and the CI `docker run` step in the same commit | next |
+| 6. CLI subcommands (`qfin ingest`, `plan`, `backtest`); update the AWS task definition and the CI `docker run` step in the same commit | done, #6 |
 
 Outside the code: open the IBKR live account early. The paper account is tied
 to it and approval can take time.

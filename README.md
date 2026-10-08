@@ -16,15 +16,15 @@ exactly what works today and what does not.
 | Data layer: daily prices, validation, Parquet, DuckDB | done |
 | Docker image and scheduled AWS run | done |
 | Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
-| Phase 0: event types, risk configuration, repository skeleton | in progress |
-| Phase 1: event-driven backtester with costs and Guard rules | planned |
+| Phase 0: event types, risk configuration, repository skeleton | done |
+| Phase 1: event-driven backtester with costs and Guard rules | next |
 | Phase 2: ML forecasts and intraday execution timing | planned |
 | Phase 3: paper trading on Interactive Brokers | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
-Nothing below the "in progress" line exists yet.
+Nothing from Phase 1 onwards exists yet.
 
 ## How it works
 
@@ -103,10 +103,10 @@ uv sync
 uv run pytest
 
 # run the data pipeline on generated data (no network needed)
-uv run qfin --synthetic
+uv run qfin ingest --synthetic
 
 # run it on real market data
-uv run qfin
+uv run qfin ingest
 ```
 
 ## Deployment
@@ -116,8 +116,8 @@ The data pipeline runs on AWS every weekday morning:
 - The Docker image is stored in **Amazon ECR**.
 - **EventBridge Scheduler** starts it as an **ECS Fargate** task at 06:45 London
   time, Tuesday to Saturday, so each run picks up the previous trading day's close.
-- The task downloads prices, validates them, and writes Parquet to **S3** (with
-  versioning, so every day's file is kept).
+- The task runs `qfin ingest`: it downloads prices, validates them and writes
+  Parquet to **S3** (with versioning, so every day's file is kept).
 - Logs go to **CloudWatch Logs**.
 - Each component has its own IAM role with the minimum permissions it needs: the
   task can only write under `data/` in one bucket, and the scheduler can only start

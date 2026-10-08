@@ -15,7 +15,7 @@
       "name": "qfin",
       "image": "ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/qfin-alphaguard:latest",
       "essential": true,
-      "command": ["--s3-bucket", "qfin-alphaguard-kefebekir"],
+      "command": ["ingest", "--s3-bucket", "qfin-alphaguard-kefebekir"],
       "environment": [
         { "name": "AWS_REGION", "value": "eu-north-1" }
       ],
