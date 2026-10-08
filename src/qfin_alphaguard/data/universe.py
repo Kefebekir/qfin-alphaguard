@@ -39,6 +39,10 @@ class Membership:
     def contains(self, day: date) -> bool:
         return self.start <= day and (self.end is None or day < self.end)
 
+    def overlaps(self, first: date, last: date) -> bool:
+        """In the index on at least one day from `first` to `last`."""
+        return self.start <= last and (self.end is None or self.end > first)
+
 
 @dataclass(frozen=True)
 class IndexHistory:
@@ -79,12 +83,15 @@ class IndexHistory:
         if last < first:
             raise ValueError(f"last ({last}) is before first ({first})")
         return tuple(
+            sorted({span.ticker for span in self.spans if span.overlaps(first, last)})
+        )
+
+    def spans_of(self, ticker: str) -> tuple[Membership, ...]:
+        """Every stretch of `ticker` in the index, oldest first."""
+        return tuple(
             sorted(
-                {
-                    span.ticker
-                    for span in self.spans
-                    if span.start <= last and (span.end is None or span.end > first)
-                }
+                (span for span in self.spans if span.ticker == ticker),
+                key=lambda span: span.start,
             )
         )
 

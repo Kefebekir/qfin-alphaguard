@@ -44,6 +44,13 @@ def test_close_above_the_high_has_error():
     assert "ohlc_consistency" in errors(validate_prices(broken))
 
 
+def test_infinite_adjustment_has_error():
+    # adjusted close / close is infinite when EODHD reports a close of zero
+    df = load_prices(Config(synthetic=True))
+    broken = set_first_row(df, "adjustment", float("inf"))
+    assert "positive_prices" in errors(validate_prices(broken))
+
+
 def test_nan_price_has_error():
     broken = set_first_row(load_prices(Config(synthetic=True)), "open", float("nan"))
     assert "missing_values" in errors(validate_prices(broken))
@@ -65,6 +72,8 @@ def test_constant_series_is_flagged():
             "low": [100.0] * 3,
             "close": [100.0] * 3,
             "volume": [1000] * 3,
+            "adjustment": [1.0] * 3,
+            "sp500": [True] * 3,
         }
     )
     report = validate_prices(df)

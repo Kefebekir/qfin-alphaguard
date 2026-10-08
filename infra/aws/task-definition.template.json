@@ -19,6 +19,12 @@
       "environment": [
         { "name": "AWS_REGION", "value": "eu-north-1" }
       ],
+      "secrets": [
+        {
+          "name": "EODHD_API_KEY",
+          "valueFrom": "arn:aws:ssm:eu-north-1:ACCOUNT_ID:parameter/qfin/eodhd-api-key"
+        }
+      ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {

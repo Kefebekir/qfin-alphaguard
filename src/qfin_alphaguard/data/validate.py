@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import polars as pl
 
 PRICE_COLUMNS = ("open", "high", "low", "close")
+# Prices and the split and dividend factor must all be finite and positive.
+POSITIVE_COLUMNS = (*PRICE_COLUMNS, "adjustment")
 
 
 @dataclass(frozen=True)
@@ -38,7 +40,7 @@ def validate_prices(df: pl.DataFrame) -> ValidationReport:
 def _check_missing_values(df: pl.DataFrame) -> list[Issue]:
     missing = df.filter(
         pl.any_horizontal(pl.all().is_null())
-        | pl.any_horizontal(pl.col(PRICE_COLUMNS).is_nan())
+        | pl.any_horizontal(pl.col(POSITIVE_COLUMNS).is_nan())
     )
     if missing.is_empty():
         return []
@@ -83,13 +85,19 @@ def _check_duplicate(df: pl.DataFrame) -> list[Issue]:
 
 
 def _check_positive_prices(df: pl.DataFrame) -> list[Issue]:
-    positive_prices = df.filter(pl.min_horizontal(PRICE_COLUMNS) <= 0)
+    positive_prices = df.filter(
+        (pl.min_horizontal(POSITIVE_COLUMNS) <= 0)
+        | pl.any_horizontal(pl.col(POSITIVE_COLUMNS).is_infinite())
+    )
     if len(positive_prices) == 0:
         return []
     return [
         Issue(
             check="positive_prices",
-            detail=f"{len(positive_prices)} rows with non-positive prices",
+            detail=(
+                f"{len(positive_prices)} rows with a price or adjustment that is "
+                "zero, negative or infinite"
+            ),
             severity="error",
         )
     ]

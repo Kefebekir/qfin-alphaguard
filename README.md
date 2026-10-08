@@ -85,15 +85,16 @@ Two things I care about more than the results:
 
 ## Known limitations
 
-- **Survivorship bias.** The ticker list contains companies that still exist and
-  are large today. Companies that were large in 2015 but later failed are not
-  included, so any backtest on this universe will look better than it would have
-  in real time.
+- **Survivorship bias, mostly removed.** The data covers every stock that was in
+  the S&P 500 on each day since 2015, including companies that were later bought
+  or delisted. What remains: the membership history is kept by one person rather
+  than S&P, and stocks outside the S&P 500 are not covered.
 - **Daily bars only.** The data layer stores daily open, high, low, close and
   volume. Intraday bars come later in Phase 1.
 - **Adjusted prices are not point-in-time.** Prices are adjusted for splits and
   dividends, so an old price differs from the one quoted on that day. Returns are
-  right, but share counts and order sizes in a backtest are approximate.
+  right; dividing by the `adjustment` column gives the price as traded, for share
+  counts and commissions.
 - **Synthetic calendar.** Generated data includes market holidays; real data does
   not. This only affects tests, not results.
 
@@ -110,8 +111,8 @@ uv run pytest
 # run the data pipeline on generated data (no network needed)
 uv run qfin ingest --synthetic
 
-# run it on real market data
-uv run qfin ingest
+# run it on real market data: needs an EODHD API key in .env (EODHD_API_KEY=...)
+uv run --env-file .env qfin ingest
 ```
 
 ## Deployment
@@ -121,12 +122,15 @@ The data pipeline runs on AWS every weekday morning:
 - The Docker image is stored in **Amazon ECR**.
 - **EventBridge Scheduler** starts it as an **ECS Fargate** task at 06:45 London
   time, Tuesday to Saturday, so each run picks up the previous trading day's close.
-- The task runs `qfin ingest`: it downloads prices, validates them and writes
-  Parquet to **S3** (with versioning, so every day's file is kept).
+- The task runs `qfin ingest`: it downloads daily prices from **EODHD** for every
+  stock that has been in the S&P 500 since 2015, validates them and writes Parquet
+  to **S3** (with versioning, so every day's file is kept).
+- The EODHD key is kept in **SSM Parameter Store** and handed to the task as a
+  secret.
 - Logs go to **CloudWatch Logs**.
 - Each component has its own IAM role with the minimum permissions it needs: the
-  task can only write under `data/` in one bucket, and the scheduler can only start
-  this one task.
+  task can only write under `data/` in one bucket, ECS can read only the EODHD key,
+  and the scheduler can only start this one task.
 
 IAM policies and the task definition template are in `infra/aws/`.
 
