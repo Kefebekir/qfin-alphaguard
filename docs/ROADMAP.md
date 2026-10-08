@@ -79,6 +79,12 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Exchange calendar with holidays and half days; all timestamps UTC.
 - [ ] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1.
 - [x] Split- and dividend-adjusted prices.
+- [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
+      WYND → TNL, CDAY → DAY, ARNC → HWM) so their earlier index years have
+      prices; with a few acquired companies EODHD lacks, about 0.67% of
+      member-days have no prices today.
+- [ ] Speed up the nightly download, 17 minutes for 767 codes: parallel
+      requests or EODHD's bulk end-of-day endpoint.
 - [ ] Backtests read the stored Parquet file, never a fresh download: two
       yfinance downloads of the same history can differ in the fifth decimal.
 - [ ] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
