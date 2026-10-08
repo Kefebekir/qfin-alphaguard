@@ -89,16 +89,25 @@ class EodhdClient:
         close. All four prices are scaled by adjusted close / close, kept as
         `adjustment`, so the price as traded is the adjusted price divided by
         it. Volume comes adjusted for splits already.
+
+        Days without trades are dropped: EODHD repeats the last price with zero
+        volume on them, for example for weeks after a delisting.
         """
         rows = self._get(
             f"eod/{code}.US", **{"from": start.isoformat(), "to": end.isoformat()}
         )
         if not rows:
             return pl.DataFrame(schema=BARS_SCHEMA)
-        traded = pl.DataFrame(rows, infer_schema_length=None).select(
-            pl.col("date").str.to_date(),
-            pl.col("open", "high", "low", "close", "adjusted_close").cast(pl.Float64),
-            pl.col("volume").cast(pl.Int64),
+        traded = (
+            pl.DataFrame(rows, infer_schema_length=None)
+            .select(
+                pl.col("date").str.to_date(),
+                pl.col("open", "high", "low", "close", "adjusted_close").cast(
+                    pl.Float64
+                ),
+                pl.col("volume").cast(pl.Int64),
+            )
+            .filter(pl.col("volume") > 0)
         )
         adjustment = pl.col("adjusted_close") / pl.col("close")
         return traded.select(

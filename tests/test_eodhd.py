@@ -74,6 +74,14 @@ def test_bars_are_adjusted_and_keep_the_factor():
     assert bars["ticker"].to_list() == ["NFLX", "NFLX"]
 
 
+def test_days_without_trades_are_dropped():
+    # After a delisting EODHD repeats the last price with zero volume.
+    stale = {**NFLX_ROWS[1], "date": "2025-11-18", "volume": 0}
+    eod, _ = client([*NFLX_ROWS, stale])
+    bars = eod.daily_bars("NFLX", date(2025, 11, 14), date(2025, 11, 18))
+    assert bars["date"].max() == date(2025, 11, 17)
+
+
 def test_an_unknown_code_gives_no_bars():
     eod, _ = client(404)
     bars = eod.daily_bars("NOPE", date(2025, 1, 2), date(2025, 1, 31))

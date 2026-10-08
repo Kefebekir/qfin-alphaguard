@@ -7,6 +7,8 @@ import polars as pl
 PRICE_COLUMNS = ("open", "high", "low", "close")
 # Prices and the split and dividend factor must all be finite and positive.
 POSITIVE_COLUMNS = (*PRICE_COLUMNS, "adjustment")
+# A one-day move this large is rare enough to look at every time it happens.
+LARGE_MOVE = 0.5
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,7 @@ def validate_prices(df: pl.DataFrame) -> ValidationReport:
     issues.extend(_check_ohlc_consistency(df))
     issues.extend(_check_volume(df))
     issues.extend(_check_constant_series(df))
+    issues.extend(_check_large_moves(df))
     return ValidationReport(issues=tuple(issues))
 
 
@@ -145,6 +148,33 @@ def _check_constant_series(df: pl.DataFrame) -> list[Issue]:
         Issue(
             check="constant_series",
             detail=f"{len(constant_series.filter(pl.col('close') == 1))} tickers with constant price series",
+            severity="warning",
+        )
+    ]
+
+
+def _check_large_moves(df: pl.DataFrame) -> list[Issue]:
+    # Most are real (SVB fell 60% on 9 March 2023), but a bad price looks the
+    # same, so the latest one is named for a person to check.
+    moves = (
+        df.sort(["ticker", "date"])
+        .with_columns(
+            (pl.col("close") / pl.col("close").shift(1).over("ticker") - 1).alias(
+                "move"
+            )
+        )
+        .filter(pl.col("sp500") & (pl.col("move").abs() > LARGE_MOVE))
+    )
+    if moves.is_empty():
+        return []
+    latest = moves.sort("date").row(-1, named=True)
+    return [
+        Issue(
+            check="large_moves",
+            detail=(
+                f"{len(moves)} index-member days moved more than {LARGE_MOVE:.0%} "
+                f"in a day; latest {latest['ticker']} on {latest['date']}"
+            ),
             severity="warning",
         )
     ]
