@@ -1,6 +1,6 @@
 # 0004: Trade a small universe of liquid US single stocks
 
-- **Status:** accepted
+- **Status:** accepted; the number of stocks is replaced by 0005
 - **Date:** 2026-10-07
 
 ## Context
