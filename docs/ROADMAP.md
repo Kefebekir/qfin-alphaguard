@@ -6,18 +6,23 @@ week alongside university.
 
 ## Where we are
 
-**Phase 0 is done and Gate M0 is met.** Phase 1, the event-driven
-backtester, is next.
+**Phase 1, step 2 is next:** the universe rule.
 
-| Phase 0 step | State |
-| --- | --- |
-| 1. Clean up template leftovers and encodings | done, #1 |
-| 2. Rewrite the README around the new plan | done, #1 |
-| 3. Event types in `events.py`, with tests | done, #2 |
-| `CLAUDE.md` with the working agreement | done, #3 |
-| 4. `guard.yaml` + `guard/config.py`: loader and validation; Efe writes the validation | done, #5 |
-| 5. Architecture, roadmap and decision records in `docs/` | done, #4 |
-| 6. CLI subcommands (`qfin ingest`, `plan`, `backtest`); update the AWS task definition and the CI `docker run` step in the same commit | done, #6 |
+| Phase 1 step | Core logic by | State |
+| --- | --- | --- |
+| 1. Daily OHLCV bars, split- and dividend-adjusted, with validation | Claude | done, #7 |
+| 2. Universe rule: 8–10 stocks, written down, survivorship bias stated (decision 0005) | Efe decides, Claude drafts | next |
+| 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | to do |
+| 4. Hourly bars (yfinance keeps 730 days) as `Bar` events | Claude | to do |
+| 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |
+| 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |
+| 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
+| 8. Timing without ML: equal-spaced child orders | Efe | to do |
+| 9. Guard rules in the backtest | Efe | to do |
+| 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
+
+Phase 0 is done and Gate M0 is met (#1–#6): cleanup, README, event types,
+`CLAUDE.md`, `guard.yaml` and its loader, docs, CLI subcommands.
 
 Outside the code: open the IBKR live account early. The paper account is tied
 to it and approval can take time.
@@ -66,11 +71,13 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Data: yfinance keeps all daily history but only 30 days of 1-minute bars
       and 730 days of hourly bars. Build the intraday mechanism on hourly bars
       first; use IBKR history for long 1-minute data.
-- [ ] Store OHLCV, not only closes: fills at the next bar's open need it.
+- [x] Store OHLCV, not only closes: fills at the next bar's open need it.
 - [ ] Universe rule written down, and its survivorship bias stated in the report.
 - [ ] Exchange calendar with holidays and half days; all timestamps UTC.
 - [ ] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1.
-- [ ] Split- and dividend-adjusted prices.
+- [x] Split- and dividend-adjusted prices.
+- [ ] Backtests read the stored Parquet file, never a fresh download: two
+      yfinance downloads of the same history can differ in the fifth decimal.
 - [ ] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
 - [ ] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance; no
       trade below `band_pct`.
