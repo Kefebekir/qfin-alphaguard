@@ -13,4 +13,4 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pytest -q
       - run: docker build -t qfin-alphaguard .
-      - run: docker run --rm qfin-alphaguard --synthetic
+      - run: docker run --rm qfin-alphaguard ingest --synthetic

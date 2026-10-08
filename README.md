@@ -103,10 +103,10 @@ uv sync
 uv run pytest
 
 # run the data pipeline on generated data (no network needed)
-uv run qfin --synthetic
+uv run qfin ingest --synthetic
 
 # run it on real market data
-uv run qfin
+uv run qfin ingest
 ```
 
 ## Deployment
@@ -116,8 +116,8 @@ The data pipeline runs on AWS every weekday morning:
 - The Docker image is stored in **Amazon ECR**.
 - **EventBridge Scheduler** starts it as an **ECS Fargate** task at 06:45 London
   time, Tuesday to Saturday, so each run picks up the previous trading day's close.
-- The task downloads prices, validates them, and writes Parquet to **S3** (with
-  versioning, so every day's file is kept).
+- The task runs `qfin ingest`: it downloads prices, validates them and writes
+  Parquet to **S3** (with versioning, so every day's file is kept).
 - Logs go to **CloudWatch Logs**.
 - Each component has its own IAM role with the minimum permissions it needs: the
   task can only write under `data/` in one bucket, and the scheduler can only start
