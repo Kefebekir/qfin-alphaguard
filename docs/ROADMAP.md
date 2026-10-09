@@ -6,16 +6,17 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 2c is next:** the trading universe, the N most liquid S&P 500
-members chosen each 1 January.
+**Phase 1, step 3 is next:** the exchange calendar. EODHD's 1-minute bars run
+from 04:00 to 20:00 New York time, so the calendar is also what keeps only the
+regular session, half days included.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
 | 1. Daily OHLCV bars, split- and dividend-adjusted, with validation | Claude | done, #7 |
 | 2a. Universe rule (decision 0005) and S&P 500 membership by date | Efe decided, Claude wrote | done, #8 |
 | 2b. Daily bars from EODHD for every member since 2015, stocks that left included | Claude | done, #9 |
-| 2c. Trading universe: the N most liquid members, chosen each 1 January | Claude; Efe sets N | next |
-| 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | to do |
+| 2c. Trading universe: the 50 most liquid members, chosen each 1 January | Claude; Efe set N = 50 | done, #10 |
+| 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | next |
 | 4. Intraday bars as `Bar` events, from EODHD intraday or IBKR history | Claude | to do |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |

@@ -42,7 +42,7 @@ least about 0.35 USD an order and its API trades whole shares only.
    exchange. Checked on the free plan before subscribing.
 3. **Trading universe:** every 1 January, the N members with the highest
    average daily dollar volume over the previous 12 months, fixed for the
-   year. N is 30 to start.
+   year. N is 30 to start (50 since 9 October 2026; see the update below).
 4. **Positions held:** set by capital, in the daily plan (Phase 1, step 7).
    Capital is not fixed yet, so backtests report results at several levels.
 5. **Broker:** IBKR stays (0002) for now. Fractional-share brokers such as
@@ -59,3 +59,33 @@ least about 0.35 USD an order and its API trades whole shares only.
   and index changes after that date are unknown until then.
 - The history is kept by one person. It matches its own full snapshot file on
   all 2,720 dates, but it is not an official S&P record.
+
+## Update, 9 October 2026: N = 50, and how the ranking works
+
+Efe set N to 50 after checking everything it touches:
+
+| Area | Check | Result |
+| --- | --- | --- |
+| Liquidity | dollar volume of the 50th stock, 2016–2026 | 512 million to 1.3 billion USD a day; our orders are negligible |
+| Turnover | names that change each January | 6–11 of 50 |
+| Live data, IBKR | at least 100 market data lines | 50 plus held positions fit |
+| Live data, EODHD | WebSocket for 50 tickers | full at 50; ask EODHD for more if Trading 212 is chosen |
+| IBKR pacing | 60 new real-time bar requests per 10 minutes | 50 at start-up fits; after a reconnect, resubscribe gradually |
+| Intraday history | 1-minute bars since 2015 | about 58 million rows: download once, then add each day |
+| Guard | `max_orders_per_min: 10` | the engine spreads orders near the deadline; depends on positions held, not on N |
+
+Settled while building the ranking (Phase 1, step 2c):
+
+- **Dollar volume at each day's traded price and share count:**
+  close / adjustment × volume / split_factor. Adjusted prices would let later
+  dividends decide earlier rankings: on 2 January 2015, dividends paid since
+  had scaled prices down by a median 16% and up to 37%. The fix changes 2–6
+  of the 50 names a year.
+- **At least 126 trading days in the previous year**, so a new listing's busy
+  first weeks cannot buy it a place.
+- **One share class per company:** of two stocks whose daily returns differ by
+  less than 0.2% on a typical day, only the more traded is kept. GOOG and
+  GOOGL differ by 0.06–0.15%; the closest different companies (KO and PEP,
+  MA and V) by 0.30% or more. A correlation threshold failed here: one bad
+  GOOG price in July 2021 pulled that year's correlation to 0.978. On
+  2016–2026 the rule drops GOOG every year and nothing else.
