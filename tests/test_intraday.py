@@ -191,6 +191,28 @@ def test_a_failed_download_is_reported_and_the_others_go_on(tmp_path):
     assert intraday_path(tmp_path, "AAA", 2025).exists()
 
 
+def test_a_year_stored_while_it_was_running_is_downloaded_again(tmp_path):
+    # Stored on 4 March 2025, when that was the latest day; 5 March came later.
+    days = [date(2025, 3, 4), date(2025, 3, 5)]
+    history = IndexHistory((span("AAA", "2000-01-03"),))
+    store(tmp_path, "AAA", 2025, [at(days[0], 20, 59)])
+    client = FakeMinuteClient({"AAA": minutes("AAA", [at(d, 20, 59) for d in days])})
+
+    done = backfill_minutes(
+        client,
+        daily("AAA", days, [100.0, 100.0]),
+        history,
+        {2025: ("AAA",)},
+        tmp_path,
+        date(2026, 10, 8),
+    )
+
+    assert client.asked == ["AAA"]
+    assert (done[0].days, done[0].trading_days) == (2, 2)
+    stored = pl.read_parquet(intraday_path(tmp_path, "AAA", 2025))
+    assert stored["start"].dt.date().to_list() == days
+
+
 def test_the_summary_counts_the_trading_days_that_have_minutes():
     # EODHD lacks some days for good: TSLA's from July 2023 to May 2024.
     days = [date(2018, 3, 5), date(2018, 3, 6), date(2018, 3, 7)]

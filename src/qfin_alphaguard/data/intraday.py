@@ -175,17 +175,20 @@ def backfill_minutes(
 ) -> list[YearOfMinutes]:
     """Store the minutes of every stock in `universes` ({year: tickers}).
 
-    Years before `last_day`'s year that already have minutes are final and
-    skipped, so an interrupted run picks up where it stopped; the current year
-    is downloaded again. A year without matching minutes gets no file and is
-    tried again next time, when its sources may be known. A download that fails
-    is reported with its error and does not stop the others.
+    Stored minutes that reach the stock's last daily bar in their year are
+    complete and skipped, so an interrupted run picks up where it stopped,
+    and a year stored while it was still running is downloaded again. Minutes
+    missing inside a year do not count: EODHD lacks some for good, and a new
+    download would not bring them. A year without matching minutes gets no
+    file and is tried again next time, when its sources may be known. A
+    download that fails is reported with its error and does not stop the
+    others.
     """
     tasks = [
         (code, year)
         for year, codes in sorted(universes.items())
         for code in codes
-        if not (year < last_day.year and _has_minutes(intraday_path(root, code, year)))
+        if not _complete(root, daily, code, year, min(date(year, 12, 31), last_day))
     ]
 
     def run(task: tuple[str, int]) -> YearOfMinutes:
@@ -252,3 +255,21 @@ def minute_feed(
 
 def _has_minutes(path: Path) -> bool:
     return path.exists() and pl.scan_parquet(path).select(pl.len()).collect().item() > 0
+
+
+def _complete(
+    root: Path, daily: pl.DataFrame, code: str, year: int, last: date
+) -> bool:
+    """Stored minutes reach the stock's last daily bar from 1 January to `last`."""
+    path = intraday_path(root, code, year)
+    if not path.exists():
+        return False
+    stored = pl.scan_parquet(path).select(pl.col("start").max()).collect().item()
+    bars = daily.filter(
+        (pl.col("ticker") == code) & pl.col("date").is_between(date(year, 1, 1), last)
+    )
+    return (
+        stored is not None
+        and not bars.is_empty()
+        and stored.date() >= bars["date"].max()
+    )
