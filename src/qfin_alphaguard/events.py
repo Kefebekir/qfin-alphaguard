@@ -169,6 +169,24 @@ class Fill:
 
 
 @dataclass(frozen=True)
+class Cancellation:
+    """An open order taken off the market.
+
+    A strategy asks for one to replace an unfilled order; the engine makes one
+    for every open order at the close, and after Guard halts trading.
+    """
+
+    client_order_id: str
+    time: datetime
+    reason: str = ""  # short note for the log, e.g. "session close"
+
+    def __post_init__(self) -> None:
+        if not self.client_order_id:
+            raise ValueError("client_order_id cannot be empty")
+        _require_utc("time", self.time)
+
+
+@dataclass(frozen=True)
 class ExecutionSettings:
     """How the engine turns a day's target change into orders."""
 
