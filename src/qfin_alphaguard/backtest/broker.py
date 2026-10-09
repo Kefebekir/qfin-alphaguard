@@ -1,11 +1,13 @@
 """What the backtest needs from a simulated broker.
 
-The simulated broker itself, with its fill rules and cost model, is Phase 1,
-step 6. The engine checks every fill it reports against the contract below and
-stops the backtest if one breaks it.
+NextBarBroker below is the simulated broker, with its fill rules and costs
+(Phase 1, step 6). The engine checks every fill it reports against the
+contract in SimulatedBroker and stops the backtest if one breaks it.
 """
 
+import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
@@ -37,3 +39,82 @@ class SimulatedBroker(Protocol):
     def on_bar(self, bar: Bar) -> Sequence[Fill]:
         """The fills this bar brings for orders in `bar.ticker`."""
         ...
+
+
+@dataclass(frozen=True)
+class CostModel:
+    """What a fill costs besides its price. Defaults: IBKR Tiered (decision 0002)."""
+
+    per_share: float = 0.0035  # USD per share, up to 300,000 shares a month
+    minimum: float = 0.35  # USD per order, paid on its first fill
+    maximum_share: float = 0.01  # commission is at most 1% of a fill's value
+    fx_bps: float = 0.0  # currency conversion: 0 when USD is held, 15 at Trading 212
+    half_spread_bps: float = 1.0  # what a marketable order pays over the traded price
+
+    def __post_init__(self) -> None:
+        for name in (
+            "per_share",
+            "minimum",
+            "maximum_share",
+            "fx_bps",
+            "half_spread_bps",
+        ):
+            value = getattr(self, name)
+            if not (math.isfinite(value) and value >= 0):
+                raise ValueError(f"{name} must be a finite number >= 0, got {value!r}")
+
+    def commission(self, quantity: int, price: float, first_fill: bool) -> float:
+        """Commission and currency conversion for one fill, in USD.
+
+        - the broker charges per_share for each share; the first fill of an
+          order pays at least `minimum`; and the commission is at most
+          maximum_share of the fill's value (quantity * price)
+        - currency conversion adds fx_bps of the fill's value on top
+        """
+        # TODO(Efe): Phase 1, step 6. tests/test_broker.py is the spec.
+        raise NotImplementedError("CostModel.commission is not written yet")
+
+
+class NextBarBroker:
+    """The simulated broker for backtests. Fills limit orders from the bars."""
+
+    def __init__(
+        self, costs: CostModel | None = None, participation: float = 0.1
+    ) -> None:
+        if not (0 < participation <= 1):
+            raise ValueError(f"participation must be in (0, 1], got {participation!r}")
+        self.costs = costs or CostModel()
+        self.participation = participation  # most of a bar's volume one order takes
+        self.waiting: dict[str, Order] = {}  # open orders by id, oldest first
+        self.filled: dict[str, int] = {}  # shares filled so far, by order id
+
+    def submit(self, order: Order) -> None:
+        self.waiting[order.client_order_id] = order
+        self.filled[order.client_order_id] = 0
+
+    def cancel(self, client_order_id: str, time: datetime) -> None:
+        del self.waiting[client_order_id]
+
+    def on_bar(self, bar: Bar) -> list[Fill]:
+        """Fills for the waiting orders in `bar.ticker`, oldest order first.
+
+        An order takes part only if it was sent at or before `bar.start`.
+
+        Price, for a buy with limit L (a sell is the mirror image):
+        - if the bar opens at or below L, the order was marketable on arrival:
+          it fills at the open plus half the spread, but never above L or above
+          the bar's high; its time is the bar's start
+        - otherwise, if the price fell below L during the bar, it fills at L;
+          its time is the bar's end
+        - a price that only touches L does not fill it: other orders wait at L
+          before ours
+
+        Quantity: what is left of the order, but at most `participation` of the
+        bar's volume, rounded down; nothing if that is 0. The rest waits.
+
+        Commission: self.costs.commission(quantity, price, first_fill), where
+        first_fill says whether this is the order's first fill. An order that
+        is completely filled stops waiting.
+        """
+        # TODO(Efe): Phase 1, step 6. tests/test_broker.py is the spec.
+        raise NotImplementedError("NextBarBroker.on_bar is not written yet")
