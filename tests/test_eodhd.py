@@ -1,11 +1,17 @@
 import io
 import json
 import urllib.error
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from qfin_alphaguard.data.eodhd import BARS_SCHEMA, EodhdClient, api_key, eodhd_code
+from qfin_alphaguard.data.eodhd import (
+    BARS_SCHEMA,
+    MINUTE_SCHEMA,
+    EodhdClient,
+    api_key,
+    eodhd_code,
+)
 
 KEY = "secret-key-123"
 
@@ -111,6 +117,32 @@ def test_gives_up_after_repeated_server_errors():
     with pytest.raises(RuntimeError, match="HTTP 500"):
         eod.daily_bars("NFLX", date(2025, 11, 14), date(2025, 11, 17))
     assert len(fake.urls) == 4
+
+
+def minute(start, close=100.0):
+    return {
+        "timestamp": int(start.timestamp()),
+        "gmtoffset": 0,
+        "datetime": start.strftime("%Y-%m-%d %H:%M:%S"),
+        "open": close,
+        "high": close,
+        "low": close,
+        "close": close,
+        "volume": 10,
+    }
+
+
+def test_minute_bars_are_asked_for_in_windows_and_come_back_in_utc():
+    bar = datetime(2026, 1, 5, 14, 30, tzinfo=UTC)
+    later = bar + timedelta(minutes=1)
+    # 2 January to 30 June is 180 days: two windows of at most 100 days.
+    eod, fake = client([minute(bar)], [minute(bar), minute(later)])
+
+    bars = eod.minute_bars("AAPL", date(2026, 1, 2), date(2026, 6, 30))
+
+    assert len(fake.urls) == 2
+    assert dict(bars.schema) == MINUTE_SCHEMA
+    assert bars["start"].to_list() == [bar, later]  # the repeated minute once
 
 
 def test_splits_are_new_shares_per_old_share():
