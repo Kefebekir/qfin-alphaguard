@@ -104,12 +104,13 @@ def _pay_for_buys(
     sale. If the buys cost more than that, every buy is multiplied by the same
     factor, available / cost of the buys (never below 0), and rounded down to
     whole shares. A buy worth less than min_trade_usd after the cut waits for
-    another day. Sales are never changed.
+    another day. Sales are never changed. With nothing to buy there is
+    nothing to cut, even when costs have taken the cash below zero.
     """
     sales = sum(-n * prices[ticker] for ticker, n in trades.items() if n < 0)
     cost = sum(n * prices[ticker] for ticker, n in trades.items() if n > 0)
     available = cash + sales
-    if cost <= available:
+    if cost == 0 or cost <= available:
         return trades
     factor = max(available, 0.0) / cost
     paid = {}

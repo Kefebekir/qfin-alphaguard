@@ -145,6 +145,14 @@ def test_a_buy_the_cut_takes_below_the_minimum_waits():
     assert trades == {"B": 390}
 
 
+def test_cash_below_zero_buys_nothing_and_never_fails():
+    # Costs can take the cash a little below zero. With nothing to buy there
+    # is nothing to cut; a buy wanted (B's edge, 43 shares) is not made.
+    assert trades_at_open(plan({"A": 1.0}), {"A": 500}, at_100("A"), -10.0) == {}
+    wants_b = plan({"A": 0.95, "B": 0.05})
+    assert trades_at_open(wants_b, {"A": 950}, at_100("A", "B"), -100.0) == {}
+
+
 # --- What it needs ------------------------------------------------------------
 
 
