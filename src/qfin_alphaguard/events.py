@@ -218,7 +218,10 @@ class Dividend:
 class ExecutionSettings:
     """How the engine turns a day's target change into orders."""
 
-    band_pct: float = 2.0  # no trade if the weight gap is smaller (percentage points)
+    # Trade a stock only if its weight gap exceeds band_k days of its own
+    # volatility, times the larger of its target and current weight
+    # (decision 0006).
+    band_k: float = 10.0
     max_children: int = 3  # the day's change is split into at most this many orders
     min_trade_usd: float = 1000.0  # no order smaller than this
     theta0: float = 0.6  # score threshold at the start of the day, falls to -theta0
@@ -227,8 +230,9 @@ class ExecutionSettings:
     deadline_before_close_min: int = 30  # send what is left this long before close
 
     def __post_init__(self) -> None:
-        if self.band_pct < 0:
-            raise ValueError(f"band_pct cannot be negative, got {self.band_pct}")
+        # A NaN would compare false with every gap and switch the band off.
+        if not (math.isfinite(self.band_k) and self.band_k >= 0):
+            raise ValueError(f"band_k must be a number >= 0, got {self.band_k!r}")
         if self.max_children < 1:
             raise ValueError(
                 f"max_children must be at least 1, got {self.max_children}"

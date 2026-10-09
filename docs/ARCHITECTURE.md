@@ -80,7 +80,7 @@ goes with the plan for the band (decision 0006).
   "volatility": {"AAPL": 0.016, "MSFT": 0.014, "NVDA": 0.032, "AMZN": 0.019,
                  "GOOGL": 0.018, "JPM": 0.015, "XOM": 0.015, "JNJ": 0.011},
   "execution": {
-    "band_pct": 2.0,
+    "band_k": 10.0,
     "max_children": 3,
     "min_trade_usd": 1000,
     "theta0": 0.6,
