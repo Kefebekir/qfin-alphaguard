@@ -89,3 +89,8 @@ Settled while building the ranking (Phase 1, step 2c):
   MA and V) by 0.30% or more. A correlation threshold failed here: one bad
   GOOG price in July 2021 pulled that year's correlation to 0.978. On
   2016–2026 the rule drops GOOG every year and nothing else.
+- **Members at the end of the previous year:** the universe is chosen from
+  the members on the previous year's last session, so it is known the evening
+  before the year's first session, when its first daily plan is made (Phase 1,
+  step 7a). On 2016–2026 it gives the same 50 names as the members of the
+  year's first session.

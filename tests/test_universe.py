@@ -135,6 +135,8 @@ def stock(
 ):
     """2015 bars worth about `traded_per_day` dollars a day, plus 4 January 2016.
 
+    `member` says whether the stock is in the index at the end of 2015.
+
     Each ticker follows its own random walk around 100 dollars unless `path`
     gives the traded prices. The adjusted close is the traded price times
     `adjustment`, as if dividends paid later had scaled it down.
@@ -152,7 +154,7 @@ def stock(
             "volume": np.round(traded_per_day / path).astype(int),
             "adjustment": [adjustment] * n,
             "split_factor": [1.0] * n,
-            "sp500": [True] * (n - 1) + [member],
+            "sp500": [member] * n,
         }
     )
 
@@ -176,8 +178,23 @@ def test_trading_universe_takes_the_most_traded_members():
     assert trading_universe(prices, 2016, 2) == ("A", "B")
 
 
-def test_stocks_outside_the_index_on_the_first_day_are_left_out():
+def test_stocks_outside_the_index_at_the_end_of_the_year_are_left_out():
     prices = pl.concat([stock("IN", 100_000), stock("OUT", 900_000, member=False)])
+    assert trading_universe(prices, 2016, 5) == ("IN",)
+
+
+def test_the_universe_is_known_before_the_year_starts():
+    # On the evening before 4 January 2016, no bar of 2016 exists yet.
+    prices = pl.concat([stock("A", 200_000), stock("B", 100_000)])
+    before = prices.filter(pl.col("date") < FIRST_DAY_2016)
+    assert trading_universe(before, 2016, 1) == ("A",)
+
+
+def test_a_stock_that_joins_the_index_in_the_new_year_waits_a_year():
+    joins = stock("JOINS", 900_000, member=False).with_columns(
+        (pl.col("date") >= FIRST_DAY_2016).alias("sp500")
+    )
+    prices = pl.concat([stock("IN", 100_000), joins])
     assert trading_universe(prices, 2016, 5) == ("IN",)
 
 
@@ -194,7 +211,8 @@ def test_later_dividends_do_not_change_the_ranking():
     assert trading_universe(prices, 2016, 1) == ("PAYS",)
 
 
-def test_nothing_after_the_first_trading_day_counts():
+def test_nothing_from_the_new_year_counts():
+    # The universe must be known the evening before the year's first session.
     prices = pl.concat([stock("A", 200_000), stock("B", 100_000)])
     later = stock("B", 10**9, days=[]).with_columns(
         pl.lit(date(2016, 1, 5)).alias("date")

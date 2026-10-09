@@ -46,7 +46,7 @@ retail-broker strategy more profitable.
 | 2 | Data layer → features | clean point-in-time bars | nightly | DuckDB → Polars |
 | 3 | Features → Alpha AI | feature matrix + target | train weekly, predict nightly | Parquet |
 | 4 | Alpha AI → optimiser | μ and σ forecasts, model version | nightly | Parquet |
-| 5 | Optimiser → engine | `daily_plan.json`: target weights, execution settings | once, before the open | JSON, versioned |
+| 5 | Optimiser → engine | `daily_plan.json`: target weights, each stock's volatility, execution settings | once, before the open | JSON, versioned |
 | 6 | `guard.yaml` → Guard | risk limits | only by hand, through a commit | YAML |
 | 7 | IBKR → engine | live prices as 5-second bars | continuous | TWS API via IB Gateway |
 | 8 | Inside the engine | 1-minute bar → features → score → intent | every bar | in memory |
@@ -62,12 +62,23 @@ from 12 of them.
 Written by the nightly job, read by the engine at start-up. The types are in
 `src/qfin_alphaguard/events.py` (`DailyPlan`, `ExecutionSettings`).
 
+Until the forecasts of Phase 2 exist, `qfin plan` (`plan.py`) builds it from
+the daily bars before the day: the minimum-variance portfolio of the year's
+trading universe, with Ledoit-Wolf covariance over the last 252 sessions and no
+stock above Guard's `max_weight`. It holds at most
+`floor(capital / (max_children · min_trade_usd))` stocks, so that each can be
+built in `max_children` orders: 10 at 30,000 USD. Each stock's own daily
+volatility, the standard deviation of its returns over the same 252 sessions,
+goes with the plan for the band (decision 0006).
+
 ```json
 {
   "date": "2027-04-12",
   "model_version": "alpha-v1.3",
   "target_weights": {"AAPL": 0.15, "MSFT": 0.15, "NVDA": 0.10, "AMZN": 0.10,
                      "GOOGL": 0.10, "JPM": 0.15, "XOM": 0.10, "JNJ": 0.15},
+  "volatility": {"AAPL": 0.016, "MSFT": 0.014, "NVDA": 0.032, "AMZN": 0.019,
+                 "GOOGL": 0.018, "JPM": 0.015, "XOM": 0.015, "JNJ": 0.011},
   "execution": {
     "band_pct": 2.0,
     "max_children": 3,
@@ -99,8 +110,9 @@ u_i,t = s_i,t · sign(Δ_i)                             score in the trade's dir
 send a child order when u_i,t ≥ θ(t)
 ```
 
-1. **At the open:** compute Δ. Skip the stock if the weight gap is below
-   `band_pct` or the trade is below `min_trade_usd`.
+1. **At the open:** compute Δ. Skip the stock if its weight gap is within its
+   own band, `k` days of its daily volatility times its weight (decision 0006),
+   or the trade is below `min_trade_usd`.
 2. **Split** the trade into at most `max_children` child orders of at least
    `min_trade_usd` each.
 3. **Every bar:** send a child when u ≥ θ(t), at least `min_gap_min` minutes
