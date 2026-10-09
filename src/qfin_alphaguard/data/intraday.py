@@ -1,9 +1,11 @@
 """1-minute bars for the trading universe, cut to the regular session.
 
 For each year, the stocks of that year's trading universe (decision 0005) get
-the year's 1-minute bars from EODHD: prices and volume as traded, and only the
-minutes that start inside the regular session (sessions.py). One Parquet file
-per stock and year, under data/raw/intraday/<ticker>/<year>.parquet.
+the year's 1-minute bars from EODHD, and the stocks that left the universe at
+the new year get January's, so that a backtest can sell them (minute_windows).
+Prices and volume are as traded, and only the minutes that start inside the
+regular session are kept (sessions.py). One Parquet file per stock and year,
+under data/raw/intraday/<ticker>/<year>.parquet.
 
 EODHD files a renamed company's 1-minute history under one of its tickers,
 not always the one in the daily data: FB_old's minutes are under META, and
@@ -52,14 +54,34 @@ class YearOfMinutes:
     year: int
     source: str | None  # where the minutes came from, such as META; None if nowhere
     rows: int
-    sessions: int  # sessions in the year, up to the last day asked for
-    matching: float  # share of days whose last minute matched the daily close
+    trading_days: int  # days with a daily bar, from 1 January to the last day asked
+    matching: float  # share of the days with minutes whose last minute matched
     error: str | None = None  # why the download failed, if it did
     dropped: int = 0  # minutes that broke the Bar rules
+    days: int = 0  # trading days with minutes; EODHD lacks some, such as TSLA's
 
 
 def intraday_path(root: Path, ticker: str, year: int) -> Path:
     return root / "intraday" / ticker / f"{year}.parquet"
+
+
+def minute_windows(universes: dict[int, Iterable[str]]) -> dict[int, dict[str, date]]:
+    """For each year, the stocks whose minutes it needs, and until which day.
+
+    A year's trading universe needs the whole year. A stock of the previous
+    year's universe that is not in this one may still be held on the year's
+    first day; the band sells it at the first open (decision 0006), and
+    Guard's order limits let even a 25% position go within a week, so its
+    minutes are needed until the end of January.
+    """
+    lists = {year: tuple(tickers) for year, tickers in universes.items()}
+    windows = {}
+    for year, tickers in lists.items():
+        needed = dict.fromkeys(tickers, date(year, 12, 31))
+        for ticker in lists.get(year - 1, ()):
+            needed.setdefault(ticker, date(year, 1, 31))
+        windows[year] = needed
+    return windows
 
 
 def regular_session(minutes: pl.DataFrame) -> pl.DataFrame:
@@ -132,9 +154,12 @@ def download_year(
     daily: pl.DataFrame,
     history: IndexHistory,
 ) -> tuple[pl.DataFrame, YearOfMinutes]:
-    """One stock's regular-session minutes for one year, checked against `daily`."""
+    """One stock's regular-session minutes for one year, checked against `daily`.
+
+    The minutes run from 1 January to `last_day` or the end of the year,
+    whichever comes first.
+    """
     first, last = date(year, 1, 1), min(date(year, 12, 31), last_day)
-    in_year = len(sessions(first, last))
     daily_bars = daily.filter(
         (pl.col("ticker") == code) & pl.col("date").is_between(first, last)
     )
@@ -149,12 +174,13 @@ def download_year(
                 year,
                 source,
                 stored.height,
-                in_year,
+                daily_bars.height,
                 share,
                 dropped=minutes.height - valid.height,
+                days=stored["start"].dt.date().n_unique(),
             )
     return pl.DataFrame(schema=MINUTE_SCHEMA), YearOfMinutes(
-        code, year, None, 0, in_year, 0.0
+        code, year, None, 0, daily_bars.height, 0.0
     )
 
 
@@ -168,27 +194,28 @@ def backfill_minutes(
     workers: int = 4,
     report: Callable[[YearOfMinutes], None] = lambda summary: None,
 ) -> list[YearOfMinutes]:
-    """Store the minutes of every stock in `universes` ({year: tickers}).
+    """Store the minutes each year of `universes` ({year: tickers}) needs.
 
-    Years before `last_day`'s year that already have minutes are final and
-    skipped, so an interrupted run picks up where it stopped; the current year
-    is downloaded again. A year without matching minutes gets no file and is
-    tried again next time, when its sources may be known. A download that fails
-    is reported with its error and does not stop the others.
+    minute_windows says which stocks and until which day. Stored minutes that
+    reach the stock's last daily bar in its window are complete and skipped,
+    so an interrupted run picks up where it stopped, and a year stored while
+    it was still running is downloaded again. Minutes missing inside a window
+    do not count: EODHD lacks some for good, and a new download would not
+    bring them. A year without matching minutes gets no file and is tried
+    again next time, when its sources may be known. A download that fails is
+    reported with its error and does not stop the others.
     """
     tasks = [
-        (code, year)
-        for year, codes in sorted(universes.items())
-        for code in codes
-        if not (year < last_day.year and _has_minutes(intraday_path(root, code, year)))
+        (code, year, min(until, last_day))
+        for year, needed in sorted(minute_windows(universes).items())
+        for code, until in needed.items()
+        if not _complete(root, daily, code, year, min(until, last_day))
     ]
 
-    def run(task: tuple[str, int]) -> YearOfMinutes:
-        code, year = task
+    def run(task: tuple[str, int, date]) -> YearOfMinutes:
+        code, year, until = task
         try:
-            minutes, summary = download_year(
-                client, code, year, last_day, daily, history
-            )
+            minutes, summary = download_year(client, code, year, until, daily, history)
         except RuntimeError as error:  # EODHD still failing after its retries
             return YearOfMinutes(code, year, None, 0, 0, 0.0, error=str(error))
         if not minutes.is_empty():
@@ -211,24 +238,34 @@ def backfill_minutes(
 def minute_feed(
     root: Path, universes: dict[int, Iterable[str]], first: date, last: date
 ) -> Iterator[Bar]:
-    """The stored minutes of each year's universe as Bar events, in time order.
+    """The stored minutes each year needs as Bar events, in time order.
 
-    One year of files is read at a time, about 5 million minutes for 50
-    stocks; turning all years into events at once would take gigabytes.
-    Within a minute the bars come in ticker order, so the same files always
-    give the same sequence. Prices are as traded: multiply by the day's
-    `adjustment` from the daily bars to compare prices across a split.
+    Each year brings its universe's minutes, and those of the stocks that
+    left it at the new year until the end of January (minute_windows). One
+    year of files is read at a time, about 5 million minutes for 50 stocks;
+    turning all years into events at once would take gigabytes. Within a
+    minute the bars come in ticker order, so the same files always give the
+    same sequence. Prices are as traded: multiply by the day's `adjustment`
+    from the daily bars to compare prices across a split.
     """
+    windows = minute_windows(universes)
     for year in range(first.year, last.year + 1):
-        paths = [
-            intraday_path(root, ticker, year) for ticker in universes.get(year, ())
-        ]
-        paths = [path for path in paths if _has_minutes(path)]
-        if not paths:
+        needed = {
+            ticker: until
+            for ticker, until in windows.get(year, {}).items()
+            if _has_minutes(intraday_path(root, ticker, year))
+        }
+        if not needed:
             continue
+        until = pl.LazyFrame(
+            {"ticker": list(needed), "until": list(needed.values())},
+            schema={"ticker": pl.String, "until": pl.Date},
+        )
         minutes = (
-            pl.scan_parquet(paths)
+            pl.scan_parquet([intraday_path(root, ticker, year) for ticker in needed])
             .filter(pl.col("start").dt.date().is_between(first, last))
+            .join(until, on="ticker")
+            .filter(pl.col("start").dt.date() <= pl.col("until"))
             .sort("start", "ticker")
             .collect()
         )
@@ -247,3 +284,21 @@ def minute_feed(
 
 def _has_minutes(path: Path) -> bool:
     return path.exists() and pl.scan_parquet(path).select(pl.len()).collect().item() > 0
+
+
+def _complete(
+    root: Path, daily: pl.DataFrame, code: str, year: int, last: date
+) -> bool:
+    """Stored minutes reach the stock's last daily bar from 1 January to `last`."""
+    path = intraday_path(root, code, year)
+    if not path.exists():
+        return False
+    stored = pl.scan_parquet(path).select(pl.col("start").max()).collect().item()
+    bars = daily.filter(
+        (pl.col("ticker") == code) & pl.col("date").is_between(date(year, 1, 1), last)
+    )
+    return (
+        stored is not None
+        and not bars.is_empty()
+        and stored.date() >= bars["date"].max()
+    )

@@ -6,8 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 7c is next:** 1-minute bars in January for the stocks that
-leave the trading universe, so that the backtest can sell them.
+**Phase 1, step 8 is next:** Efe's timing without ML: each day's trade in a
+stock split into equal-spaced child orders.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -23,8 +23,8 @@ leave the trading universe, so that the backtest can sell them.
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | done, #16 |
 | 7a. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY, as many stocks as the capital can hold | Claude | done, #17 |
 | 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | done, #18 |
-| 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | next |
-| 8. Timing without ML: equal-spaced child orders | Efe | to do |
+| 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | done, #19 |
+| 8. Timing without ML: equal-spaced child orders | Efe | next |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
 
@@ -97,9 +97,22 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Backtests read the stored Parquet file, never a fresh download: two
       yfinance downloads of the same history can differ in the fifth decimal.
 - [x] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
-- [ ] Selling a stock that leaves the trading universe in January: its 1-minute
-      bars for the new year are not downloaded yet. Download January for the
-      previous year's universe too (step 7c).
+- [x] Selling a stock that leaves the trading universe at the new year: its
+      January minutes are downloaded too, 6–10 stocks a year (step 7c).
+- [ ] Stock-days without minutes: 1.7% of the 136,301 a backtest of
+      2016–2026 needs. 2,010 belong to old or renamed codes no minutes were
+      found for: BKNG 2016–17 is under PCLN and AABA under YHOO, which the
+      renamed-ticker map above would find; CHK_old, DWDP and VIAC are still to
+      look up. 286 are holes in stored years: EODHD has no 1-minute bars for
+      TSLA from 19 July 2023 to 14 May 2024, nor for NVDA from its split on 10
+      June 2024 to 24 July, and BKNG's before 27 February 2018 are under PCLN.
+      The backtest must not trade a stock on a day without minutes, and the
+      report says how often the plan wanted to (step 10).
+- [ ] A held stock whose bars stop during its year: renamed (DWDP → DD in
+      2019, FB → META and VIAC → PARA in 2022) or bought for cash (TWTR, 54.20
+      USD on 27 October 2022). The backtest must carry the shares over to the
+      new code or pay the cash out, or it keeps a position it can neither sell
+      nor value.
 - [x] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance, holding
       as many stocks as the capital can hold.
 - [x] The band: trade a stock only when its gap is larger than its own
