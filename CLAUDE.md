@@ -55,6 +55,10 @@ Both ruff commands must pass before a commit.
 - `src/qfin_alphaguard/events.py`: immutable event types shared by the
   backtester and the live engine
 - `src/qfin_alphaguard/sessions.py`: when the exchange is open, in UTC
+- `src/qfin_alphaguard/strategy.py`, `portfolio.py`: the Strategy interface
+  and its read-only View, and the books; shared with the live engine
+- `src/qfin_alphaguard/backtest/`: the event loop and the simulated broker's
+  interface
 - `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that
   loads and checks them
 - `src/qfin_alphaguard/data/`: download, validation, S&P 500 membership by date,

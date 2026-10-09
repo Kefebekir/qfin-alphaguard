@@ -113,6 +113,27 @@ send a child order when u_i,t ≥ θ(t)
 6. **Order:** a limit order within `price_collar_bps` of the last price; an
    unfilled order is reconsidered on the next bar.
 
+## Backtest event loop
+
+`backtest/engine.py` replays bars in time order. Bars that end at the same
+moment form a slice, and every slice is handled in the same order:
+
+1. The simulated broker fills waiting orders from the slice's bars. Each of
+   those orders was sent at the end of an earlier slice.
+2. The portfolio books the fills and the strategy hears of them.
+3. The strategy sees the complete slice and answers with order intents and
+   cancellations, dated with the slice's end.
+4. Each intent passes Guard, which approves it, reduces its quantity, rejects
+   it or halts trading; what passes becomes an order sent at that moment.
+
+So an order decided after bar t can fill no earlier than bar t+1. The engine is
+also the referee: it stops the run if a fill is dated before its order, lies
+outside its bar, is priced where the bar never traded, breaks its limit, or
+exceeds what is left of the order, and if Guard changes anything but the
+quantity. At each close it cancels open orders and logs the portfolio's value.
+The strategy sees only a read-only `View` (time, session, cash, positions, last
+prices, open orders), so the same `Strategy` class can run live in Phase 3.
+
 ## Risk file
 
 Only Efe changes this file, by hand and through a commit. The Python Guard,
