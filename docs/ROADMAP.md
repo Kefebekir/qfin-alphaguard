@@ -6,8 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 4b is next:** `Bar` events from the stored 1-minute bars, and the
-nightly job adding each day's minutes.
+**Phase 1, step 5 is next:** the event loop, with the `Strategy` interface and
+the rule that an order decided after bar t fills no earlier than bar t+1.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -17,8 +17,8 @@ nightly job adding each day's minutes.
 | 2c. Trading universe: the 50 most liquid members, chosen each 1 January | Claude; Efe set N = 50 | done, #10 |
 | 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | done, #11 |
 | 4a. 1-minute bars since 2016 for each year's trading universe, cut to the regular session | Claude | done, #12 |
-| 4b. `Bar` events from the minutes; the nightly job adds each day's minutes | Claude | next |
-| 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |
+| 4b. The stored minutes as `Bar` events, in time order | Claude | done, #13 |
+| 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | next |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |
 | 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
@@ -87,6 +87,10 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       PCLN until 2018, AABA was YHOO until 2017).
 - [ ] Speed up the nightly download, 17 minutes for 767 codes: parallel
       requests or EODHD's bulk end-of-day endpoint.
+- [ ] Add each day's 1-minute bars in the nightly job once a backtest runs in
+      the cloud. Until then `qfin intraday` refreshes them locally in about 3
+      minutes; on S3 they should be one file per day, because versioning would
+      otherwise keep a copy of every stock's whole-year file each night.
 - [ ] Backtests read the stored Parquet file, never a fresh download: two
       yfinance downloads of the same history can differ in the fifth decimal.
 - [ ] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
