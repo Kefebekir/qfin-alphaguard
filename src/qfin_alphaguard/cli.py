@@ -2,7 +2,7 @@
 
     qfin ingest     load, validate and store daily prices (the nightly AWS job)
     qfin intraday   download 1-minute bars for each year's trading universe
-    qfin plan       build the next day's daily_plan.json (Phase 1, not built yet)
+    qfin plan       build a day's plan: the portfolio to hold, from the bars before it
     qfin backtest   run the event-driven backtester (Phase 1, not built yet)
 
 The nightly AWS job runs the command in infra/aws/task-definition.template.json;
@@ -11,7 +11,8 @@ a test checks that this CLI still accepts it.
 
 import argparse
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.eodhd import EodhdClient, api_key
@@ -25,6 +26,9 @@ from qfin_alphaguard.data.store import (
 )
 from qfin_alphaguard.data.universe import sp500, trading_universes
 from qfin_alphaguard.data.validate import validate_prices
+from qfin_alphaguard.guard.config import load_guard_config
+from qfin_alphaguard.plan import build_plan, plan_to_json
+from qfin_alphaguard.sessions import session_days
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,9 +74,25 @@ def build_parser() -> argparse.ArgumentParser:
     intraday.set_defaults(run=_intraday)
 
     plan = commands.add_parser(
-        "plan", help="build the next day's daily_plan.json (not built yet)"
+        "plan", help="build a day's plan from the daily bars before it"
     )
-    plan.set_defaults(run=_not_built_yet)
+    plan.add_argument(
+        "--date",
+        type=date.fromisoformat,
+        help="trading day (YYYY-MM-DD); defaults to the session after the last bars",
+    )
+    plan.add_argument(
+        "--capital",
+        type=float,
+        default=30_000.0,
+        help="account value in USD; it sets how many stocks are held",
+    )
+    plan.add_argument(
+        "--synthetic", action="store_true", help="plan from the synthetic bars"
+    )
+    plan.add_argument("--guard", default="guard.yaml", help="the risk limits file")
+    plan.add_argument("--out", help="where to write the plan's JSON")
+    plan.set_defaults(run=_plan)
 
     backtest = commands.add_parser(
         "backtest", help="run the event-driven backtester (not built yet)"
@@ -161,6 +181,43 @@ def _intraday(args: argparse.Namespace) -> int:
         f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}"
     )
     return 1 if failed else 0
+
+
+def _plan(args: argparse.Namespace) -> int:
+    config = Config(synthetic=args.synthetic)
+    daily_path = prices_path(config)
+    if not daily_path.exists():
+        print(f"{daily_path} not found; run `qfin ingest` first", file=sys.stderr)
+        return 1
+    prices = read_prices(daily_path)
+    if args.date:
+        day = args.date
+        if session_days(day, day) != [day]:
+            print(f"{day} is not a trading day", file=sys.stderr)
+            return 1
+    else:
+        last = prices["date"].max()
+        day = session_days(last + timedelta(1), last + timedelta(10))[0]
+    # A day's plan is made from the bars of the session before it; from older
+    # bars it would be the plan of an earlier day.
+    before = session_days(day - timedelta(10), day - timedelta(1))[-1]
+    if not (prices["date"] == before).any():
+        print(
+            f"no bars for {before}, the session before {day}; run `qfin ingest` first",
+            file=sys.stderr,
+        )
+        return 1
+    max_weight = load_guard_config(args.guard).max_weight
+    plan = build_plan(prices, day, args.capital, max_weight)
+    out = Path(args.out) if args.out else Path("data/plans") / f"daily_plan_{day}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(plan_to_json(plan), encoding="utf-8")
+    weights = sorted(plan.target_weights.values(), reverse=True)
+    print(
+        f"plan for {day}: {len(weights)} stocks, largest weight {weights[0]:.1%}, "
+        f"invested {sum(weights):.1%}; wrote {out}"
+    )
+    return 0
 
 
 def _not_built_yet(args: argparse.Namespace) -> int:
