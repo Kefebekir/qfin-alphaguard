@@ -89,8 +89,10 @@ Two things I care about more than the results:
   the S&P 500 on each day since 2015, including companies that were later bought
   or delisted. What remains: the membership history is kept by one person rather
   than S&P, and stocks outside the S&P 500 are not covered.
-- **Daily bars only.** The data layer stores daily open, high, low, close and
-  volume. Intraday bars come later in Phase 1.
+- **1-minute bars only for the trading universe.** Daily bars cover every S&P 500
+  member; 1-minute bars, from 2016, only each year's 50 most liquid members. EODHD
+  has no 1-minute data for a few companies that later gave up their ticker, such
+  as the Chesapeake Energy that went bankrupt in 2020.
 - **Adjusted prices are not point-in-time.** Prices are adjusted for splits and
   dividends, so an old price differs from the one quoted on that day. Returns are
   right; dividing by the `adjustment` column gives the price as traded, and
