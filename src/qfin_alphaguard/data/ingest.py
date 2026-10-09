@@ -1,49 +1,82 @@
-"""Load price data, either from the network or from the synthetic generator."""
+"""Load price data, either from EODHD or from the synthetic generator."""
+
+from collections import defaultdict
+from datetime import date
 
 import polars as pl
-import yfinance as yf
 
 from qfin_alphaguard.config import Config
+from qfin_alphaguard.data.eodhd import BARS_SCHEMA, EodhdClient, api_key, eodhd_code
 from qfin_alphaguard.data.synthetic import generate_prices
+from qfin_alphaguard.data.universe import IndexHistory, Membership, sp500
 
-# Adjusting for splits and dividends multiplies all four prices by a factor,
-# and rounding can leave a close a hair above the high: about 1e-16 relative,
-# 22 of 88,740 rows when checked in October 2026. Gaps up to this size are
-# rounding; anything larger is a real data error and is left for validation.
+# Scaling prices for splits and dividends can leave a close a hair above the
+# high: about 1e-16 relative, from floating-point rounding. Gaps up to this
+# size are rounding; anything larger is a real data error and is left for
+# validation.
 ROUNDING_TOLERANCE = 1e-9
 
 
 def load_prices(config: Config) -> pl.DataFrame:
-    """Return daily bars in long format: date, ticker, open, high, low, close, volume.
+    """Daily bars: date, ticker, open, high, low, close, volume, adjustment, sp500.
 
-    Prices are adjusted for splits and dividends.
+    Prices are adjusted for splits and dividends; the price as traded is the
+    adjusted price divided by `adjustment`. `sp500` says whether the stock was
+    in the S&P 500 that day.
     """
     if config.synthetic:
         return generate_prices(config)
-    return _download_prices(config)
+    first = date.fromisoformat(config.start_date)
+    last = date.fromisoformat(config.end_date)
+    return download_sp500(EodhdClient(api_key()), sp500(), first, last)
 
 
-def _download_prices(config: Config) -> pl.DataFrame:
-    raw = yf.download(
-        list(config.tickers),
-        start=config.start_date,
-        end=config.end_date,
-        auto_adjust=True,
-        progress=False,
-    )
-    # Columns are (field, ticker) pairs; stacking the ticker level gives one
-    # row per date and ticker. Days before a stock was listed are all NaN.
-    long = raw.stack(level="Ticker").reset_index()
+def download_sp500(
+    client: EodhdClient, history: IndexHistory, first: date, last: date
+) -> pl.DataFrame:
+    """Daily bars for every stock in the index on any day from `first` to `last`.
 
-    df = (
-        pl.from_pandas(long)
-        .rename(str.lower)
-        .select("date", "ticker", "open", "high", "low", "close", "volume")
-        .drop_nulls()
-        .with_columns(pl.col("date").cast(pl.Date), pl.col("volume").cast(pl.Int64))
-        .sort(["ticker", "date"])
-    )
-    return snap_rounding(df)
+    One ticker can stand for different companies over time, and EODHD keeps
+    the earlier ones as TICKER_old, TICKER_old1 and so on. For each stretch of
+    membership, the code with the most bars inside the stretch is taken, and
+    its bars on those days are marked `sp500`.
+    """
+    old_codes = client.old_codes()
+    frames = []
+    for ticker in history.tickers_between(first, last):
+        code = eodhd_code(ticker)
+        bars: dict[str, pl.DataFrame] = {}  # downloaded once per code
+        stretches: dict[str, list[Membership]] = defaultdict(list)
+        for span in history.spans_of(ticker):
+            if not span.overlaps(first, last):
+                continue
+            best, most = None, 0
+            for candidate in (code, *old_codes.get(code, ())):
+                if candidate not in bars:
+                    bars[candidate] = client.daily_bars(candidate, first, last)
+                inside = bars[candidate].filter(_inside(span)).height
+                if inside > most:
+                    best, most = candidate, inside
+            if best is not None:
+                stretches[best].append(span)
+        for candidate, spans in stretches.items():
+            member = pl.any_horizontal([_inside(span) for span in spans])
+            frames.append(bars[candidate].with_columns(member.alias("sp500")))
+
+    if not frames:
+        return pl.DataFrame(schema={**BARS_SCHEMA, "sp500": pl.Boolean})
+    return snap_rounding(pl.concat(frames).sort(["ticker", "date"]))
+
+
+def sp500_coverage(prices: pl.DataFrame, history: IndexHistory) -> float:
+    """Share of index member-days, on the dates in `prices`, that have a bar.
+
+    A drop shows missing data, or index changes after the membership history's
+    `as_of` date that the file does not know about yet.
+    """
+    days = prices["date"].unique()
+    expected = sum(len(history.members_on(day)) for day in days)
+    return prices.filter(pl.col("sp500")).height / expected if expected else 0.0
 
 
 def snap_rounding(df: pl.DataFrame) -> pl.DataFrame:
@@ -63,3 +96,10 @@ def snap_rounding(df: pl.DataFrame) -> pl.DataFrame:
         .alias("high"),
         pl.when(low_is_rounding).then(body_low).otherwise(pl.col("low")).alias("low"),
     )
+
+
+def _inside(span: Membership) -> pl.Expr:
+    inside = pl.col("date") >= span.start
+    if span.end is not None:
+        inside = inside & (pl.col("date") < span.end)
+    return inside

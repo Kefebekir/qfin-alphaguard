@@ -6,7 +6,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Config:
-    # which assets to pull and over what window
+    # Tickers for synthetic data only. Real data covers every stock that was in
+    # the S&P 500 during the window (data/universe.py, decision 0005).
     tickers: tuple[str, ...] = (
         "AAPL",
         "MSFT",

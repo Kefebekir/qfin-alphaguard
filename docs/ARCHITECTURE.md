@@ -42,7 +42,7 @@ retail-broker strategy more profitable.
 
 | # | From → to | Content | Frequency | Format |
 | --- | --- | --- | --- | --- |
-| 1 | Providers → data layer | daily and intraday bars, macro series | nightly | yfinance, IBKR history, FRED → Parquet |
+| 1 | Providers → data layer | daily and intraday bars, macro series | nightly | EODHD, IBKR history, FRED → Parquet |
 | 2 | Data layer → features | clean point-in-time bars | nightly | DuckDB → Polars |
 | 3 | Features → Alpha AI | feature matrix + target | train weekly, predict nightly | Parquet |
 | 4 | Alpha AI → optimiser | μ and σ forecasts, model version | nightly | Parquet |

@@ -6,17 +6,17 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 2b is next:** daily bars from EODHD for every S&P 500 member
-since 2015.
+**Phase 1, step 2c is next:** the trading universe, the N most liquid S&P 500
+members chosen each 1 January.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
 | 1. Daily OHLCV bars, split- and dividend-adjusted, with validation | Claude | done, #7 |
 | 2a. Universe rule (decision 0005) and S&P 500 membership by date | Efe decided, Claude wrote | done, #8 |
-| 2b. Daily bars from EODHD for every member since 2015, stocks that left included | Claude | next |
-| 2c. Trading universe: the N most liquid members, chosen each 1 January | Claude; Efe sets N | to do |
+| 2b. Daily bars from EODHD for every member since 2015, stocks that left included | Claude | done, #9 |
+| 2c. Trading universe: the N most liquid members, chosen each 1 January | Claude; Efe sets N | next |
 | 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | to do |
-| 4. Hourly bars (yfinance keeps 730 days) as `Bar` events | Claude | to do |
+| 4. Intraday bars as `Bar` events, from EODHD intraday or IBKR history | Claude | to do |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |
 | 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
@@ -79,6 +79,12 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Exchange calendar with holidays and half days; all timestamps UTC.
 - [ ] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1.
 - [x] Split- and dividend-adjusted prices.
+- [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
+      WYND → TNL, CDAY → DAY, ARNC → HWM) so their earlier index years have
+      prices; with a few acquired companies EODHD lacks, about 0.67% of
+      member-days have no prices today.
+- [ ] Speed up the nightly download, 17 minutes for 767 codes: parallel
+      requests or EODHD's bulk end-of-day endpoint.
 - [ ] Backtests read the stored Parquet file, never a fresh download: two
       yfinance downloads of the same history can differ in the fifth decimal.
 - [ ] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.

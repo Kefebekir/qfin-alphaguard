@@ -36,6 +36,19 @@ def test_tickers_between_keeps_stocks_that_left_during_the_window():
     assert tickers == ("JOINS", "LEFT", "STAYS")
 
 
+def test_overlaps_counts_the_first_and_last_day_of_the_window():
+    membership = span("AAA", "2020-01-06", "2020-01-09")
+    assert membership.overlaps(date(2020, 1, 1), date(2020, 1, 6))
+    assert membership.overlaps(date(2020, 1, 8), date(2020, 1, 31))
+    assert not membership.overlaps(date(2020, 1, 9), date(2020, 1, 31))
+
+
+def test_spans_of_lists_a_tickers_stretches_oldest_first():
+    later, earlier = span("DOW", "2019-04-02"), span("DOW", "1996-01-02", "2017-09-01")
+    history = IndexHistory((later, span("AAA", "2000-01-03"), earlier))
+    assert history.spans_of("DOW") == (earlier, later)
+
+
 def test_a_ticker_can_leave_and_come_back():
     history = IndexHistory(
         (span("DOW", "1996-01-02", "2017-09-01"), span("DOW", "2019-04-02"))

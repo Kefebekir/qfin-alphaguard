@@ -44,6 +44,13 @@ def test_close_above_the_high_has_error():
     assert "ohlc_consistency" in errors(validate_prices(broken))
 
 
+def test_infinite_adjustment_has_error():
+    # adjusted close / close is infinite when EODHD reports a close of zero
+    df = load_prices(Config(synthetic=True))
+    broken = set_first_row(df, "adjustment", float("inf"))
+    assert "positive_prices" in errors(validate_prices(broken))
+
+
 def test_nan_price_has_error():
     broken = set_first_row(load_prices(Config(synthetic=True)), "open", float("nan"))
     assert "missing_values" in errors(validate_prices(broken))
@@ -52,6 +59,28 @@ def test_nan_price_has_error():
 def test_negative_volume_has_error():
     broken = set_first_row(load_prices(Config(synthetic=True)), "volume", -1)
     assert "volume" in errors(validate_prices(broken))
+
+
+def test_a_large_one_day_move_is_a_warning():
+    days = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+    closes = [100.0, 101.0, 161.0]  # +59% on the last day
+    df = pl.DataFrame(
+        {
+            "date": days,
+            "ticker": ["AAA"] * 3,
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": [1000] * 3,
+            "adjustment": [1.0] * 3,
+            "sp500": [True] * 3,
+        }
+    )
+    report = validate_prices(df)
+    assert report.ok
+    (move,) = [issue for issue in report.issues if issue.check == "large_moves"]
+    assert "2024-01-04" in move.detail
 
 
 def test_constant_series_is_flagged():
@@ -65,6 +94,8 @@ def test_constant_series_is_flagged():
             "low": [100.0] * 3,
             "close": [100.0] * 3,
             "volume": [1000] * 3,
+            "adjustment": [1.0] * 3,
+            "sp500": [True] * 3,
         }
     )
     report = validate_prices(df)

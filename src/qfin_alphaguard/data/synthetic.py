@@ -9,7 +9,11 @@ from qfin_alphaguard.config import Config
 
 
 def generate_prices(config: Config) -> pl.DataFrame:
-    """Return daily bars in long format: date, ticker, open, high, low, close, volume."""
+    """Daily bars in the same columns as real data.
+
+    Synthetic prices need no adjustment, and every ticker counts as an index
+    member on every day.
+    """
     rng = np.random.default_rng(config.seed)
     dates = pl.date_range(
         start=date.fromisoformat(config.start_date),
@@ -51,6 +55,8 @@ def generate_prices(config: Config) -> pl.DataFrame:
                     "low": lows[:, i],
                     "close": closes[:, i],
                     "volume": volumes[:, i],
+                    "adjustment": np.ones(n_days),
+                    "sp500": [True] * n_days,
                 }
             )
         )

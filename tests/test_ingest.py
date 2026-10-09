@@ -1,11 +1,17 @@
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
-import pandas as pd
 import polars as pl
 
 from qfin_alphaguard.config import Config
-from qfin_alphaguard.data.ingest import load_prices, snap_rounding
+from qfin_alphaguard.data.eodhd import BARS_SCHEMA
+from qfin_alphaguard.data.ingest import (
+    download_sp500,
+    load_prices,
+    snap_rounding,
+    sp500_coverage,
+)
+from qfin_alphaguard.data.universe import IndexHistory, Membership
 from qfin_alphaguard.data.validate import validate_prices
 
 EXPECTED_SCHEMA = {
@@ -16,6 +22,8 @@ EXPECTED_SCHEMA = {
     "low": pl.Float64,
     "close": pl.Float64,
     "volume": pl.Int64,
+    "adjustment": pl.Float64,
+    "sp500": pl.Boolean,
 }
 
 
@@ -29,45 +37,105 @@ def test_load_prices_is_sorted_by_ticker_then_date():
     assert df.equals(df.sort(["ticker", "date"]))
 
 
-def fake_download(*args, **kwargs):
-    """A frame shaped like yf.download's: one row per date, (field, ticker) columns.
+def weekdays(first, last):
+    days = (first + timedelta(n) for n in range((last - first).days + 1))
+    return [day for day in days if day.weekday() < 5]
 
-    BBB is not listed yet on the first day, so all its fields are NaN there.
-    """
-    columns = pd.MultiIndex.from_product(
-        [["Close", "High", "Low", "Open", "Volume"], ["AAA", "BBB"]],
-        names=["Price", "Ticker"],
+
+def span(ticker, start, end=None):
+    return Membership(
+        ticker, date.fromisoformat(start), date.fromisoformat(end) if end else None
     )
-    nan = np.nan
-    rows = [
-        # Close       High          Low          Open          Volume
-        [101.0, nan, 102.0, nan, 99.0, nan, 100.0, nan, 1000.0, nan],
-        [102.0, 51.0, 103.0, 52.0, 100.5, 49.0, 101.0, 50.0, 1100.0, 500.0],
+
+
+class FakeClient:
+    """Stands in for EodhdClient: flat bars for each code on the given days."""
+
+    def __init__(self, days_by_code, old_codes=None):
+        self.days_by_code = days_by_code
+        self._old_codes = old_codes or {}
+        self.downloads = []
+
+    def old_codes(self):
+        return self._old_codes
+
+    def daily_bars(self, code, start, end):
+        self.downloads.append(code)
+        days = [day for day in self.days_by_code.get(code, []) if start <= day <= end]
+        n = len(days)
+        return pl.DataFrame(
+            {
+                "date": days,
+                "ticker": [code] * n,
+                "open": [100.0] * n,
+                "high": [101.0] * n,
+                "low": [99.0] * n,
+                "close": [100.5] * n,
+                "volume": [1000] * n,
+                "adjustment": [1.0] * n,
+            },
+            schema=BARS_SCHEMA,
+        )
+
+
+def test_bars_are_marked_sp500_only_while_a_member():
+    history = IndexHistory((span("AAA", "2020-01-06", "2020-01-09"),))
+    first, last = date(2020, 1, 2), date(2020, 1, 10)
+    client = FakeClient({"AAA": weekdays(first, last)})
+
+    prices = download_sp500(client, history, first, last)
+
+    assert dict(prices.schema) == EXPECTED_SCHEMA
+    assert prices.height == 7  # days outside the membership are kept, unmarked
+    assert prices.filter(pl.col("sp500"))["date"].to_list() == [
+        date(2020, 1, 6),
+        date(2020, 1, 7),
+        date(2020, 1, 8),
     ]
-    index = pd.DatetimeIndex(["2024-01-02", "2024-01-03"], name="Date")
-    return pd.DataFrame(rows, index=index, columns=columns)
 
 
-def test_download_gives_one_row_per_date_and_ticker(monkeypatch):
-    monkeypatch.setattr("qfin_alphaguard.data.ingest.yf.download", fake_download)
+def test_a_reused_ticker_takes_each_company_for_its_own_stretch():
+    # DOW was Dow Chemical (EODHD code DOW_old) until 2017 and Dow Inc. from 2019.
+    history = IndexHistory(
+        (span("DOW", "2015-01-02", "2017-09-01"), span("DOW", "2019-04-02"))
+    )
+    client = FakeClient(
+        {
+            "DOW_old": weekdays(date(2017, 8, 28), date(2017, 9, 8)),
+            "DOW": weekdays(date(2019, 3, 20), date(2019, 4, 5)),
+        },
+        old_codes={"DOW": ("DOW_old",)},
+    )
 
-    df = load_prices(Config(tickers=("AAA", "BBB")))
+    prices = download_sp500(client, history, date(2017, 8, 28), date(2019, 4, 5))
 
-    assert dict(df.schema) == EXPECTED_SCHEMA
-    assert df.select("ticker", "date").rows() == [
-        ("AAA", date(2024, 1, 2)),
-        ("AAA", date(2024, 1, 3)),
-        ("BBB", date(2024, 1, 3)),  # the NaN day before the listing is dropped
-    ]
-    assert df.row(2, named=True) == {
-        "date": date(2024, 1, 3),
-        "ticker": "BBB",
-        "open": 50.0,
-        "high": 52.0,
-        "low": 49.0,
-        "close": 51.0,
-        "volume": 500,
-    }
+    members = prices.filter(pl.col("sp500"))
+    assert members.filter(pl.col("ticker") == "DOW_old")["date"].max() == date(
+        2017, 8, 31
+    )
+    assert members.filter(pl.col("ticker") == "DOW")["date"].min() == date(2019, 4, 2)
+    assert client.downloads == ["DOW", "DOW_old"]  # each code fetched once
+
+
+def test_class_shares_are_fetched_with_a_dash():
+    history = IndexHistory((span("BRK.B", "2020-01-02"),))
+    client = FakeClient({"BRK-B": weekdays(date(2020, 1, 2), date(2020, 1, 3))})
+
+    prices = download_sp500(client, history, date(2020, 1, 2), date(2020, 1, 3))
+
+    assert client.downloads == ["BRK-B"]
+    assert prices["ticker"].unique().to_list() == ["BRK-B"]
+
+
+def test_a_member_without_data_lowers_the_coverage():
+    history = IndexHistory((span("AAA", "2020-01-02"), span("BBB", "2020-01-02")))
+    first, last = date(2020, 1, 2), date(2020, 1, 10)
+    client = FakeClient({"AAA": weekdays(first, last)})  # nothing for BBB
+
+    prices = download_sp500(client, history, first, last)
+
+    assert prices["ticker"].unique().to_list() == ["AAA"]
+    assert sp500_coverage(prices, history) == 0.5
 
 
 def one_bar(**prices):
@@ -77,6 +145,8 @@ def one_bar(**prices):
             "ticker": ["AAA"],
             **{name: [value] for name, value in prices.items()},
             "volume": [1000],
+            "adjustment": [1.0],
+            "sp500": [True],
         }
     )
 

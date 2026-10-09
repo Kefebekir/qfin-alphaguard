@@ -5,12 +5,8 @@ import pytest
 
 from qfin_alphaguard.cli import build_parser, main
 
-TASK_DEFINITION = (
-    Path(__file__).resolve().parents[1]
-    / "infra"
-    / "aws"
-    / "task-definition.template.json"
-)
+AWS = Path(__file__).resolve().parents[1] / "infra" / "aws"
+TASK_DEFINITION = AWS / "task-definition.template.json"
 
 
 def test_ingest_synthetic_writes_parquet(tmp_path, monkeypatch):
@@ -46,3 +42,18 @@ def test_aws_task_definition_runs_a_valid_command():
 
     assert args.command == "ingest"
     assert args.s3_bucket
+
+
+def test_aws_task_gets_the_eodhd_key_it_may_read():
+    # qfin ingest needs EODHD_API_KEY; ECS reads it from SSM with the execution
+    # role, which may read that one parameter and nothing else.
+    container = json.loads(TASK_DEFINITION.read_text(encoding="utf-8"))
+    (secret,) = container["containerDefinitions"][0]["secrets"]
+    policy = json.loads(
+        (AWS / "execution-role-secrets-policy.json").read_text(encoding="utf-8")
+    )
+    (statement,) = policy["Statement"]
+
+    assert secret["name"] == "EODHD_API_KEY"
+    assert statement["Action"] == "ssm:GetParameters"
+    assert secret["valueFrom"].replace("ACCOUNT_ID", "*") == statement["Resource"]

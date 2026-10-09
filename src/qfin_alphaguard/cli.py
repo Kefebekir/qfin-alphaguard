@@ -13,8 +13,9 @@ import sys
 from datetime import UTC, datetime
 
 from qfin_alphaguard.config import Config
-from qfin_alphaguard.data.ingest import load_prices
+from qfin_alphaguard.data.ingest import load_prices, sp500_coverage
 from qfin_alphaguard.data.store import prices_path, upload_to_s3, write_prices
+from qfin_alphaguard.data.universe import sp500
 from qfin_alphaguard.data.validate import validate_prices
 
 
@@ -73,6 +74,8 @@ def _ingest(args: argparse.Namespace) -> int:
 
     df = load_prices(config)
     print(f"Loaded {len(df)} rows for {df['ticker'].n_unique()} tickers")
+    if not args.synthetic:
+        print(f"S&P 500 member-days with prices: {sp500_coverage(df, sp500()):.1%}")
 
     report = validate_prices(df)
     for issue in report.issues:

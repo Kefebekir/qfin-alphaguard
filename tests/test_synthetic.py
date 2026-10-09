@@ -6,7 +6,17 @@ from qfin_alphaguard.data.synthetic import generate_prices
 
 def test_columns():
     df = generate_prices(Config())
-    assert df.columns == ["date", "ticker", "open", "high", "low", "close", "volume"]
+    assert df.columns == [
+        "date",
+        "ticker",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "adjustment",
+        "sp500",
+    ]
 
 
 def test_shape():
