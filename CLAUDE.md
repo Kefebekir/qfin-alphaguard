@@ -45,6 +45,7 @@ uv run ruff format .                  # format
 uv run qfin ingest --synthetic        # run the data pipeline without network access
 uv run --env-file .env qfin ingest    # real data; needs EODHD_API_KEY in .env
 uv run --env-file .env qfin intraday  # 1-minute bars, after ingest
+uv run qfin plan                      # the next session's target portfolio, after ingest
 ```
 
 CI runs ruff, the tests and a Docker build on every push and pull request.
@@ -57,6 +58,8 @@ Both ruff commands must pass before a commit.
 - `src/qfin_alphaguard/sessions.py`: when the exchange is open, in UTC
 - `src/qfin_alphaguard/strategy.py`, `portfolio.py`: the Strategy interface
   and its read-only View, and the books; shared with the live engine
+- `src/qfin_alphaguard/plan.py`: the daily plan, the portfolio to hold the
+  next day and each stock's volatility
 - `src/qfin_alphaguard/backtest/`: the event loop and the simulated broker's
   interface
 - `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that

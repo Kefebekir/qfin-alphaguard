@@ -17,14 +17,15 @@ exactly what works today and what does not.
 | Docker image and scheduled AWS run | done |
 | Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
 | Phase 0: event types, risk configuration, repository skeleton | done |
-| Phase 1: event-driven backtester with costs and Guard rules | next |
+| Phase 1: event-driven backtester with costs and Guard rules | in progress |
 | Phase 2: ML forecasts and intraday execution timing | planned |
 | Phase 3: paper trading on Interactive Brokers | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
-Nothing from Phase 1 onwards exists yet.
+Phase 1 is in progress: [docs/ROADMAP.md](docs/ROADMAP.md) says which of its steps
+work today. Nothing from Phase 2 onwards exists yet.
 
 ## How it works
 

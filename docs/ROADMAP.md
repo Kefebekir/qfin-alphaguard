@@ -6,9 +6,9 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 7 is next:** the daily plan, `qfin plan`: target weights from
-Ledoit-Wolf covariance and CVXPY, with Efe's rule for when a weight gap is too
-small to trade.
+**Phase 1, step 7b is next:** Efe's band: at the open, which stocks to trade and
+how many shares, from the plan, the positions and each stock's own volatility
+(decision 0006).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -22,7 +22,9 @@ small to trade.
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | done, #14 |
 | 5b. Splits and dividends: share counts follow splits, dividends paid in cash | Claude | done, #15 |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | done, #16 |
-| 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | next |
+| 7a. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY, as many stocks as the capital can hold | Claude | done, #17 |
+| 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | next |
+| 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | to do |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
@@ -98,9 +100,15 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
 - [ ] Selling a stock that leaves the trading universe in January: its 1-minute
       bars for the new year are not downloaded yet. Download January for the
-      previous year's universe too, as part of the daily plan (step 7).
-- [ ] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance; no
-      trade below `band_pct`.
+      previous year's universe too (step 7c).
+- [x] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance, holding
+      as many stocks as the capital can hold.
+- [ ] The band: trade a stock only when its gap is larger than its own
+      volatility allows (decision 0006, step 7b).
+- [ ] Fewer swaps at small capital: at 30,000 USD the plan holds its top 10,
+      and stocks entering and leaving it, 42 times in 2025, cost 16 of the 19
+      bps a year whatever the band (decision 0006). Keep a held stock unless
+      its replacement is clearly better, and measure it in the step 10 backtest.
 - [ ] Timing without ML: equal-spaced child orders.
 - [ ] Choose `max_children` and `min_gap_min` in the backtest, net of
       commissions (for example 1, 2, 3, 5 or 10 child orders; 0 to 60 minutes
