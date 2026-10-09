@@ -57,3 +57,9 @@ def test_aws_task_gets_the_eodhd_key_it_may_read():
     assert secret["name"] == "EODHD_API_KEY"
     assert statement["Action"] == "ssm:GetParameters"
     assert secret["valueFrom"].replace("ACCOUNT_ID", "*") == statement["Resource"]
+
+
+def test_intraday_needs_the_daily_prices_first(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["intraday"]) == 1
+    assert "run `qfin ingest` first" in capsys.readouterr().err

@@ -6,8 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 4 is next:** intraday bars from EODHD's 1-minute data, cut to
-the regular session with the exchange calendar, as `Bar` events.
+**Phase 1, step 4b is next:** `Bar` events from the stored 1-minute bars, and the
+nightly job adding each day's minutes.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -16,7 +16,8 @@ the regular session with the exchange calendar, as `Bar` events.
 | 2b. Daily bars from EODHD for every member since 2015, stocks that left included | Claude | done, #9 |
 | 2c. Trading universe: the 50 most liquid members, chosen each 1 January | Claude; Efe set N = 50 | done, #10 |
 | 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | done, #11 |
-| 4. Intraday bars as `Bar` events, from EODHD intraday or IBKR history | Claude | next |
+| 4a. 1-minute bars since 2016 for each year's trading universe, cut to the regular session | Claude | done, #12 |
+| 4b. `Bar` events from the minutes; the nightly job adds each day's minutes | Claude | next |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |
 | 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
@@ -71,9 +72,8 @@ Fix the decisions and build the skeleton (steps above).
 
 Run the nightly plan and intraday timing end to end on history, without ML.
 
-- [ ] Data: yfinance keeps all daily history but only 30 days of 1-minute bars
-      and 730 days of hourly bars. Build the intraday mechanism on hourly bars
-      first; use IBKR history for long 1-minute data.
+- [x] Data: EODHD daily bars for every S&P 500 member since 2015, and 1-minute
+      bars since 2016 for each year's trading universe (decision 0005).
 - [x] Store OHLCV, not only closes: fills at the next bar's open need it.
 - [ ] Universe rule written down, and its survivorship bias stated in the report.
 - [x] Exchange calendar with holidays and half days; all timestamps UTC.
@@ -82,7 +82,9 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
       WYND → TNL, CDAY → DAY, ARNC → HWM) so their earlier index years have
       prices; with a few acquired companies EODHD lacks, about 0.67% of
-      member-days have no prices today.
+      member-days have no prices today. The same map finds 1-minute bars for
+      stocks whose earlier ticker the membership file does not show (BKNG was
+      PCLN until 2018, AABA was YHOO until 2017).
 - [ ] Speed up the nightly download, 17 minutes for 767 codes: parallel
       requests or EODHD's bulk end-of-day endpoint.
 - [ ] Backtests read the stored Parquet file, never a fresh download: two
@@ -91,6 +93,10 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance; no
       trade below `band_pct`.
 - [ ] Timing without ML: equal-spaced child orders.
+- [ ] Choose `max_children` and `min_gap_min` in the backtest, net of
+      commissions (for example 1, 2, 3, 5 or 10 child orders; 0 to 60 minutes
+      apart), with walk-forward tests, instead of keeping the Phase 0 guesses.
+      Guard's limits stay hand-set safety limits, not tuned for profit.
 - [ ] Cost model: commission and FX for the chosen broker, plus spread and slippage.
 - [ ] Guard rules applied in the backtest too.
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against

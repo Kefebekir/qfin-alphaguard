@@ -5,6 +5,7 @@ lives in the git-ignored .env file (`uv run --env-file .env qfin ingest`); on
 AWS it comes from an SSM parameter (infra/aws/task-definition.template.json).
 """
 
+import http.client
 import json
 import os
 import re
@@ -14,12 +15,25 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 import polars as pl
 
 BASE_URL = "https://eodhd.com/api"
 ATTEMPTS = 4  # for a rate limit (429), a server error (5xx) or a network error
+
+# EODHD returns at most about 120 days of 1-minute bars per request.
+MINUTE_WINDOW_DAYS = 100
+
+MINUTE_SCHEMA = {
+    "start": pl.Datetime("us", "UTC"),
+    "ticker": pl.String,
+    "open": pl.Float64,
+    "high": pl.Float64,
+    "low": pl.Float64,
+    "close": pl.Float64,
+    "volume": pl.Int64,
+}
 
 BARS_SCHEMA = {
     "date": pl.Date,
@@ -74,8 +88,10 @@ class EodhdClient:
                 problem = f"HTTP {error.code}"
                 if error.code != 429 and error.code < 500:
                     break  # a bad request or key does not get better by retrying
-            except OSError as error:  # network errors and timeouts
-                problem = str(getattr(error, "reason", error))
+            except (OSError, http.client.HTTPException, json.JSONDecodeError) as error:
+                # Network errors and timeouts, and answers cut off on the way:
+                # a large 1-minute download once broke off after 97 KB.
+                problem = str(getattr(error, "reason", error)) or type(error).__name__
             if attempt < ATTEMPTS:
                 self._sleep(2**attempt)
         # Raised outside the except blocks so the traceback does not carry the
@@ -121,6 +137,47 @@ class EodhdClient:
             adjustment.alias("adjustment"),
         )
 
+    def minute_bars(self, code: str, first: date, last: date) -> pl.DataFrame:
+        """1-minute bars from `first` to `last`, both included, as traded.
+
+        EODHD labels a bar with the minute it starts, in UTC, and includes
+        pre-market and after-hours trading: cut to the regular session with
+        intraday.regular_session. Prices and volume are not adjusted for
+        splits. Asks in windows of MINUTE_WINDOW_DAYS days.
+        """
+        frames = []
+        window_first = first
+        while window_first <= last:
+            window_last = min(window_first + timedelta(MINUTE_WINDOW_DAYS - 1), last)
+            since = _midnight_utc(window_first)
+            until = _midnight_utc(window_last + timedelta(1))
+            rows = self._get(
+                f"intraday/{code}.US",
+                interval="1m",
+                **{
+                    "from": str(int(since.timestamp())),
+                    "to": str(int(until.timestamp()) - 1),
+                },
+            )
+            if rows:
+                frames.append(
+                    pl.DataFrame(rows, infer_schema_length=None)
+                    .select(
+                        pl.from_epoch("timestamp", time_unit="s")
+                        .dt.replace_time_zone("UTC")
+                        .dt.cast_time_unit("us")
+                        .alias("start"),
+                        pl.lit(code).alias("ticker"),
+                        pl.col("open", "high", "low", "close").cast(pl.Float64),
+                        pl.col("volume").cast(pl.Int64),
+                    )
+                    .drop_nulls()
+                )
+            window_first = window_last + timedelta(1)
+        if not frames:
+            return pl.DataFrame(schema=MINUTE_SCHEMA)
+        return pl.concat(frames).unique("start", keep="first").sort("start")
+
     def splits(self, code: str) -> list[tuple[date, float]]:
         """Stock splits of one code as (date, ratio), oldest first.
 
@@ -146,3 +203,7 @@ class EodhdClient:
             if match:
                 found[match.group(1)].append(row["Code"])
         return {ticker: tuple(sorted(codes)) for ticker, codes in found.items()}
+
+
+def _midnight_utc(day: date) -> datetime:
+    return datetime(day.year, day.month, day.day, tzinfo=UTC)

@@ -27,6 +27,9 @@ import polars as pl
 # so a new listing's busy first weeks cannot buy it a place.
 MIN_TRADING_DAYS = 126
 
+# How many stocks the trading universe holds (decision 0005, set by Efe).
+TRADING_UNIVERSE_SIZE = 50
+
 # Two share classes of one company move as one. On a typical day the returns
 # of GOOG and GOOGL differed by 0.06-0.15% in every year since 2015, while the
 # closest pairs of different companies among the most traded members (KO and

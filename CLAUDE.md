@@ -38,12 +38,13 @@ interview. Claude works as a pair programmer, not as the author.
 ## Commands
 
 ```bash
-uv sync                             # install dependencies
-uv run pytest                       # run the tests
-uv run ruff check .                 # lint
-uv run ruff format .                # format
-uv run qfin ingest --synthetic      # run the data pipeline without network access
-uv run --env-file .env qfin ingest  # real data; needs EODHD_API_KEY in .env
+uv sync                               # install dependencies
+uv run pytest                         # run the tests
+uv run ruff check .                   # lint
+uv run ruff format .                  # format
+uv run qfin ingest --synthetic        # run the data pipeline without network access
+uv run --env-file .env qfin ingest    # real data; needs EODHD_API_KEY in .env
+uv run --env-file .env qfin intraday  # 1-minute bars, after ingest
 ```
 
 CI runs ruff, the tests and a Docker build on every push and pull request.

@@ -1,6 +1,7 @@
 """Command line entry point.
 
     qfin ingest     load, validate and store daily prices (the nightly AWS job)
+    qfin intraday   download 1-minute bars for each year's trading universe
     qfin plan       build the next day's daily_plan.json (Phase 1, not built yet)
     qfin backtest   run the event-driven backtester (Phase 1, not built yet)
 
@@ -13,9 +14,20 @@ import sys
 from datetime import UTC, datetime
 
 from qfin_alphaguard.config import Config
+from qfin_alphaguard.data.eodhd import EodhdClient, api_key
 from qfin_alphaguard.data.ingest import load_prices, sp500_coverage
-from qfin_alphaguard.data.store import prices_path, upload_to_s3, write_prices
-from qfin_alphaguard.data.universe import sp500
+from qfin_alphaguard.data.intraday import YearOfMinutes, backfill_minutes
+from qfin_alphaguard.data.store import (
+    prices_path,
+    read_prices,
+    upload_to_s3,
+    write_prices,
+)
+from qfin_alphaguard.data.universe import (
+    TRADING_UNIVERSE_SIZE,
+    sp500,
+    trading_universe,
+)
 from qfin_alphaguard.data.validate import validate_prices
 
 
@@ -43,6 +55,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="last date to download (YYYY-MM-DD); defaults to today for real data",
     )
     ingest.set_defaults(run=_ingest)
+
+    intraday = commands.add_parser(
+        "intraday", help="download 1-minute bars for each year's trading universe"
+    )
+    intraday.add_argument(
+        "--from-year",
+        type=int,
+        default=2016,
+        help="first year; 2016 is the first with a trading universe",
+    )
+    intraday.add_argument(
+        "--to-year", type=int, help="last year; defaults to the current year"
+    )
+    intraday.add_argument(
+        "--workers", type=int, default=4, help="requests to EODHD at a time"
+    )
+    intraday.set_defaults(run=_intraday)
 
     plan = commands.add_parser(
         "plan", help="build the next day's daily_plan.json (not built yet)"
@@ -90,6 +119,53 @@ def _ingest(args: argparse.Namespace) -> int:
         uri = upload_to_s3(path, args.s3_bucket)
         print(f"uploaded {uri}")
     return 0
+
+
+def _intraday(args: argparse.Namespace) -> int:
+    config = Config()
+    daily_path = prices_path(config)
+    if not daily_path.exists():
+        print(f"{daily_path} not found; run `qfin ingest` first", file=sys.stderr)
+        return 1
+    daily = read_prices(daily_path)
+    today = datetime.now(UTC).date()
+    years = range(args.from_year, (args.to_year or today.year) + 1)
+    universes = {
+        year: trading_universe(daily, year, TRADING_UNIVERSE_SIZE) for year in years
+    }
+
+    def report(stored: YearOfMinutes) -> None:
+        if stored.error:
+            print(f"{stored.year} {stored.ticker:9} failed: {stored.error}", flush=True)
+            return
+        source = stored.source or "nowhere"
+        print(
+            f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
+            f" {stored.matching:.0%} of days match the daily close",
+            flush=True,
+        )
+
+    done = backfill_minutes(
+        EodhdClient(api_key()),
+        daily,
+        sp500(),
+        universes,
+        config.raw_dir,
+        today,
+        workers=args.workers,
+        report=report,
+    )
+    failed = [f"{stored.ticker} {stored.year}" for stored in done if stored.error]
+    missing = [
+        f"{stored.ticker} {stored.year}"
+        for stored in done
+        if not stored.source and not stored.error
+    ]
+    print(
+        f"stored {len(done) - len(failed) - len(missing)} stock-years; "
+        f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}"
+    )
+    return 1 if failed else 0
 
 
 def _not_built_yet(args: argparse.Namespace) -> int:
