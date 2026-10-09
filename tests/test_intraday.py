@@ -166,6 +166,29 @@ def test_a_year_without_matching_minutes_is_tried_again_next_time(tmp_path):
     assert client.asked == ["AAA", "AAA"]
 
 
+def test_a_failed_download_is_reported_and_the_others_go_on(tmp_path):
+    day = date(2025, 3, 4)
+    history = IndexHistory((span("AAA", "2000-01-03"), span("BAD", "2000-01-03")))
+
+    class FailsForBad(FakeMinuteClient):
+        def minute_bars(self, code, first, last):
+            if code == "BAD":
+                raise RuntimeError("EODHD request for intraday/BAD.US failed: HTTP 500")
+            return super().minute_bars(code, first, last)
+
+    client = FailsForBad({"AAA": minutes("AAA", [at(day, 20, 59)], [100.0])})
+    prices = pl.concat([daily("AAA", [day], [100.0]), daily("BAD", [day], [100.0])])
+
+    done = backfill_minutes(
+        client, prices, history, {2025: ("AAA", "BAD")}, tmp_path, date(2026, 10, 8)
+    )
+
+    by_ticker = {stored.ticker: stored for stored in done}
+    assert by_ticker["AAA"].source == "AAA"
+    assert "HTTP 500" in by_ticker["BAD"].error
+    assert intraday_path(tmp_path, "AAA", 2025).exists()
+
+
 def test_minutes_that_do_not_match_the_daily_closes_are_not_kept():
     day = date(2018, 3, 6)
     history = IndexHistory((span("AAA", "2000-01-03"),))

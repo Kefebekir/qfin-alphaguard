@@ -1,3 +1,4 @@
+import http.client
 import io
 import json
 import urllib.error
@@ -31,6 +32,8 @@ class FakeUrlopen:
         reply = self.replies.pop(0)
         if isinstance(reply, int):
             raise urllib.error.HTTPError(url, reply, "error", {}, None)
+        if reply == "cut off":
+            raise http.client.IncompleteRead(b'[{"date": "2025-1')
         return io.BytesIO(json.dumps(reply).encode())
 
 
@@ -99,6 +102,12 @@ def test_a_rate_limit_is_retried():
     eod, fake = client(429, 503, NFLX_ROWS)
     assert eod.daily_bars("NFLX", date(2025, 11, 14), date(2025, 11, 17)).height == 2
     assert len(fake.urls) == 3
+
+
+def test_an_answer_cut_off_on_the_way_is_retried():
+    eod, fake = client("cut off", NFLX_ROWS)
+    assert eod.daily_bars("NFLX", date(2025, 11, 14), date(2025, 11, 17)).height == 2
+    assert len(fake.urls) == 2
 
 
 def test_a_bad_key_fails_at_once_and_the_error_hides_the_key():

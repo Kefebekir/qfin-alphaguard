@@ -5,6 +5,7 @@ lives in the git-ignored .env file (`uv run --env-file .env qfin ingest`); on
 AWS it comes from an SSM parameter (infra/aws/task-definition.template.json).
 """
 
+import http.client
 import json
 import os
 import re
@@ -87,8 +88,10 @@ class EodhdClient:
                 problem = f"HTTP {error.code}"
                 if error.code != 429 and error.code < 500:
                     break  # a bad request or key does not get better by retrying
-            except OSError as error:  # network errors and timeouts
-                problem = str(getattr(error, "reason", error))
+            except (OSError, http.client.HTTPException, json.JSONDecodeError) as error:
+                # Network errors and timeouts, and answers cut off on the way:
+                # a large 1-minute download once broke off after 97 KB.
+                problem = str(getattr(error, "reason", error)) or type(error).__name__
             if attempt < ATTEMPTS:
                 self._sleep(2**attempt)
         # Raised outside the except blocks so the traceback does not carry the

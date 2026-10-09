@@ -135,6 +135,9 @@ def _intraday(args: argparse.Namespace) -> int:
     }
 
     def report(stored: YearOfMinutes) -> None:
+        if stored.error:
+            print(f"{stored.year} {stored.ticker:9} failed: {stored.error}", flush=True)
+            return
         source = stored.source or "nowhere"
         print(
             f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
@@ -152,11 +155,17 @@ def _intraday(args: argparse.Namespace) -> int:
         workers=args.workers,
         report=report,
     )
-    missing = [f"{stored.ticker} {stored.year}" for stored in done if not stored.source]
+    failed = [f"{stored.ticker} {stored.year}" for stored in done if stored.error]
+    missing = [
+        f"{stored.ticker} {stored.year}"
+        for stored in done
+        if not stored.source and not stored.error
+    ]
     print(
-        f"stored {len(done)} stock-years; without matching minutes: {missing or 'none'}"
+        f"stored {len(done) - len(failed) - len(missing)} stock-years; "
+        f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}"
     )
-    return 0
+    return 1 if failed else 0
 
 
 def _not_built_yet(args: argparse.Namespace) -> int:

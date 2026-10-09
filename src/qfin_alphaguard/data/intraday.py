@@ -44,6 +44,7 @@ class YearOfMinutes:
     rows: int
     sessions: int  # sessions in the year, up to the last day asked for
     matching: float  # share of days whose last minute matched the daily close
+    error: str | None = None  # why the download failed, if it did
 
 
 def intraday_path(root: Path, ticker: str, year: int) -> Path:
@@ -154,7 +155,8 @@ def backfill_minutes(
     Years before `last_day`'s year that already have minutes are final and
     skipped, so an interrupted run picks up where it stopped; the current year
     is downloaded again. A year without matching minutes gets no file and is
-    tried again next time, when its sources may be known.
+    tried again next time, when its sources may be known. A download that fails
+    is reported with its error and does not stop the others.
     """
     tasks = [
         (code, year)
@@ -165,7 +167,12 @@ def backfill_minutes(
 
     def run(task: tuple[str, int]) -> YearOfMinutes:
         code, year = task
-        minutes, summary = download_year(client, code, year, last_day, daily, history)
+        try:
+            minutes, summary = download_year(
+                client, code, year, last_day, daily, history
+            )
+        except RuntimeError as error:  # EODHD still failing after its retries
+            return YearOfMinutes(code, year, None, 0, 0, 0.0, error=str(error))
         if not minutes.is_empty():
             path = intraday_path(root, code, year)
             path.parent.mkdir(parents=True, exist_ok=True)
