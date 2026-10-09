@@ -61,11 +61,15 @@ the 25% band, by net Sharpe ratio. The 1,000 USD minimum trade applies on top.
 
 - The plan carries each stock's daily volatility (`DailyPlan.volatility`): the
   standard deviation of its daily returns over the last year.
-- The band is Efe's code (Phase 1 step 7b). It also has to settle whether a
-  stock the plan drops is sold completely even below 1,000 USD. At 100,000 USD
-  and k = 10, keeping such remainders leaves a median of 25 stocks held instead
-  of 15, and the tracking error is 0.94% instead of 0.72%, for 5.6 instead of
-  6.8 bps a year.
+- The band is Efe's code (Phase 1 step 7b). Two more rules were settled with
+  it; Efe left the choice to Claude:
+  - A stock the plan drops is sold completely, even below 1,000 USD. At
+    100,000 USD and k = 10, keeping such remainders would leave a median of 25
+    stocks held instead of 15, and the tracking error would be 0.94% instead
+    of 0.72%, for 5.6 instead of 6.8 bps a year.
+  - Buys are paid from cash and the day's sales. When those fall short, every
+    buy is cut by the same factor; nothing is borrowed, as Guard's
+    `max_gross_exposure: 1.0` also requires.
 - At 30,000 USD and below, swaps cost more than any band saves. Keeping a held
   stock unless its replacement is clearly better changes the plan, not the
   band; it is measured in the step 10 backtest.

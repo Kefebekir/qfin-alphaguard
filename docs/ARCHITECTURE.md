@@ -110,9 +110,12 @@ u_i,t = s_i,t · sign(Δ_i)                             score in the trade's dir
 send a child order when u_i,t ≥ θ(t)
 ```
 
-1. **At the open:** compute Δ. Skip the stock if its weight gap is within its
-   own band, `k` days of its daily volatility times its weight (decision 0006),
-   or the trade is below `min_trade_usd`.
+1. **At the open:** compute Δ (`rebalance.trades_at_open`). Skip the stock if
+   its weight gap is within its own band, `band_k` days of its daily volatility
+   times the larger of its target and current weight (decision 0006), or the
+   trade is below `min_trade_usd`. A stock the plan dropped is sold
+   completely. Buys are paid from cash and the day's sales; when those fall
+   short, every buy is cut by the same factor.
 2. **Split** the trade into at most `max_children` child orders of at least
    `min_trade_usd` each.
 3. **Every bar:** send a child when u ≥ θ(t), at least `min_gap_min` minutes
