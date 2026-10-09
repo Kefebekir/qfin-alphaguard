@@ -10,6 +10,7 @@ from qfin_alphaguard.data.intraday import (
     matching_share,
     minute_feed,
     minute_sources,
+    minute_windows,
     regular_session,
 )
 from qfin_alphaguard.data.universe import IndexHistory, Membership
@@ -213,6 +214,47 @@ def test_a_year_stored_while_it_was_running_is_downloaded_again(tmp_path):
     assert stored["start"].dt.date().to_list() == days
 
 
+def test_a_year_needs_its_universe_all_year_and_the_stocks_that_left_until_january():
+    windows = minute_windows({2024: ("A", "B"), 2025: ("B", "C")})
+
+    assert windows == {
+        2024: {"A": date(2024, 12, 31), "B": date(2024, 12, 31)},
+        2025: {
+            "B": date(2025, 12, 31),
+            "C": date(2025, 12, 31),
+            "A": date(2025, 1, 31),
+        },
+    }
+
+
+def test_a_stock_that_left_the_universe_gets_its_minutes_for_january(tmp_path):
+    days = [date(2025, 1, 2), date(2025, 2, 3)]
+    history = IndexHistory((span("OLD", "2000-01-03"), span("NEW", "2000-01-03")))
+    client = FakeMinuteClient(
+        {
+            "OLD": minutes("OLD", [at(day, 20, 59) for day in days]),
+            "NEW": minutes("NEW", [at(day, 20, 59) for day in days]),
+        }
+    )
+    prices = pl.concat(
+        [daily("OLD", days, [100.0, 100.0]), daily("NEW", days, [100.0, 100.0])]
+    )
+
+    backfill_minutes(
+        client,
+        prices,
+        history,
+        {2024: ("OLD",), 2025: ("NEW",)},
+        tmp_path,
+        date(2026, 10, 8),
+    )
+
+    old = pl.read_parquet(intraday_path(tmp_path, "OLD", 2025))
+    new = pl.read_parquet(intraday_path(tmp_path, "NEW", 2025))
+    assert old["start"].dt.date().to_list() == days[:1]  # January only
+    assert new["start"].dt.date().to_list() == days
+
+
 def test_the_summary_counts_the_trading_days_that_have_minutes():
     # EODHD lacks some days for good: TSLA's from July 2023 to May 2024.
     days = [date(2018, 3, 5), date(2018, 3, 6), date(2018, 3, 7)]
@@ -319,12 +361,22 @@ def test_the_feed_keeps_to_the_days_asked_for_and_skips_missing_files(tmp_path):
     assert [bar.start.date() for bar in bars] == days[1:]
 
 
-def test_the_feed_takes_each_year_from_that_years_universe(tmp_path):
+def test_the_feed_gives_a_stock_that_left_the_universe_until_january_ends(tmp_path):
     store(tmp_path, "OLD", 2024, [at(date(2024, 12, 31), 15, 0)])
     store(tmp_path, "NEW", 2025, [at(date(2025, 1, 2), 15, 0)])
-    store(tmp_path, "OLD", 2025, [at(date(2025, 1, 2), 15, 0)])  # out of the 2025 list
+    # OLD left the universe at the new year; a file may hold more than January.
+    store(
+        tmp_path,
+        "OLD",
+        2025,
+        [at(date(2025, 1, 2), 15, 0), at(date(2025, 2, 3), 15, 0)],
+    )
 
     universes = {2024: ("OLD",), 2025: ("NEW",)}
-    bars = list(minute_feed(tmp_path, universes, date(2024, 12, 31), date(2025, 1, 2)))
+    bars = list(minute_feed(tmp_path, universes, date(2024, 12, 31), date(2025, 2, 3)))
 
-    assert [bar.ticker for bar in bars] == ["OLD", "NEW"]
+    assert [(bar.start.date(), bar.ticker) for bar in bars] == [
+        (date(2024, 12, 31), "OLD"),
+        (date(2025, 1, 2), "NEW"),
+        (date(2025, 1, 2), "OLD"),
+    ]

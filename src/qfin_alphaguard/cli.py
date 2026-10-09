@@ -57,7 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.set_defaults(run=_ingest)
 
     intraday = commands.add_parser(
-        "intraday", help="download 1-minute bars for each year's trading universe"
+        "intraday",
+        help="download 1-minute bars for each year's trading universe, and for "
+        "January of the stocks that left it",
     )
     intraday.add_argument(
         "--from-year",
