@@ -74,6 +74,7 @@ def test_a_large_one_day_move_is_a_warning():
             "close": closes,
             "volume": [1000] * 3,
             "adjustment": [1.0] * 3,
+            "split_factor": [1.0] * 3,
             "sp500": [True] * 3,
         }
     )
@@ -95,6 +96,7 @@ def test_constant_series_is_flagged():
             "close": [100.0] * 3,
             "volume": [1000] * 3,
             "adjustment": [1.0] * 3,
+            "split_factor": [1.0] * 3,
             "sp500": [True] * 3,
         }
     )

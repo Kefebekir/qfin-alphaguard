@@ -56,6 +56,7 @@ def generate_prices(config: Config) -> pl.DataFrame:
                     "close": closes[:, i],
                     "volume": volumes[:, i],
                     "adjustment": np.ones(n_days),
+                    "split_factor": np.ones(n_days),
                     "sp500": [True] * n_days,
                 }
             )

@@ -16,13 +16,20 @@ from qfin_alphaguard.data.universe import IndexHistory, Membership, sp500
 # validation.
 ROUNDING_TOLERANCE = 1e-9
 
+# A split shows up as a jump in `adjustment` (10x for a 10-for-1 split). Split
+# histories are fetched only for codes whose adjustment jumps by more than
+# this from one day to the next; a 5-for-4 split is a 1.25 jump, while
+# ordinary dividends move it by a few percent at most.
+SPLIT_JUMP = 1.15
+
 
 def load_prices(config: Config) -> pl.DataFrame:
-    """Daily bars: date, ticker, open, high, low, close, volume, adjustment, sp500.
+    """Daily bars with prices and volume adjusted for splits and dividends.
 
-    Prices are adjusted for splits and dividends; the price as traded is the
-    adjusted price divided by `adjustment`. `sp500` says whether the stock was
-    in the S&P 500 that day.
+    Columns: date, ticker, open, high, low, close, volume, adjustment,
+    split_factor, sp500. The price as traded that day is the adjusted price
+    divided by `adjustment`; the shares traded are `volume / split_factor`.
+    `sp500` says whether the stock was in the S&P 500 that day.
     """
     if config.synthetic:
         return generate_prices(config)
@@ -61,11 +68,27 @@ def download_sp500(
                 stretches[best].append(span)
         for candidate, spans in stretches.items():
             member = pl.any_horizontal([_inside(span) for span in spans])
-            frames.append(bars[candidate].with_columns(member.alias("sp500")))
+            with_splits = _with_split_factor(client, candidate, bars[candidate])
+            frames.append(with_splits.with_columns(member.alias("sp500")))
 
     if not frames:
-        return pl.DataFrame(schema={**BARS_SCHEMA, "sp500": pl.Boolean})
-    return snap_rounding(pl.concat(frames).sort(["ticker", "date"]))
+        return pl.DataFrame(
+            schema={**BARS_SCHEMA, "split_factor": pl.Float64, "sp500": pl.Boolean}
+        )
+    prices = drop_lone_bars(pl.concat(frames))
+    return snap_rounding(prices.sort(["ticker", "date"]))
+
+
+def drop_lone_bars(prices: pl.DataFrame) -> pl.DataFrame:
+    """Drop bars on days when fewer than half the usual number of codes traded.
+
+    Such a day is a market holiday with a stray bar, not a trading day:
+    Nordstrom has bars on New Year's Day 2025 and on 9 January 2025, when the
+    exchange closed for President Carter's funeral. The exchange calendar
+    (Phase 1, step 3) will replace this rule.
+    """
+    codes_that_day = pl.len().over("date")
+    return prices.filter(codes_that_day >= 0.5 * codes_that_day.median())
 
 
 def sp500_coverage(prices: pl.DataFrame, history: IndexHistory) -> float:
@@ -96,6 +119,24 @@ def snap_rounding(df: pl.DataFrame) -> pl.DataFrame:
         .alias("high"),
         pl.when(low_is_rounding).then(body_low).otherwise(pl.col("low")).alias("low"),
     )
+
+
+def _with_split_factor(
+    client: EodhdClient, code: str, bars: pl.DataFrame
+) -> pl.DataFrame:
+    """Add `split_factor`: how many of today's shares one share of that day became.
+
+    It is 10 for Netflix before its 10-for-1 split in November 2025 and 1 after,
+    so dividing the split-adjusted volume by it gives the shares traded that day.
+    """
+    bars = bars.sort("date")
+    step = pl.col("adjustment") / pl.col("adjustment").shift(1)
+    jumps = bars.select(((step > SPLIT_JUMP) | (step < 1 / SPLIT_JUMP)).any()).item()
+    factor = pl.lit(1.0)
+    if jumps:
+        for day, ratio in client.splits(code):
+            factor = factor * pl.when(pl.col("date") < day).then(ratio).otherwise(1.0)
+    return bars.with_columns(factor.alias("split_factor"))
 
 
 def _inside(span: Membership) -> pl.Expr:

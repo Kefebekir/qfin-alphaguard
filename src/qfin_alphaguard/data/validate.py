@@ -5,8 +5,8 @@ from dataclasses import dataclass
 import polars as pl
 
 PRICE_COLUMNS = ("open", "high", "low", "close")
-# Prices and the split and dividend factor must all be finite and positive.
-POSITIVE_COLUMNS = (*PRICE_COLUMNS, "adjustment")
+# Prices and the split and dividend factors must all be finite and positive.
+POSITIVE_COLUMNS = (*PRICE_COLUMNS, "adjustment", "split_factor")
 # A one-day move this large is rare enough to look at every time it happens.
 LARGE_MOVE = 0.5
 

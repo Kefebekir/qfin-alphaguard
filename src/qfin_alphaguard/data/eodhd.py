@@ -121,6 +121,18 @@ class EodhdClient:
             adjustment.alias("adjustment"),
         )
 
+    def splits(self, code: str) -> list[tuple[date, float]]:
+        """Stock splits of one code as (date, ratio), oldest first.
+
+        The ratio is new shares per old share: 10.0 for Netflix's 10-for-1
+        split, 0.005 for a 1-for-200 reverse split.
+        """
+        found = []
+        for row in self._get(f"splits/{code}.US") or []:
+            new, old = (float(part) for part in row["split"].split("/"))
+            found.append((date.fromisoformat(row["date"]), new / old))
+        return sorted(found)
+
     def old_codes(self) -> dict[str, tuple[str, ...]]:
         """EODHD codes of earlier companies whose ticker was later reused, by ticker.
 
