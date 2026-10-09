@@ -7,6 +7,7 @@ import pytest
 
 from qfin_alphaguard.events import (
     Bar,
+    Cancellation,
     DailyPlan,
     ExecutionSettings,
     Fill,
@@ -166,3 +167,11 @@ def test_execution_settings_reject_threshold_above_one():
 def test_risk_action_must_be_the_enum_not_a_string():
     with pytest.raises(TypeError):
         RiskEvent(time=T, rule="max_order_usd", action="reject", detail="too big")
+
+
+def test_a_cancellation_names_its_order_and_a_utc_time():
+    assert Cancellation("bt-0000001", T, "session close").reason == "session close"
+    with pytest.raises(ValueError):
+        Cancellation("", T)
+    with pytest.raises(ValueError, match="UTC"):
+        Cancellation("bt-0000001", NAIVE)
