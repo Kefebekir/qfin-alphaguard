@@ -1,7 +1,7 @@
-"""Cash and shares held, changed only by fills.
+"""Cash and shares held, changed by fills and by corporate actions.
 
-Prices here are as traded, so a split while a position is held needs its
-share count adjusted; corporate actions arrive in Phase 1, step 5b.
+Prices are as traded, so a split changes the share count, and a dividend is
+paid into cash on its ex-date.
 """
 
 import math
@@ -33,6 +33,26 @@ class Portfolio:
         else:
             del self._positions[fill.ticker]
         self._cash -= shares * fill.price + fill.commission
+
+    def split(self, ticker: str, ratio: float, price: float) -> None:
+        """Shares follow a split; a fraction of a share is paid in cash at `price`.
+
+        `price` is per new share. Brokers pay such fractions as "cash in lieu".
+        """
+        held = self._positions.get(ticker, 0)
+        if not held:
+            return
+        exact = round(held * ratio, 9)  # so 3 shares at 1-for-3 make 1, not 0.999...
+        whole = math.trunc(exact)
+        if whole:
+            self._positions[ticker] = whole
+        else:
+            del self._positions[ticker]
+        self._cash += (exact - whole) * price
+
+    def dividend(self, ticker: str, amount: float) -> None:
+        """Cash for each share held; a short position pays it instead."""
+        self._cash += self._positions.get(ticker, 0) * amount
 
     def value(self, prices: Mapping[str, float]) -> float:
         """Cash plus every position at `prices`, which must cover them all."""
