@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from qfin_alphaguard.events import Bar, Fill, Order
+from qfin_alphaguard.events import Bar, Fill, Order, Side
 
 
 class SimulatedBroker(Protocol):
@@ -71,8 +71,12 @@ class CostModel:
           maximum_share of the fill's value (quantity * price)
         - currency conversion adds fx_bps of the fill's value on top
         """
-        # TODO(Efe): Phase 1, step 6. tests/test_broker.py is the spec.
-        raise NotImplementedError("CostModel.commission is not written yet")
+        value = quantity * price
+        broker = self.per_share * quantity
+        if first_fill:
+            broker = max(broker, self.minimum)
+        broker = min(broker, self.maximum_share * value)
+        return broker + self.fx_bps / 10_000 * value
 
 
 class NextBarBroker:
@@ -109,6 +113,8 @@ class NextBarBroker:
         - a price that only touches L does not fill it: other orders wait at L
           before ours
 
+
+
         Quantity: what is left of the order, but at most `participation` of the
         bar's volume, rounded down; nothing if that is 0. The rest waits.
 
@@ -116,5 +122,44 @@ class NextBarBroker:
         first_fill says whether this is the order's first fill. An order that
         is completely filled stops waiting.
         """
-        # TODO(Efe): Phase 1, step 6. tests/test_broker.py is the spec.
-        raise NotImplementedError("NextBarBroker.on_bar is not written yet")
+        fills = []
+        half_spread = self.costs.half_spread_bps / 10_000
+        for client_order_id, order in list(self.waiting.items()):
+            intent = order.intent
+            if intent.ticker != bar.ticker or order.sent_at > bar.start:
+                continue
+            limit = intent.limit_price
+            buy = intent.side is Side.BUY
+            marketable = bar.open <= limit if buy else bar.open >= limit
+            through = bar.low < limit if buy else bar.high > limit
+            if marketable:
+                if buy:
+                    price = min(bar.open * (1 + half_spread), limit, bar.high)
+                else:
+                    price = max(bar.open * (1 - half_spread), limit, bar.low)
+                time = bar.start
+            elif through:
+                price, time = limit, bar.end
+            else:
+                continue
+            left = intent.quantity - self.filled[client_order_id]
+            quantity = min(left, math.floor(self.participation * bar.volume))
+            if quantity == 0:
+                continue
+            first_fill = self.filled[client_order_id] == 0
+            commission = self.costs.commission(quantity, price, first_fill)
+            fills.append(
+                Fill(
+                    client_order_id,
+                    intent.ticker,
+                    intent.side,
+                    quantity,
+                    price,
+                    commission,
+                    time,
+                )
+            )
+            self.filled[client_order_id] += quantity
+            if self.filled[client_order_id] == intent.quantity:
+                del self.waiting[client_order_id]
+        return fills
