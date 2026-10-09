@@ -162,16 +162,18 @@ def test_no_split_history_is_fetched_without_a_jump():
     assert prices["split_factor"].unique().to_list() == [1.0]
 
 
-def test_a_stray_bar_on_a_market_holiday_is_dropped():
-    days = weekdays(date(2024, 12, 30), date(2025, 1, 3))  # includes 1 January
-    trading_days = [day for day in days if day != date(2025, 1, 1)]
-    client = FakeClient({"A": trading_days, "B": trading_days, "C": days})
-    history = IndexHistory(tuple(span(t, "2020-01-02") for t in "ABC"))
+def test_bars_on_days_the_exchange_was_closed_are_dropped():
+    # 1 and 9 January 2025: New Year's Day and the closure for President Carter.
+    days = weekdays(date(2024, 12, 30), date(2025, 1, 10))
+    client = FakeClient({"A": days})
+    history = IndexHistory((span("A", "2020-01-02"),))
 
     prices = download_sp500(client, history, days[0], days[-1])
 
-    assert date(2025, 1, 1) not in prices["date"].to_list()
-    assert prices.height == 3 * len(trading_days)
+    dates = prices["date"].to_list()
+    assert date(2025, 1, 1) not in dates
+    assert date(2025, 1, 9) not in dates
+    assert len(dates) == len(days) - 2
 
 
 def test_a_member_without_data_lowers_the_coverage():

@@ -9,6 +9,7 @@ from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.eodhd import BARS_SCHEMA, EodhdClient, api_key, eodhd_code
 from qfin_alphaguard.data.synthetic import generate_prices
 from qfin_alphaguard.data.universe import IndexHistory, Membership, sp500
+from qfin_alphaguard.sessions import session_days
 
 # Scaling prices for splits and dividends can leave a close a hair above the
 # high: about 1e-16 relative, from floating-point rounding. Gaps up to this
@@ -75,20 +76,20 @@ def download_sp500(
         return pl.DataFrame(
             schema={**BARS_SCHEMA, "split_factor": pl.Float64, "sp500": pl.Boolean}
         )
-    prices = drop_lone_bars(pl.concat(frames))
+    prices = keep_sessions(pl.concat(frames))
     return snap_rounding(prices.sort(["ticker", "date"]))
 
 
-def drop_lone_bars(prices: pl.DataFrame) -> pl.DataFrame:
-    """Drop bars on days when fewer than half the usual number of codes traded.
+def keep_sessions(prices: pl.DataFrame) -> pl.DataFrame:
+    """Drop bars on days the exchange was closed.
 
-    Such a day is a market holiday with a stray bar, not a trading day:
-    Nordstrom has bars on New Year's Day 2025 and on 9 January 2025, when the
-    exchange closed for President Carter's funeral. The exchange calendar
-    (Phase 1, step 3) will replace this rule.
+    EODHD has a few: by its data, Nordstrom traded on New Year's Day 2025 and
+    on 9 January 2025, when the exchange closed for President Carter's funeral.
     """
-    codes_that_day = pl.len().over("date")
-    return prices.filter(codes_that_day >= 0.5 * codes_that_day.median())
+    if prices.is_empty():
+        return prices
+    days = pl.Series(session_days(prices["date"].min(), prices["date"].max()))
+    return prices.filter(pl.col("date").is_in(days.implode()))
 
 
 def sp500_coverage(prices: pl.DataFrame, history: IndexHistory) -> float:

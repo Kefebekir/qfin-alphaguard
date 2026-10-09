@@ -11,6 +11,7 @@ dependencies = [
     "boto3>=1.43.108",
     "cvxpy>=1.9.3",
     "duckdb>=1.5.5",
+    "exchange-calendars>=4.13.2",
     "numpy>=2.5.3",
     "polars>=1.44.2",
     "pyarrow>=25.0.1",

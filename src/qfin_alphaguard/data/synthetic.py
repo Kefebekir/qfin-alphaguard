@@ -6,22 +6,23 @@ import numpy as np
 import polars as pl
 
 from qfin_alphaguard.config import Config
+from qfin_alphaguard.sessions import session_days
 
 
 def generate_prices(config: Config) -> pl.DataFrame:
     """Daily bars in the same columns as real data.
 
-    Synthetic prices need no adjustment, and every ticker counts as an index
-    member on every day.
+    Synthetic prices need no adjustment, every ticker counts as an index
+    member on every day, and the days are the exchange's real sessions.
     """
     rng = np.random.default_rng(config.seed)
-    dates = pl.date_range(
-        start=date.fromisoformat(config.start_date),
-        end=date.fromisoformat(config.end_date),
-        interval="1d",
-        eager=True,
+    # The exchange's real trading days, so holidays have no bars here either.
+    dates = pl.Series(
+        "date",
+        session_days(
+            date.fromisoformat(config.start_date), date.fromisoformat(config.end_date)
+        ),
     )
-    dates = dates.filter(dates.dt.weekday() <= 5)
 
     n_days = len(dates)
     n_assets = len(config.tickers)
