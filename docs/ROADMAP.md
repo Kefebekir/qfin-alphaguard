@@ -82,7 +82,9 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
       WYND → TNL, CDAY → DAY, ARNC → HWM) so their earlier index years have
       prices; with a few acquired companies EODHD lacks, about 0.67% of
-      member-days have no prices today.
+      member-days have no prices today. The same map finds 1-minute bars for
+      stocks whose earlier ticker the membership file does not show (BKNG was
+      PCLN until 2018, AABA was YHOO until 2017).
 - [ ] Speed up the nightly download, 17 minutes for 767 codes: parallel
       requests or EODHD's bulk end-of-day endpoint.
 - [ ] Backtests read the stored Parquet file, never a fresh download: two
@@ -91,6 +93,10 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance; no
       trade below `band_pct`.
 - [ ] Timing without ML: equal-spaced child orders.
+- [ ] Choose `max_children` and `min_gap_min` in the backtest, net of
+      commissions (for example 1, 2, 3, 5 or 10 child orders; 0 to 60 minutes
+      apart), with walk-forward tests, instead of keeping the Phase 0 guesses.
+      Guard's limits stay hand-set safety limits, not tuned for profit.
 - [ ] Cost model: commission and FX for the chosen broker, plus spread and slippage.
 - [ ] Guard rules applied in the backtest too.
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
