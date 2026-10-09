@@ -96,8 +96,6 @@ Two things I care about more than the results:
   right; dividing by the `adjustment` column gives the price as traded, and
   `volume / split_factor` the shares traded, for share counts, commissions and
   ranking stocks by liquidity without using later dividends.
-- **Synthetic calendar.** Generated data includes market holidays; real data does
-  not. This only affects tests, not results.
 
 ## Getting started
 

@@ -6,9 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 3 is next:** the exchange calendar. EODHD's 1-minute bars run
-from 04:00 to 20:00 New York time, so the calendar is also what keeps only the
-regular session, half days included.
+**Phase 1, step 4 is next:** intraday bars from EODHD's 1-minute data, cut to
+the regular session with the exchange calendar, as `Bar` events.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -16,8 +15,8 @@ regular session, half days included.
 | 2a. Universe rule (decision 0005) and S&P 500 membership by date | Efe decided, Claude wrote | done, #8 |
 | 2b. Daily bars from EODHD for every member since 2015, stocks that left included | Claude | done, #9 |
 | 2c. Trading universe: the 50 most liquid members, chosen each 1 January | Claude; Efe set N = 50 | done, #10 |
-| 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | next |
-| 4. Intraday bars as `Bar` events, from EODHD intraday or IBKR history | Claude | to do |
+| 3. Exchange calendar: sessions, holidays and half days, all in UTC | Claude | done, #11 |
+| 4. Intraday bars as `Bar` events, from EODHD intraday or IBKR history | Claude | next |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | to do |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |
 | 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
@@ -77,7 +76,7 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       first; use IBKR history for long 1-minute data.
 - [x] Store OHLCV, not only closes: fills at the next bar's open need it.
 - [ ] Universe rule written down, and its survivorship bias stated in the report.
-- [ ] Exchange calendar with holidays and half days; all timestamps UTC.
+- [x] Exchange calendar with holidays and half days; all timestamps UTC.
 - [ ] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1.
 - [x] Split- and dividend-adjusted prices.
 - [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
