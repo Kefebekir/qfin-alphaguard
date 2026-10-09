@@ -24,6 +24,7 @@ stock split into equal-spaced child orders.
 | 7a. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY, as many stocks as the capital can hold | Claude | done, #17 |
 | 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | done, #18 |
 | 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | done, #19 |
+| 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
 | 8. Timing without ML: equal-spaced child orders | Efe | next |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
@@ -116,11 +117,14 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance, holding
       as many stocks as the capital can hold.
 - [x] The band: trade a stock only when its gap is larger than its own
-      volatility allows (decision 0006, step 7b).
+      volatility allows (decision 0006, step 7b), and then only as far as the
+      band's edge (decision 0007, step 7d).
 - [ ] Fewer swaps at small capital: at 30,000 USD the plan holds its top 10,
       and stocks entering and leaving it, 42 times in 2025, cost 16 of the 19
-      bps a year whatever the band (decision 0006). Keep a held stock unless
-      its replacement is clearly better, and measure it in the step 10 backtest.
+      bps a year whatever the band (decision 0006). A buffer (keep a held
+      stock while it ranks within the top 12) halved the trades over
+      2017–2026 without raising the Sharpe ratio (decision 0007); measure it
+      again in the step 10 backtest.
 - [ ] Timing without ML: equal-spaced child orders.
 - [ ] Choose `max_children` and `min_gap_min` in the backtest, net of
       commissions (for example 1, 2, 3, 5 or 10 child orders; 0 to 60 minutes

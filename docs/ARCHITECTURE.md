@@ -99,11 +99,13 @@ commissions low and avoid same-day reversals, and the model's value becomes
 measurable: execution price against arrival price, compared with an
 equal-spaced schedule that uses no model.
 
-For each stock *i*, with plan weight w, account value E, price p, shares held
-n, ML score s in [-1, 1]:
+For each stock *i*, with plan weight w, current weight c, daily volatility σ,
+account value E, price p, shares held n, ML score s in [-1, 1]:
 
 ```
-Δ_i   = round(w_i · E / p_i) − n_i                    shares to trade today
+b_i   = band_k · σ_i · max(w_i, c_i)                  the stock's own band
+e_i   = w_i − b_i · sign(w_i − c_i)                   the band's edge
+Δ_i   = round(e_i · E / p_i) − n_i                    shares to trade today, if |w_i − c_i| > b_i
 N_i   = min(max_children, floor(|Δ_i| · p_i / min_trade_usd))   number of child orders
 u_i,t = s_i,t · sign(Δ_i)                             score in the trade's direction
 θ(t)  = theta0 · (1 − 2 · (t − t0) / (T − t0))        threshold, falls from theta0 to −theta0
@@ -113,9 +115,10 @@ send a child order when u_i,t ≥ θ(t)
 1. **At the open:** compute Δ (`rebalance.trades_at_open`). Skip the stock if
    its weight gap is within its own band, `band_k` days of its daily volatility
    times the larger of its target and current weight (decision 0006), or the
-   trade is below `min_trade_usd`. A stock the plan dropped is sold
-   completely. Buys are paid from cash and the day's sales; when those fall
-   short, every buy is cut by the same factor.
+   trade is below `min_trade_usd`. Otherwise trade only as far as the band's
+   edge (decision 0007). A stock the plan dropped is sold completely. Buys are
+   paid from cash and the day's sales; when those fall short, every buy is cut
+   by the same factor.
 2. **Split** the trade into at most `max_children` child orders of at least
    `min_trade_usd` each.
 3. **Every bar:** send a child when u ≥ θ(t), at least `min_gap_min` minutes

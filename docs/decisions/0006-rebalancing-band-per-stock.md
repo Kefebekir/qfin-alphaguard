@@ -1,6 +1,6 @@
 # 0006: Rebalance a stock only when its gap beats its own volatility
 
-- **Status:** accepted
+- **Status:** accepted; where a trade stops was changed by decision 0007
 - **Date:** 2026-10-09
 
 ## Context
