@@ -12,12 +12,14 @@ from qfin_alphaguard.backtest.engine import (
 from qfin_alphaguard.events import (
     Bar,
     Cancellation,
+    Dividend,
     Fill,
     Order,
     OrderIntent,
     RiskAction,
     RiskEvent,
     Side,
+    Split,
 )
 from qfin_alphaguard.guard.check import GuardDecision
 from qfin_alphaguard.strategy import Strategy
@@ -125,9 +127,9 @@ class AllowAll:
         return GuardDecision(intent)
 
 
-def run(feed, strategy, broker=None, guard=None, cash=10_000.0):
+def run(feed, strategy, broker=None, guard=None, cash=10_000.0, actions=()):
     return run_backtest(
-        feed, strategy, broker or NextOpenBroker(), guard or AllowAll(), cash
+        feed, strategy, broker or NextOpenBroker(), guard or AllowAll(), cash, actions
     )
 
 
@@ -526,3 +528,53 @@ def test_session_close_records_cash_and_value():
             5_000.0,
         ),
     )
+
+
+# --- Splits and dividends --------------------------------------------------
+
+
+def test_a_held_position_keeps_its_value_through_a_split():
+    strategy = Script({at(1): lambda view: [buy(view, quantity=10, limit=2_000.0)]})
+    feed = [
+        bar("A", 0, open=1_100.0),
+        bar("A", 1, open=1_100.0),
+        bar("A", 0, open=110.0, day_open=NEXT_OPEN),  # 10-for-1 overnight
+    ]
+    split = Split("A", NEXT_OPEN.date(), 10.0)
+
+    result = run(
+        feed, strategy, NextOpenBroker(commission=0.0), cash=20_000.0, actions=[split]
+    )
+
+    assert result.positions == {"A": 100}
+    first, second = result.closes
+    assert second.value == pytest.approx(first.value)
+    assert split in result.log
+
+
+def test_a_split_divides_the_last_price_the_strategy_sees_even_when_not_held():
+    seen = {}
+
+    class Watches(Script):
+        def on_session_start(self, view):
+            seen[view.now] = dict(view.last_prices)
+
+    feed = [bar("A", 0, open=1_100.0), bar("A", 0, open=110.0, day_open=NEXT_OPEN)]
+    result = run(feed, Watches(), actions=[Split("A", NEXT_OPEN.date(), 10.0)])
+
+    assert seen[NEXT_OPEN] == {"A": pytest.approx(110.0)}
+    assert records(result, Split) == []  # nothing held, so nothing booked
+
+
+def test_a_dividend_on_a_held_stock_reaches_cash_at_the_open():
+    strategy = Script({at(1): lambda view: [buy(view, quantity=10)]})
+    feed = [bar("A", 0), bar("A", 1), bar("A", 0, day_open=NEXT_OPEN)]
+    dividend = Dividend("A", NEXT_OPEN.date(), 0.25)
+
+    result = run(
+        feed, strategy, NextOpenBroker(commission=0.0), cash=1_000.0, actions=[dividend]
+    )
+
+    first, second = result.closes
+    assert second.cash == pytest.approx(first.cash + 2.5)
+    assert dividend in result.log

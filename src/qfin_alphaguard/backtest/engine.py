@@ -17,14 +17,13 @@ The engine is the referee. It checks every fill against the broker contract
 (backtest/broker.py) and every Guard answer against GuardDecision, and stops
 with an error rather than go on with a backtest whose results would be wrong.
 At each session close it cancels the open orders, values the portfolio and
-logs both.
-
-Not handled yet (Phase 1, step 5b): splits and dividends. Prices are as traded,
-so a split while a position is held distorts its value until corporate
-actions adjust the share count.
+logs both. At each session open, before the strategy hears of the session, it
+applies that day's splits and dividends (data/corporate.py): prices are as
+traded, so held shares must follow a split and dividends must reach cash.
 """
 
 import hashlib
+from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -34,12 +33,14 @@ from qfin_alphaguard.backtest.broker import SimulatedBroker
 from qfin_alphaguard.events import (
     Bar,
     Cancellation,
+    Dividend,
     Fill,
     Order,
     OrderIntent,
     RiskAction,
     RiskEvent,
     Side,
+    Split,
 )
 from qfin_alphaguard.guard.check import GuardDecision, RiskCheck
 from qfin_alphaguard.portfolio import Portfolio
@@ -65,7 +66,16 @@ class SessionClose:
     value: float  # cash plus every position at the last price seen
 
 
-Record = OrderIntent | Order | Fill | Cancellation | RiskEvent | SessionClose
+Record = (
+    OrderIntent
+    | Order
+    | Fill
+    | Cancellation
+    | RiskEvent
+    | SessionClose
+    | Split
+    | Dividend
+)
 
 
 @dataclass(frozen=True)
@@ -87,9 +97,13 @@ def run_backtest(
     broker: SimulatedBroker,
     guard: RiskCheck,
     cash: float,
+    actions: Iterable[Split | Dividend] = (),
 ) -> BacktestResult:
-    """Replay `feed`, bars in time order, through `strategy`, Guard and `broker`."""
-    engine = _Engine(strategy, broker, guard, cash)
+    """Replay `feed`, bars in time order, through `strategy`, Guard and `broker`.
+
+    `actions` are the splits and dividends of the stocks in `feed`.
+    """
+    engine = _Engine(strategy, broker, guard, cash, actions)
     for bars in _slices(feed):
         engine.handle(bars)
     engine.finish()
@@ -104,8 +118,16 @@ class _OpenOrder:
 
 class _Engine:
     def __init__(
-        self, strategy: Strategy, broker: SimulatedBroker, guard: RiskCheck, cash: float
+        self,
+        strategy: Strategy,
+        broker: SimulatedBroker,
+        guard: RiskCheck,
+        cash: float,
+        actions: Iterable[Split | Dividend],
     ) -> None:
+        self.actions: dict[date, list[Split | Dividend]] = defaultdict(list)
+        for action in actions:
+            self.actions[action.day].append(action)
         self.strategy = strategy
         self.broker = broker
         self.guard = guard
@@ -135,6 +157,7 @@ class _Engine:
             if self.session is not None:
                 self.close_session()
             self.session = _session_on(first.start.date())
+            self.apply_actions(self.session.day)
             self.strategy.on_session_start(self.view(self.session.open))
         if not (self.session.open <= first.start and first.end <= self.session.close):
             raise BacktestError(
@@ -150,6 +173,23 @@ class _Engine:
                 self.strategy.on_fill(fill, self.view(now))
         for decision in self.strategy.on_bars(MappingProxyType(bars), self.view(now)):
             self.decide(decision, now)
+
+    def apply_actions(self, day: date) -> None:
+        """The day's splits and dividends, before anyone sees the session."""
+        for action in self.actions.pop(day, ()):
+            held = action.ticker in self.portfolio.positions
+            if isinstance(action, Split):
+                # The last price is per old share. Divide it even when nothing is
+                # held, or a strategy would size its next order at a stale price.
+                if action.ticker in self.last_prices:
+                    self.last_prices[action.ticker] /= action.ratio
+                if held:
+                    price = self.last_prices.get(action.ticker, 0.0)
+                    self.portfolio.split(action.ticker, action.ratio, price)
+            elif held:
+                self.portfolio.dividend(action.ticker, action.amount)
+            if held:
+                self.log.append(action)
 
     def book(self, fill: Fill, bar: Bar) -> None:
         """Check a fill against the broker contract, then book it."""

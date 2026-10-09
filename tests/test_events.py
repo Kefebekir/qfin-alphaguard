@@ -9,6 +9,7 @@ from qfin_alphaguard.events import (
     Bar,
     Cancellation,
     DailyPlan,
+    Dividend,
     ExecutionSettings,
     Fill,
     Order,
@@ -16,6 +17,7 @@ from qfin_alphaguard.events import (
     RiskEvent,
     Side,
     Signal,
+    Split,
 )
 
 T = datetime(2027, 4, 12, 14, 35, tzinfo=UTC)
@@ -175,3 +177,15 @@ def test_a_cancellation_names_its_order_and_a_utc_time():
         Cancellation("", T)
     with pytest.raises(ValueError, match="UTC"):
         Cancellation("bt-0000001", NAIVE)
+
+
+@pytest.mark.parametrize("ratio", [0.0, -2.0, 1.0, math.nan])
+def test_a_split_ratio_must_be_positive_and_not_one(ratio):
+    with pytest.raises(ValueError):
+        Split("NFLX", date(2025, 11, 17), ratio)
+
+
+@pytest.mark.parametrize("amount", [0.0, -0.25, math.inf])
+def test_a_dividend_must_be_positive(amount):
+    with pytest.raises(ValueError):
+        Dividend("AAPL", date(2025, 2, 10), amount)

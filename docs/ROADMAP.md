@@ -6,8 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 5b is next:** splits and dividends in the backtest. Prices are
-as traded, so held shares must follow a split and dividends must reach cash.
+**Phase 1, step 6 is next:** the simulated broker and its cost model, written by
+Efe; Claude prepares the skeleton, the tests and the explanations.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -19,8 +19,8 @@ as traded, so held shares must follow a split and dividends must reach cash.
 | 4a. 1-minute bars since 2016 for each year's trading universe, cut to the regular session | Claude | done, #12 |
 | 4b. The stored minutes as `Bar` events, in time order | Claude | done, #13 |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | done, #14 |
-| 5b. Splits and dividends: share counts follow splits, dividends paid in cash | Claude | next |
-| 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | to do |
+| 5b. Splits and dividends: share counts follow splits, dividends paid in cash | Claude | done, #15 |
+| 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | next |
 | 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |

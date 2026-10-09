@@ -130,7 +130,11 @@ So an order decided after bar t can fill no earlier than bar t+1. The engine is
 also the referee: it stops the run if a fill is dated before its order, lies
 outside its bar, is priced where the bar never traded, breaks its limit, or
 exceeds what is left of the order, and if Guard changes anything but the
-quantity. At each close it cancels open orders and logs the portfolio's value.
+quantity. At each close it cancels open orders and logs the portfolio's value. At each
+open, before the strategy hears of the session, it applies that day's splits
+(held shares and the last price follow the ratio; a fraction of a share is paid
+in cash) and dividends (cash per share held), derived from the daily bars in
+`data/corporate.py`.
 The strategy sees only a read-only `View` (time, session, cash, positions, last
 prices, open orders), so the same `Strategy` class can run live in Phase 3.
 

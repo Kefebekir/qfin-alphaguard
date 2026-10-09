@@ -59,3 +59,52 @@ def test_the_books_record_a_sale_beyond_the_holding_as_short():
 def test_cash_must_be_a_finite_number():
     with pytest.raises(ValueError):
         Portfolio(float("nan"))
+
+
+def test_held_shares_follow_a_split():
+    portfolio = Portfolio(0.0)
+    portfolio.apply(fill(Side.BUY, 10, 1_100.0))
+    portfolio.split("A", 10.0, price=110.0)
+    assert portfolio.positions == {"A": 100}
+    assert portfolio.value({"A": 110.0}) == pytest.approx(-11_000.0 + 11_000.0)
+
+
+def test_a_fraction_of_a_share_left_by_a_split_is_paid_in_cash():
+    portfolio = Portfolio(0.0)
+    portfolio.apply(fill(Side.BUY, 3, 90.0))
+    portfolio.split("A", 1.5, price=60.0)  # 4.5 shares: 4 kept, half a share paid
+    assert portfolio.positions == {"A": 4}
+    assert portfolio.cash == pytest.approx(-270.0 + 30.0)
+
+
+def test_a_split_does_not_lose_a_share_to_floating_point_rounding():
+    # A 15% stock dividend is a 23-for-20 split; 100 * 1.15 is 114.99999999999999
+    # in floating point, which must still make 115 shares, not 114 and some cash.
+    portfolio = Portfolio(0.0)
+    portfolio.apply(fill(Side.BUY, 100, 23.0))
+    portfolio.split("A", 1.15, price=20.0)
+    assert portfolio.positions == {"A": 115}
+    assert portfolio.cash == pytest.approx(-2_300.0)
+
+
+def test_a_reverse_split_keeps_whole_shares():
+    portfolio = Portfolio(0.0)
+    portfolio.apply(fill(Side.BUY, 3, 10.0))
+    portfolio.split("A", 1 / 3, price=30.0)
+    assert portfolio.positions == {"A": 1}
+    assert portfolio.cash == pytest.approx(-30.0)
+
+
+def test_a_split_of_a_stock_not_held_changes_nothing():
+    portfolio = Portfolio(100.0)
+    portfolio.split("A", 10.0, price=1.0)
+    assert (portfolio.positions, portfolio.cash) == ({}, 100.0)
+
+
+def test_a_dividend_is_paid_per_share_held_and_charged_to_a_short():
+    portfolio = Portfolio(0.0)
+    portfolio.apply(fill(Side.BUY, 10, 100.0))
+    portfolio.apply(fill(Side.SELL, 4, 50.0, ticker="B"))
+    portfolio.dividend("A", 0.25)
+    portfolio.dividend("B", 0.50)
+    assert portfolio.cash == pytest.approx(-1_000.0 + 200.0 + 2.5 - 2.0)

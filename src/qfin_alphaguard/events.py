@@ -187,6 +187,34 @@ class Cancellation:
 
 
 @dataclass(frozen=True)
+class Split:
+    """From the open of `day`, each share of `ticker` became `ratio` shares."""
+
+    ticker: str
+    day: date
+    ratio: float  # new shares per old share: 10.0 for a 10-for-1 split
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(self.ratio) and self.ratio > 0 and self.ratio != 1):
+            raise ValueError(
+                f"a split ratio must be positive and not 1, got {self.ratio!r}"
+            )
+
+
+@dataclass(frozen=True)
+class Dividend:
+    """Each share of `ticker` held at the close before `day`, the ex-date, earned `amount`."""
+
+    ticker: str
+    day: date
+    amount: float  # dollars per share, as paid
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(self.amount) and self.amount > 0):
+            raise ValueError(f"a dividend must be positive, got {self.amount!r}")
+
+
+@dataclass(frozen=True)
 class ExecutionSettings:
     """How the engine turns a day's target change into orders."""
 
