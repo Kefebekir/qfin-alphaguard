@@ -6,8 +6,9 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 6 is next:** the simulated broker and its cost model, written by
-Efe; Claude prepares the skeleton, the tests and the explanations.
+**Phase 1, step 7 is next:** the daily plan, `qfin plan`: target weights from
+Ledoit-Wolf covariance and CVXPY, with Efe's rule for when a weight gap is too
+small to trade.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -20,8 +21,8 @@ Efe; Claude prepares the skeleton, the tests and the explanations.
 | 4b. The stored minutes as `Bar` events, in time order | Claude | done, #13 |
 | 5. Event loop: time-ordered feed and `Strategy` interface; decide after bar t, fill no earlier than t+1 | Claude, reviewed by Efe | done, #14 |
 | 5b. Splits and dividends: share counts follow splits, dividends paid in cash | Claude | done, #15 |
-| 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | next |
-| 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | to do |
+| 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | done, #16 |
+| 7. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY; no trade below `band_pct` | Claude; Efe writes the band rule | next |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
@@ -105,7 +106,9 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       commissions (for example 1, 2, 3, 5 or 10 child orders; 0 to 60 minutes
       apart), with walk-forward tests, instead of keeping the Phase 0 guesses.
       Guard's limits stay hand-set safety limits, not tuned for profit.
-- [ ] Cost model: commission and FX for the chosen broker, plus spread and slippage.
+- [x] Cost model: commission and FX for the chosen broker, plus spread and slippage.
+      On 2025's real minutes a marketable ~2,000 USD order costs about 1.9 bps
+      in commission and 1.3 bps against the decision price.
 - [ ] Guard rules applied in the backtest too.
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
       buy-and-hold and equal-weight baselines.
