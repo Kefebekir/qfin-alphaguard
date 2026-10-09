@@ -23,6 +23,7 @@ EXPECTED_SCHEMA = {
     "close": pl.Float64,
     "volume": pl.Int64,
     "adjustment": pl.Float64,
+    "split_factor": pl.Float64,
     "sp500": pl.Boolean,
 }
 
@@ -51,13 +52,20 @@ def span(ticker, start, end=None):
 class FakeClient:
     """Stands in for EodhdClient: flat bars for each code on the given days."""
 
-    def __init__(self, days_by_code, old_codes=None):
+    def __init__(self, days_by_code, old_codes=None, adjustments=None, splits=None):
         self.days_by_code = days_by_code
         self._old_codes = old_codes or {}
+        self.adjustments = adjustments or {}
+        self._splits = splits or {}
         self.downloads = []
+        self.split_requests = []
 
     def old_codes(self):
         return self._old_codes
+
+    def splits(self, code):
+        self.split_requests.append(code)
+        return self._splits.get(code, [])
 
     def daily_bars(self, code, start, end):
         self.downloads.append(code)
@@ -72,7 +80,7 @@ class FakeClient:
                 "low": [99.0] * n,
                 "close": [100.5] * n,
                 "volume": [1000] * n,
-                "adjustment": [1.0] * n,
+                "adjustment": self.adjustments.get(code, [1.0] * n),
             },
             schema=BARS_SCHEMA,
         )
@@ -127,6 +135,45 @@ def test_class_shares_are_fetched_with_a_dash():
     assert prices["ticker"].unique().to_list() == ["BRK-B"]
 
 
+def test_split_factor_comes_from_the_split_history_when_the_adjustment_jumps():
+    # Netflix split 10-for-1 on 17 November 2025: the adjustment jumps from 0.1 to 1.
+    days = [date(2025, 11, 13), date(2025, 11, 14), date(2025, 11, 17)]
+    client = FakeClient(
+        {"NFLX": days},
+        adjustments={"NFLX": [0.1, 0.1, 1.0]},
+        splits={"NFLX": [(date(2025, 11, 17), 10.0)]},
+    )
+    history = IndexHistory((span("NFLX", "2010-12-20"),))
+
+    prices = download_sp500(client, history, days[0], days[-1])
+
+    assert prices["split_factor"].to_list() == [10.0, 10.0, 1.0]
+    assert client.split_requests == ["NFLX"]
+
+
+def test_no_split_history_is_fetched_without_a_jump():
+    days = weekdays(date(2020, 1, 2), date(2020, 1, 10))
+    client = FakeClient({"AAA": days}, adjustments={"AAA": [0.97] * len(days)})
+    history = IndexHistory((span("AAA", "2020-01-02"),))
+
+    prices = download_sp500(client, history, days[0], days[-1])
+
+    assert client.split_requests == []
+    assert prices["split_factor"].unique().to_list() == [1.0]
+
+
+def test_a_stray_bar_on_a_market_holiday_is_dropped():
+    days = weekdays(date(2024, 12, 30), date(2025, 1, 3))  # includes 1 January
+    trading_days = [day for day in days if day != date(2025, 1, 1)]
+    client = FakeClient({"A": trading_days, "B": trading_days, "C": days})
+    history = IndexHistory(tuple(span(t, "2020-01-02") for t in "ABC"))
+
+    prices = download_sp500(client, history, days[0], days[-1])
+
+    assert date(2025, 1, 1) not in prices["date"].to_list()
+    assert prices.height == 3 * len(trading_days)
+
+
 def test_a_member_without_data_lowers_the_coverage():
     history = IndexHistory((span("AAA", "2020-01-02"), span("BBB", "2020-01-02")))
     first, last = date(2020, 1, 2), date(2020, 1, 10)
@@ -146,6 +193,7 @@ def one_bar(**prices):
             **{name: [value] for name, value in prices.items()},
             "volume": [1000],
             "adjustment": [1.0],
+            "split_factor": [1.0],
             "sp500": [True],
         }
     )

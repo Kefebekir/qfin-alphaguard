@@ -93,8 +93,9 @@ Two things I care about more than the results:
   volume. Intraday bars come later in Phase 1.
 - **Adjusted prices are not point-in-time.** Prices are adjusted for splits and
   dividends, so an old price differs from the one quoted on that day. Returns are
-  right; dividing by the `adjustment` column gives the price as traded, for share
-  counts and commissions.
+  right; dividing by the `adjustment` column gives the price as traded, and
+  `volume / split_factor` the shares traded, for share counts, commissions and
+  ranking stocks by liquidity without using later dividends.
 - **Synthetic calendar.** Generated data includes market holidays; real data does
   not. This only affects tests, not results.
 

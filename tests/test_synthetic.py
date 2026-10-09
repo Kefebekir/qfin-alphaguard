@@ -15,6 +15,7 @@ def test_columns():
         "close",
         "volume",
         "adjustment",
+        "split_factor",
         "sp500",
     ]
 

@@ -113,6 +113,20 @@ def test_gives_up_after_repeated_server_errors():
     assert len(fake.urls) == 4
 
 
+def test_splits_are_new_shares_per_old_share():
+    eod, fake = client(
+        [
+            {"date": "2025-11-17", "split": "10.000000/1.000000"},
+            {"date": "2020-04-15", "split": "1.000000/200.000000"},  # reverse split
+        ]
+    )
+    assert eod.splits("NFLX") == [
+        (date(2020, 4, 15), 0.005),
+        (date(2025, 11, 17), 10.0),
+    ]
+    assert "splits/NFLX.US" in fake.urls[0]
+
+
 def test_old_codes_group_earlier_companies_by_ticker():
     listing = [
         {"Code": "DOW_old", "Name": "The Dow Chemical Company"},
