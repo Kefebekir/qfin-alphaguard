@@ -15,7 +15,7 @@ kept only if they match: a check on the data, and on the company.
 """
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
@@ -25,6 +25,7 @@ import polars as pl
 
 from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA, EodhdClient, eodhd_code
 from qfin_alphaguard.data.universe import IndexHistory
+from qfin_alphaguard.events import Bar
 from qfin_alphaguard.sessions import sessions
 
 # A day matches when the last regular-session minute closes within this of the
@@ -32,6 +33,15 @@ from qfin_alphaguard.sessions import sessions
 CLOSE_TOLERANCE = 0.01
 # A code's minutes are taken for a stock when this share of the days match.
 MATCHING_DAYS = 0.9
+
+# The rules a Bar event enforces (events.py). A minute that breaks one is
+# dropped when it is downloaded, rather than stopping a backtest halfway.
+VALID_MINUTE = (
+    (pl.min_horizontal("open", "high", "low", "close") > 0)
+    & (pl.col("low") <= pl.min_horizontal("open", "close"))
+    & (pl.max_horizontal("open", "close") <= pl.col("high"))
+    & (pl.col("volume") >= 0)
+)
 
 
 @dataclass(frozen=True)
@@ -45,6 +55,7 @@ class YearOfMinutes:
     sessions: int  # sessions in the year, up to the last day asked for
     matching: float  # share of days whose last minute matched the daily close
     error: str | None = None  # why the download failed, if it did
+    dropped: int = 0  # minutes that broke the Bar rules
 
 
 def intraday_path(root: Path, ticker: str, year: int) -> Path:
@@ -129,11 +140,18 @@ def download_year(
     )
     for source in minute_sources(code, history):
         minutes = regular_session(client.minute_bars(source, first, last))
-        share = matching_share(minutes, daily_bars)
+        valid = minutes.filter(VALID_MINUTE)
+        share = matching_share(valid, daily_bars)
         if share >= MATCHING_DAYS:
-            stored = minutes.with_columns(pl.lit(code).alias("ticker"))
+            stored = valid.with_columns(pl.lit(code).alias("ticker"))
             return stored, YearOfMinutes(
-                code, year, source, stored.height, in_year, share
+                code,
+                year,
+                source,
+                stored.height,
+                in_year,
+                share,
+                dropped=minutes.height - valid.height,
             )
     return pl.DataFrame(schema=MINUTE_SCHEMA), YearOfMinutes(
         code, year, None, 0, in_year, 0.0
@@ -188,6 +206,43 @@ def backfill_minutes(
             report(summary)
             done.append(summary)
     return done
+
+
+def minute_feed(
+    root: Path, universes: dict[int, Iterable[str]], first: date, last: date
+) -> Iterator[Bar]:
+    """The stored minutes of each year's universe as Bar events, in time order.
+
+    One year of files is read at a time, about 5 million minutes for 50
+    stocks; turning all years into events at once would take gigabytes.
+    Within a minute the bars come in ticker order, so the same files always
+    give the same sequence. Prices are as traded: multiply by the day's
+    `adjustment` from the daily bars to compare prices across a split.
+    """
+    for year in range(first.year, last.year + 1):
+        paths = [
+            intraday_path(root, ticker, year) for ticker in universes.get(year, ())
+        ]
+        paths = [path for path in paths if _has_minutes(path)]
+        if not paths:
+            continue
+        minutes = (
+            pl.scan_parquet(paths)
+            .filter(pl.col("start").dt.date().is_between(first, last))
+            .sort("start", "ticker")
+            .collect()
+        )
+        for row in minutes.iter_rows(named=True):
+            yield Bar(
+                ticker=row["ticker"],
+                start=row["start"],
+                seconds=60,
+                open=row["open"],
+                high=row["high"],
+                low=row["low"],
+                close=row["close"],
+                volume=row["volume"],
+            )
 
 
 def _has_minutes(path: Path) -> bool:

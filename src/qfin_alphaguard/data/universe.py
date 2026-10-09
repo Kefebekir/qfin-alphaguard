@@ -15,6 +15,7 @@ liquid of the members at the start of that year (decision 0005).
 import csv
 import math
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from functools import cache
@@ -191,6 +192,13 @@ def trading_universe(prices: pl.DataFrame, year: int, size: int) -> tuple[str, .
         ):
             chosen.append(ticker)
     return tuple(chosen)
+
+
+def trading_universes(
+    prices: pl.DataFrame, years: Iterable[int], size: int = TRADING_UNIVERSE_SIZE
+) -> dict[int, tuple[str, ...]]:
+    """The trading universe of each year in `years`."""
+    return {year: trading_universe(prices, year, size) for year in years}
 
 
 def _median_gap(returns: pl.DataFrame, a: str, b: str) -> float:

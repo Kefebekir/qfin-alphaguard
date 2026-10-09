@@ -8,10 +8,12 @@ from qfin_alphaguard.data.intraday import (
     download_year,
     intraday_path,
     matching_share,
+    minute_feed,
     minute_sources,
     regular_session,
 )
 from qfin_alphaguard.data.universe import IndexHistory, Membership
+from qfin_alphaguard.events import Bar
 
 
 def at(day, hour, minute):
@@ -225,3 +227,66 @@ def test_backfill_skips_finished_years_and_writes_one_file_per_stock_and_year(
     assert [stored.ticker for stored in done] == ["BBB"]
     assert client.asked == ["BBB"]
     assert pl.read_parquet(intraday_path(tmp_path, "BBB", 2025)).height == 1
+
+
+def test_minutes_that_break_the_bar_rules_are_dropped_and_counted():
+    day = date(2018, 3, 6)
+    history = IndexHistory((span("AAA", "2000-01-03"),))
+    bars = minutes("AAA", [at(day, 20, 58), at(day, 20, 59)], [100.0, 100.0])
+    broken = bars.with_columns(  # the first minute closes above its high
+        pl.when(pl.col("start") == at(day, 20, 58))
+        .then(101.0)
+        .otherwise(pl.col("close"))
+        .alias("close")
+    )
+    client = FakeMinuteClient({"AAA": broken})
+
+    stored, summary = download_year(
+        client, "AAA", 2018, date(2026, 10, 8), daily("AAA", [day], [100.0]), history
+    )
+
+    assert stored["start"].to_list() == [at(day, 20, 59)]
+    assert summary.dropped == 1
+
+
+def store(root, ticker, year, starts, closes=None):
+    path = intraday_path(root, ticker, year)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    minutes(ticker, starts, closes).write_parquet(path)
+
+
+def test_the_feed_gives_bars_in_time_order_then_ticker_order(tmp_path):
+    day = date(2025, 3, 4)
+    store(tmp_path, "BBB", 2025, [at(day, 14, 30), at(day, 14, 31)])
+    store(tmp_path, "AAA", 2025, [at(day, 14, 31), at(day, 14, 30)])
+
+    bars = list(minute_feed(tmp_path, {2025: ("BBB", "AAA")}, day, day))
+
+    assert [(bar.start.minute, bar.ticker) for bar in bars] == [
+        (30, "AAA"),
+        (30, "BBB"),
+        (31, "AAA"),
+        (31, "BBB"),
+    ]
+    assert all(isinstance(bar, Bar) and bar.seconds == 60 for bar in bars)
+    assert bars[0].start == at(day, 14, 30)  # a UTC time, as every event needs
+
+
+def test_the_feed_keeps_to_the_days_asked_for_and_skips_missing_files(tmp_path):
+    days = [date(2025, 3, 3), date(2025, 3, 4), date(2025, 3, 5)]
+    store(tmp_path, "AAA", 2025, [at(day, 15, 0) for day in days])
+
+    bars = list(minute_feed(tmp_path, {2025: ("AAA", "NONE")}, days[1], days[2]))
+
+    assert [bar.start.date() for bar in bars] == days[1:]
+
+
+def test_the_feed_takes_each_year_from_that_years_universe(tmp_path):
+    store(tmp_path, "OLD", 2024, [at(date(2024, 12, 31), 15, 0)])
+    store(tmp_path, "NEW", 2025, [at(date(2025, 1, 2), 15, 0)])
+    store(tmp_path, "OLD", 2025, [at(date(2025, 1, 2), 15, 0)])  # out of the 2025 list
+
+    universes = {2024: ("OLD",), 2025: ("NEW",)}
+    bars = list(minute_feed(tmp_path, universes, date(2024, 12, 31), date(2025, 1, 2)))
+
+    assert [bar.ticker for bar in bars] == ["OLD", "NEW"]
