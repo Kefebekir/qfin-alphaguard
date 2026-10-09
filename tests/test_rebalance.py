@@ -35,21 +35,32 @@ def test_a_gap_within_the_stocks_band_is_left_alone():
     assert trades_at_open(plan({"A": 0.31}), {"A": 300}, at_100("A"), 70_000.0) == {}
 
 
-def test_a_gap_beyond_the_band_is_traded_to_the_target_in_whole_shares():
-    # 40% of 100,000 USD buys 404.86 shares at 98.80 USD: 405, so 105 more.
-    trades = trades_at_open(plan({"A": 0.40}), {"A": 300}, {"A": 98.8}, 70_360.0)
-    assert trades == {"A": 105}
+def test_a_stock_below_its_band_is_bought_up_to_the_bands_edge():
+    # 29.52% held, 40% wanted; the band is 10 * 1% * 40% = 4 points, so the
+    # edge is 36%: 365.85 shares at 98.40 USD, so 366, and 66 more. Going all
+    # the way to the target would have bought 107.
+    trades = trades_at_open(plan({"A": 0.40}), {"A": 300}, {"A": 98.4}, 70_480.0)
+    assert trades == {"A": 66}
+
+
+def test_a_stock_above_its_band_is_sold_down_to_the_bands_edge():
+    # 30% held, 20% wanted; the band is 10 * 1% * 30% = 3 points, so the edge
+    # is 23%: 230 shares, and 70 to sell. Going to the target would sell 100.
+    assert trades_at_open(plan({"A": 0.20}), {"A": 300}, at_100("A"), 70_000.0) == {
+        "A": -70
+    }
 
 
 def test_each_stock_has_its_own_band():
     # Both are 4 points below their 20%; CALM's band is 1 point, WILD's 6.
+    # CALM is bought up to its edge, 19%.
     trades = trades_at_open(
         plan({"CALM": 0.20, "WILD": 0.20}, {"CALM": 0.005, "WILD": 0.03}),
         {"CALM": 160, "WILD": 160},
         at_100("CALM", "WILD"),
         68_000.0,
     )
-    assert trades == {"CALM": 40}
+    assert trades == {"CALM": 30}
 
 
 def test_the_band_grows_with_the_larger_of_target_and_current_weight():
@@ -65,7 +76,8 @@ def test_the_band_grows_with_the_larger_of_target_and_current_weight():
 
 
 def test_band_k_comes_from_the_plan():
-    # A 2-point gap: within a 10-day band (3.2 points), traded with none.
+    # A 2-point gap: within a 10-day band (3.2 points), traded with none, and
+    # then all the way to the target, which is the band's edge.
     assert trades_at_open(plan({"A": 0.32}), {"A": 300}, at_100("A"), 70_000.0) == {}
     no_band = plan({"A": 0.32}, band_k=0.0)
     assert trades_at_open(no_band, {"A": 300}, at_100("A"), 70_000.0) == {"A": 20}
@@ -84,9 +96,10 @@ def test_a_trade_worth_less_than_the_minimum_waits():
     assert trades_at_open(lower, {"A": 12}, at_100("A"), 18_800.0) == {"A": 8}
 
 
-def test_a_new_stock_is_bought():
+def test_a_new_stock_is_bought_up_to_its_bands_edge():
+    # 5% wanted, a band of 10 * 1% * 5% = 0.5 points: 4.5%, 90 shares at 50 USD.
     trades = trades_at_open(plan({"NEW": 0.05}), {}, {"NEW": 50.0}, 100_000.0)
-    assert trades == {"NEW": 100}
+    assert trades == {"NEW": 90}
 
 
 def test_a_stock_the_plan_dropped_is_sold_completely_even_below_the_minimum():
@@ -101,26 +114,28 @@ def test_a_stock_the_plan_dropped_is_sold_completely_even_below_the_minimum():
 
 
 def test_sales_pay_for_buys_on_the_same_day():
+    # B's edge is 90% minus a 9-point band: 81% of 10,000 USD.
     trades = trades_at_open(plan({"B": 0.9}), {"A": 100}, at_100("A", "B"), 0.0)
-    assert trades == {"A": -100, "B": 90}
+    assert trades == {"A": -100, "B": 81}
 
 
 def test_buys_are_cut_by_the_same_factor_when_cash_is_short():
-    # A is 10 points over its target but within its band (18 points), so it
-    # is not sold. Cash and the sale of OLD bring 40,000 USD for 50,000 USD of
-    # buys: each buy gets 80%, and the sale itself is not cut.
+    # A is 13 points over its target but within its band (19 points), so it
+    # is not sold. B and C want 214 shares each (22.5% of 95,050 USD), 42,800
+    # USD; cash and the sale of OLD bring 35,050 USD, so each buy gets 81.9%,
+    # 175.25 shares, rounded down. The sale itself is not cut.
     trades = trades_at_open(
         plan({"A": 0.50, "B": 0.25, "C": 0.25}, {"A": 0.03}),
         {"A": 600, "OLD": 50},
         at_100("A", "B", "C", "OLD"),
-        35_000.0,
+        30_050.0,
     )
-    assert trades == {"OLD": -50, "B": 200, "C": 200}
+    assert trades == {"OLD": -50, "B": 175, "C": 175}
 
 
 def test_a_buy_the_cut_takes_below_the_minimum_waits():
-    # 40,000 USD for 46,100 USD of buys: B's 450 shares become 390, and D's
-    # 11 become 9, worth 900 USD.
+    # B's edge is 40.5% and D's 0.99%: 405 and 10 shares, 41,500 USD for
+    # 40,000 USD of cash. B's become 390, and D's 9, worth 900 USD.
     trades = trades_at_open(
         plan({"A": 0.50, "B": 0.45, "D": 0.011}, {"A": 0.03}),
         {"A": 600},

@@ -3,8 +3,9 @@
 At the open the engine compares the day's plan with the shares it holds. A
 stock is traded only when its gap is larger than its own band (decision
 0006): band_k days of its daily volatility, times the larger of its target
-and current weight. The strategy then splits the day's trades into orders and
-times them (Phase 1, step 8).
+and current weight. It is then traded only as far as the band's edge, not to
+the target (decision 0007). The strategy then splits the day's trades into
+orders and times them (Phase 1, step 8).
 
 trades_at_open checks its inputs and values the account. The two rules it
 applies are Efe's (Phase 1, step 7b): _change for each stock and
@@ -73,9 +74,10 @@ def _change(
     2. If |target - current| <= settings.band_k * volatility *
        max(target, current), return 0: the gap is within the stock's own
        noise.
-    3. Otherwise trade to the nearest whole number of shares at the target,
-       round(target * equity / price), unless the trade is worth less than
-       settings.min_trade_usd; then return 0.
+    3. Otherwise trade only as far as the band's edge, to the nearest whole
+       number of shares at it, unless the trade is worth less than
+       settings.min_trade_usd; then return 0. The edge is the target minus
+       the band for a stock below its target, plus the band for one above.
     """
     if target == 0:
         return -held
