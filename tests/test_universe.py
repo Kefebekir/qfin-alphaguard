@@ -1,8 +1,18 @@
-from datetime import date
+import zlib
+from datetime import date, timedelta
 
+import numpy as np
+import polars as pl
 import pytest
 
-from qfin_alphaguard.data.universe import IndexHistory, Membership, sp500
+from qfin_alphaguard.data.universe import (
+    MIN_TRADING_DAYS,
+    IndexHistory,
+    Membership,
+    dollar_volume,
+    sp500,
+    trading_universe,
+)
 
 
 def span(ticker, start, end=None):
@@ -110,3 +120,102 @@ def test_sp500_keeps_stocks_that_have_left():
     # Hess left when Chevron bought it in July 2025.
     assert "HES" in history.tickers_between(date(2015, 1, 2), history.as_of)
     assert "HES" not in history.members_on(history.as_of)
+
+
+YEAR_2015 = [
+    date(2015, 1, 1) + timedelta(n)
+    for n in range(365)
+    if (date(2015, 1, 1) + timedelta(n)).weekday() < 5
+]
+FIRST_DAY_2016 = date(2016, 1, 4)
+
+
+def stock(
+    ticker, traded_per_day, *, days=YEAR_2015, member=True, adjustment=1.0, path=None
+):
+    """2015 bars worth about `traded_per_day` dollars a day, plus 4 January 2016.
+
+    Each ticker follows its own random walk around 100 dollars unless `path`
+    gives the traded prices. The adjusted close is the traded price times
+    `adjustment`, as if dividends paid later had scaled it down.
+    """
+    rows = [*days, FIRST_DAY_2016]
+    n = len(rows)
+    if path is None:
+        rng = np.random.default_rng(zlib.crc32(ticker.encode()))
+        path = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, n)))
+    return pl.DataFrame(
+        {
+            "date": rows,
+            "ticker": [ticker] * n,
+            "close": path * adjustment,
+            "volume": np.round(traded_per_day / path).astype(int),
+            "adjustment": [adjustment] * n,
+            "split_factor": [1.0] * n,
+            "sp500": [True] * (n - 1) + [member],
+        }
+    )
+
+
+def test_dollar_volume_uses_the_price_and_shares_of_that_day():
+    # Netflix on 10 November 2025, a week before its 10-for-1 split.
+    bars = pl.DataFrame(
+        {
+            "close": [112.007],
+            "adjustment": [0.1],
+            "volume": [36_929_000],
+            "split_factor": [10.0],
+        }
+    )
+    traded = bars.select(dollar_volume()).item()
+    assert traded == pytest.approx(1120.07 * 3_692_900)
+
+
+def test_trading_universe_takes_the_most_traded_members():
+    prices = pl.concat([stock("A", 300_000), stock("B", 200_000), stock("C", 100_000)])
+    assert trading_universe(prices, 2016, 2) == ("A", "B")
+
+
+def test_stocks_outside_the_index_on_the_first_day_are_left_out():
+    prices = pl.concat([stock("IN", 100_000), stock("OUT", 900_000, member=False)])
+    assert trading_universe(prices, 2016, 5) == ("IN",)
+
+
+def test_too_little_trading_last_year_is_left_out():
+    recent = YEAR_2015[-(MIN_TRADING_DAYS - 1) :]
+    prices = pl.concat([stock("OLD", 100_000), stock("NEW", 900_000, days=recent)])
+    assert trading_universe(prices, 2016, 5) == ("OLD",)
+
+
+def test_later_dividends_do_not_change_the_ranking():
+    # PAYS traded slightly more, but dividends paid after 2015 halve its
+    # adjusted prices; ranking by adjusted prices would put it second.
+    prices = pl.concat([stock("PAYS", 101_000, adjustment=0.5), stock("NONE", 100_000)])
+    assert trading_universe(prices, 2016, 1) == ("PAYS",)
+
+
+def test_nothing_after_the_first_trading_day_counts():
+    prices = pl.concat([stock("A", 200_000), stock("B", 100_000)])
+    later = stock("B", 10**9, days=[]).with_columns(
+        pl.lit(date(2016, 1, 5)).alias("date")
+    )
+    assert trading_universe(pl.concat([prices, later]), 2016, 1) == ("A",)
+
+
+def test_only_the_more_traded_of_two_share_classes_is_kept():
+    rng = np.random.default_rng(0)
+    walk = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(YEAR_2015) + 1)))
+    prices = pl.concat(
+        [
+            stock("GOOGL", 300_000, path=walk),
+            stock("GOOG", 200_000, path=walk * 1.01),  # one company, another class
+            stock("OTHER", 100_000),
+        ]
+    )
+    assert trading_universe(prices, 2016, 2) == ("GOOGL", "OTHER")
+
+
+def test_a_year_without_the_previous_years_prices_cannot_be_ranked():
+    prices = stock("A", 100_000).filter(pl.col("date") >= FIRST_DAY_2016)
+    with pytest.raises(ValueError, match="2015"):
+        trading_universe(prices, 2016, 1)
