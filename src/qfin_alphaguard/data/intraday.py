@@ -52,10 +52,11 @@ class YearOfMinutes:
     year: int
     source: str | None  # where the minutes came from, such as META; None if nowhere
     rows: int
-    sessions: int  # sessions in the year, up to the last day asked for
-    matching: float  # share of days whose last minute matched the daily close
+    trading_days: int  # days with a daily bar, from 1 January to the last day asked
+    matching: float  # share of the days with minutes whose last minute matched
     error: str | None = None  # why the download failed, if it did
     dropped: int = 0  # minutes that broke the Bar rules
+    days: int = 0  # trading days with minutes; EODHD lacks some, such as TSLA's
 
 
 def intraday_path(root: Path, ticker: str, year: int) -> Path:
@@ -132,9 +133,12 @@ def download_year(
     daily: pl.DataFrame,
     history: IndexHistory,
 ) -> tuple[pl.DataFrame, YearOfMinutes]:
-    """One stock's regular-session minutes for one year, checked against `daily`."""
+    """One stock's regular-session minutes for one year, checked against `daily`.
+
+    The minutes run from 1 January to `last_day` or the end of the year,
+    whichever comes first.
+    """
     first, last = date(year, 1, 1), min(date(year, 12, 31), last_day)
-    in_year = len(sessions(first, last))
     daily_bars = daily.filter(
         (pl.col("ticker") == code) & pl.col("date").is_between(first, last)
     )
@@ -149,12 +153,13 @@ def download_year(
                 year,
                 source,
                 stored.height,
-                in_year,
+                daily_bars.height,
                 share,
                 dropped=minutes.height - valid.height,
+                days=stored["start"].dt.date().n_unique(),
             )
     return pl.DataFrame(schema=MINUTE_SCHEMA), YearOfMinutes(
-        code, year, None, 0, in_year, 0.0
+        code, year, None, 0, daily_bars.height, 0.0
     )
 
 

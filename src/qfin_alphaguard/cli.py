@@ -156,7 +156,8 @@ def _intraday(args: argparse.Namespace) -> int:
         dropped = f", {stored.dropped} broken minutes dropped" if stored.dropped else ""
         print(
             f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
-            f" {stored.matching:.0%} of days match the daily close{dropped}",
+            f" on {stored.days} of {stored.trading_days} days,"
+            f" {stored.matching:.0%} of them match the daily close{dropped}",
             flush=True,
         )
 
@@ -176,9 +177,15 @@ def _intraday(args: argparse.Namespace) -> int:
         for stored in done
         if not stored.source and not stored.error
     ]
+    short = [
+        f"{stored.ticker} {stored.year} ({stored.days} of {stored.trading_days} days)"
+        for stored in done
+        if stored.source and stored.days < stored.trading_days
+    ]
     print(
         f"stored {len(done) - len(failed) - len(missing)} stock-years; "
-        f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}"
+        f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}; "
+        f"days without minutes: {short or 'none'}"
     )
     return 1 if failed else 0
 

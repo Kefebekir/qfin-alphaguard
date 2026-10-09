@@ -191,6 +191,22 @@ def test_a_failed_download_is_reported_and_the_others_go_on(tmp_path):
     assert intraday_path(tmp_path, "AAA", 2025).exists()
 
 
+def test_the_summary_counts_the_trading_days_that_have_minutes():
+    # EODHD lacks some days for good: TSLA's from July 2023 to May 2024.
+    days = [date(2018, 3, 5), date(2018, 3, 6), date(2018, 3, 7)]
+    history = IndexHistory((span("AAA", "2000-01-03"),))
+    one_day = minutes("AAA", [at(days[0], 20, 58), at(days[0], 20, 59)])
+    client = FakeMinuteClient({"AAA": one_day})
+
+    _, summary = download_year(
+        client, "AAA", 2018, date(2026, 10, 8), daily("AAA", days, [100.0] * 3), history
+    )
+
+    # Two minutes on one of three days, and that day matches its close.
+    assert (summary.rows, summary.days, summary.trading_days) == (2, 1, 3)
+    assert summary.matching == 1.0
+
+
 def test_minutes_that_do_not_match_the_daily_closes_are_not_kept():
     day = date(2018, 3, 6)
     history = IndexHistory((span("AAA", "2000-01-03"),))
