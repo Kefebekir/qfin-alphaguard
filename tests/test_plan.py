@@ -36,6 +36,14 @@ def test_a_plan_is_fully_invested_within_the_weight_limit():
     assert all(plan.volatility[ticker] > 0 for ticker in plan.target_weights)
 
 
+def test_volatility_is_each_stocks_own_over_the_last_year():
+    plan = build_plan(PRICES, DAY, capital=100_000, max_weight=0.25)
+    ko = PRICES.filter((pl.col("ticker") == "KO") & (pl.col("date") < DAY))
+    returns = np.diff(np.log(ko.sort("date")["close"].to_numpy()))[-252:]
+    # A daily figure, not annualised, and not shrunk towards the other stocks.
+    assert plan.volatility["KO"] == pytest.approx(returns.std(ddof=1), rel=1e-9)
+
+
 def test_no_stock_gets_more_than_the_weight_limit():
     # A very calm stock would take most of a minimum-variance portfolio.
     calm = PRICES.filter(pl.col("ticker") == "KO").sort("date")

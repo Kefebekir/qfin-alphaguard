@@ -67,7 +67,8 @@ the daily bars before the day: the minimum-variance portfolio of the year's
 trading universe, with Ledoit-Wolf covariance over the last 252 sessions and no
 stock above Guard's `max_weight`. It holds at most
 `floor(capital / (max_children · min_trade_usd))` stocks, so that each can be
-built in `max_children` orders: 10 at 30,000 USD. Each stock's daily volatility
+built in `max_children` orders: 10 at 30,000 USD. Each stock's own daily
+volatility, the standard deviation of its returns over the same 252 sessions,
 goes with the plan for the band (decision 0006).
 
 ```json

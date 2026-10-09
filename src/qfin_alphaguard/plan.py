@@ -11,8 +11,11 @@ For trading day D, using only the daily bars before D:
    enough to build in max_children orders of min_trade_usd. The optimiser's
    largest weights are kept and the portfolio solved again on them.
 
-The plan also carries each stock's daily volatility, for the band that
-decides at the open whether a gap is worth trading (Phase 1, step 7b).
+The plan also carries each stock's own daily volatility, the standard
+deviation of its returns in the same window, for the band that decides at the
+open whether a gap is worth trading (Phase 1, step 7b). It is not taken from
+the shrunk covariance: Ledoit-Wolf pulls every variance towards the average,
+which on 2025's data made the calmest stocks look up to 17% more volatile.
 """
 
 import json
@@ -24,7 +27,7 @@ import numpy as np
 import polars as pl
 
 from qfin_alphaguard.data.universe import TRADING_UNIVERSE_SIZE, trading_universe
-from qfin_alphaguard.estimation.covariance import TRADING_DAYS, ledoit_wolf_covariance
+from qfin_alphaguard.estimation.covariance import ledoit_wolf_covariance
 from qfin_alphaguard.events import DailyPlan, ExecutionSettings
 from qfin_alphaguard.optimize.min_variance import min_variance_weights
 
@@ -68,8 +71,9 @@ def build_plan(
     ]
     if len(window) < LOOKBACK_DAYS or not full:
         raise ValueError(f"not a year of returns before {day} for the universe")
-    cov, _ = ledoit_wolf_covariance(window.select(full).to_numpy())
-    volatility = np.sqrt(np.diag(cov) / TRADING_DAYS)
+    returns = window.select(full).to_numpy()
+    cov, _ = ledoit_wolf_covariance(returns)
+    volatility = returns.std(axis=0, ddof=1)
 
     held = _min_variance(cov, max_weight)
     count = positions_for(capital, settings)
