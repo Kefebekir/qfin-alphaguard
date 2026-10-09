@@ -98,6 +98,18 @@ def test_a_current_code_is_its_own_source():
     assert minute_sources("AAPL", history) == ("AAPL",)
 
 
+def test_a_renamed_company_also_tries_the_code_it_became():
+    # DowDuPont (DWDP) became DD on 3 June 2019.
+    history = IndexHistory(
+        (
+            span("DD", "1996-01-02", "2017-09-01"),
+            span("DWDP", "2017-09-01", "2019-06-03"),
+            span("DD", "2019-06-03"),
+        )
+    )
+    assert minute_sources("DWDP", history) == ("DWDP", "DD")
+
+
 def test_a_renamed_company_is_looked_for_under_the_code_that_replaced_it():
     history = IndexHistory(
         (
@@ -139,6 +151,21 @@ def test_a_renamed_company_gets_its_minutes_from_the_new_code():
     assert stored["ticker"].unique().to_list() == ["FB_old"]
 
 
+def test_a_year_without_matching_minutes_is_tried_again_next_time(tmp_path):
+    day = date(2025, 3, 4)
+    history = IndexHistory((span("AAA", "2000-01-03"),))
+    client = FakeMinuteClient({"AAA": minutes("AAA", [at(day, 20, 59)], [50.0])})
+    prices = daily("AAA", [day], [100.0])  # the minutes do not match
+
+    for _ in range(2):
+        backfill_minutes(
+            client, prices, history, {2025: ("AAA",)}, tmp_path, date(2026, 10, 8)
+        )
+
+    assert not intraday_path(tmp_path, "AAA", 2025).exists()
+    assert client.asked == ["AAA", "AAA"]
+
+
 def test_minutes_that_do_not_match_the_daily_closes_are_not_kept():
     day = date(2018, 3, 6)
     history = IndexHistory((span("AAA", "2000-01-03"),))
@@ -166,7 +193,7 @@ def test_backfill_skips_finished_years_and_writes_one_file_per_stock_and_year(
     prices = pl.concat([daily("AAA", [day], [100.0]), daily("BBB", [day], [50.0])])
     finished = intraday_path(tmp_path, "AAA", 2025)
     finished.parent.mkdir(parents=True)
-    minutes("AAA", []).write_parquet(finished)
+    minutes("AAA", [at(day, 20, 59)]).write_parquet(finished)
 
     done = backfill_minutes(
         client, prices, history, {2025: ("AAA", "BBB")}, tmp_path, date(2026, 10, 8)

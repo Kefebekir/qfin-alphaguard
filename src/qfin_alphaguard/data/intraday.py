@@ -5,11 +5,13 @@ the year's 1-minute bars from EODHD: prices and volume as traded, and only the
 minutes that start inside the regular session (sessions.py). One Parquet file
 per stock and year, under data/raw/intraday/<ticker>/<year>.parquet.
 
-EODHD has no 1-minute data under TICKER_old codes. A company that was only
-renamed (FB became META in June 2022) keeps its 1-minute history under the new
-code, so for an _old code the codes that joined the index on the day it left
-are tried. Every year of minutes is checked against the daily closes, and kept
-only if they match: a check on the data, and on the company.
+EODHD files a renamed company's 1-minute history under one of its tickers,
+not always the one in the daily data: FB_old's minutes are under META, and
+DowDuPont's (DWDP) under DD. So a stock's own code is tried first, then the
+codes that joined the index on a day it left (renamed to) and those that left
+on a day it joined (renamed from). EODHD has no minutes under TICKER_old
+codes at all. Every year of minutes is checked against the daily closes and
+kept only if they match: a check on the data, and on the company.
 """
 
 import re
@@ -96,19 +98,18 @@ def matching_share(minutes: pl.DataFrame, daily: pl.DataFrame) -> float:
 def minute_sources(code: str, history: IndexHistory) -> tuple[str, ...]:
     """EODHD codes that may hold `code`'s 1-minute bars, to try in order."""
     old = re.fullmatch(r"(.+)_old\d*", code)
-    if not old:
-        return (code,)
-    ticker = old.group(1).replace("-", ".")
-    left = {span.end for span in history.spans_of(ticker) if span.end is not None}
-    return tuple(
-        sorted(
-            {
-                eodhd_code(span.ticker)
-                for span in history.spans
-                if span.start in left and span.ticker != ticker
-            }
-        )
+    ticker = (old.group(1) if old else code).replace("-", ".")
+    own = history.spans_of(ticker)
+    left = {span.end for span in own if span.end is not None}
+    joined = {span.start for span in own}
+    renamed_to = sorted(
+        {eodhd_code(s.ticker) for s in history.spans if s.start in left} - {code}
     )
+    renamed_from = sorted(
+        {eodhd_code(s.ticker) for s in history.spans if s.end in joined} - {code}
+    )
+    first = () if old else (code,)  # EODHD has no minutes under _old codes
+    return tuple(dict.fromkeys((*first, *renamed_to, *renamed_from)))
 
 
 def download_year(
@@ -150,24 +151,25 @@ def backfill_minutes(
 ) -> list[YearOfMinutes]:
     """Store the minutes of every stock in `universes` ({year: tickers}).
 
-    Years before `last_day`'s year that already have a file are final and
+    Years before `last_day`'s year that already have minutes are final and
     skipped, so an interrupted run picks up where it stopped; the current year
-    is downloaded again. A year with no matching minutes still gets an empty
-    file, so it is not asked for again.
+    is downloaded again. A year without matching minutes gets no file and is
+    tried again next time, when its sources may be known.
     """
     tasks = [
         (code, year)
         for year, codes in sorted(universes.items())
         for code in codes
-        if not (year < last_day.year and intraday_path(root, code, year).exists())
+        if not (year < last_day.year and _has_minutes(intraday_path(root, code, year)))
     ]
 
     def run(task: tuple[str, int]) -> YearOfMinutes:
         code, year = task
         minutes, summary = download_year(client, code, year, last_day, daily, history)
-        path = intraday_path(root, code, year)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        minutes.write_parquet(path)
+        if not minutes.is_empty():
+            path = intraday_path(root, code, year)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            minutes.write_parquet(path)
         return summary
 
     done = []
@@ -179,3 +181,7 @@ def backfill_minutes(
             report(summary)
             done.append(summary)
     return done
+
+
+def _has_minutes(path: Path) -> bool:
+    return path.exists() and pl.scan_parquet(path).select(pl.len()).collect().item() > 0
