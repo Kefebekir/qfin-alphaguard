@@ -23,11 +23,7 @@ from qfin_alphaguard.data.store import (
     upload_to_s3,
     write_prices,
 )
-from qfin_alphaguard.data.universe import (
-    TRADING_UNIVERSE_SIZE,
-    sp500,
-    trading_universe,
-)
+from qfin_alphaguard.data.universe import sp500, trading_universes
 from qfin_alphaguard.data.validate import validate_prices
 
 
@@ -130,18 +126,17 @@ def _intraday(args: argparse.Namespace) -> int:
     daily = read_prices(daily_path)
     today = datetime.now(UTC).date()
     years = range(args.from_year, (args.to_year or today.year) + 1)
-    universes = {
-        year: trading_universe(daily, year, TRADING_UNIVERSE_SIZE) for year in years
-    }
+    universes = trading_universes(daily, years)
 
     def report(stored: YearOfMinutes) -> None:
         if stored.error:
             print(f"{stored.year} {stored.ticker:9} failed: {stored.error}", flush=True)
             return
         source = stored.source or "nowhere"
+        dropped = f", {stored.dropped} broken minutes dropped" if stored.dropped else ""
         print(
             f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
-            f" {stored.matching:.0%} of days match the daily close",
+            f" {stored.matching:.0%} of days match the daily close{dropped}",
             flush=True,
         )
 
