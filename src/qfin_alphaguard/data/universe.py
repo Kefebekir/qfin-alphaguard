@@ -152,26 +152,23 @@ def dollar_volume() -> pl.Expr:
 
 
 def trading_universe(prices: pl.DataFrame, year: int, size: int) -> tuple[str, ...]:
-    """The `size` most liquid index members on the first trading day of `year`.
+    """The `size` most liquid index members, chosen for trading in `year`.
 
-    Members are the codes marked `sp500` that day. They are ranked by average
-    daily dollar volume over the previous calendar year, and need at least
-    MIN_TRADING_DAYS of trading in it. Of two stocks whose daily returns that
-    year differed by less than SAME_COMPANY_GAP on a typical day, only the more
-    traded is kept. Nothing after the first trading day of `year` is used, so the answer
-    does not change when more data arrives.
+    Members are the codes marked `sp500` on the last trading day of the
+    previous year. They are ranked by average daily dollar volume over that
+    year, and need at least MIN_TRADING_DAYS of trading in it. Of two stocks
+    whose daily returns that year differed by less than SAME_COMPANY_GAP on a
+    typical day, only the more traded is kept.
+
+    Nothing from `year` itself is used: the universe is known on the evening
+    before the year's first session, when its first daily plan is made.
     """
-    in_year = prices.filter(pl.col("date").dt.year() == year)
-    if in_year.is_empty():
-        raise ValueError(f"no prices in {year}")
-    first_day = in_year["date"].min()
-    members = in_year.filter((pl.col("date") == first_day) & pl.col("sp500"))
-    last_year = prices.filter(
-        (pl.col("date").dt.year() == year - 1)
-        & pl.col("ticker").is_in(members["ticker"].implode())
-    )
-    if last_year.is_empty():
+    previous = prices.filter(pl.col("date").dt.year() == year - 1)
+    if previous.is_empty():
         raise ValueError(f"no prices in {year - 1} to rank the members of {year} by")
+    last_day = previous["date"].max()
+    members = previous.filter((pl.col("date") == last_day) & pl.col("sp500"))
+    last_year = previous.filter(pl.col("ticker").is_in(members["ticker"].implode()))
     ranked = (
         last_year.group_by("ticker")
         .agg(dollar_volume().mean().alias("dollar_volume"), pl.len().alias("days"))
