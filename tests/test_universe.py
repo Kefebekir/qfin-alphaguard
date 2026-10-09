@@ -183,6 +183,21 @@ def test_stocks_outside_the_index_at_the_end_of_the_year_are_left_out():
     assert trading_universe(prices, 2016, 5) == ("IN",)
 
 
+def test_the_universe_is_known_before_the_year_starts():
+    # On the evening before 4 January 2016, no bar of 2016 exists yet.
+    prices = pl.concat([stock("A", 200_000), stock("B", 100_000)])
+    before = prices.filter(pl.col("date") < FIRST_DAY_2016)
+    assert trading_universe(before, 2016, 1) == ("A",)
+
+
+def test_a_stock_that_joins_the_index_in_the_new_year_waits_a_year():
+    joins = stock("JOINS", 900_000, member=False).with_columns(
+        (pl.col("date") >= FIRST_DAY_2016).alias("sp500")
+    )
+    prices = pl.concat([stock("IN", 100_000), joins])
+    assert trading_universe(prices, 2016, 5) == ("IN",)
+
+
 def test_too_little_trading_last_year_is_left_out():
     recent = YEAR_2015[-(MIN_TRADING_DAYS - 1) :]
     prices = pl.concat([stock("OLD", 100_000), stock("NEW", 900_000, days=recent)])
