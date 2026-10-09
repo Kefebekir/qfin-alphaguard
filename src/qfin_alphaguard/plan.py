@@ -62,6 +62,7 @@ def build_plan(
         .with_columns(pl.col("close").log().diff().over("ticker").alias("return"))
         .pivot(on="ticker", index="date", values="return")
         .sort("date")
+        .slice(1)  # the first day has no return, for any stock
         .tail(LOOKBACK_DAYS)
     )
     full = [
