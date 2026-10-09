@@ -6,9 +6,8 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 7b is next:** Efe's band: at the open, which stocks to trade and
-how many shares, from the plan, the positions and each stock's own volatility
-(decision 0006).
+**Phase 1, step 7c is next:** 1-minute bars in January for the stocks that
+leave the trading universe, so that the backtest can sell them.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -23,8 +22,8 @@ how many shares, from the plan, the positions and each stock's own volatility
 | 5b. Splits and dividends: share counts follow splits, dividends paid in cash | Claude | done, #15 |
 | 6. Simulated broker and cost model: next-bar fills, commission, FX, spread, slippage | Efe | done, #16 |
 | 7a. Daily plan: `qfin plan` with Ledoit-Wolf and CVXPY, as many stocks as the capital can hold | Claude | done, #17 |
-| 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | next |
-| 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | to do |
+| 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | done, #18 |
+| 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | next |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
@@ -103,7 +102,7 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       previous year's universe too (step 7c).
 - [x] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance, holding
       as many stocks as the capital can hold.
-- [ ] The band: trade a stock only when its gap is larger than its own
+- [x] The band: trade a stock only when its gap is larger than its own
       volatility allows (decision 0006, step 7b).
 - [ ] Fewer swaps at small capital: at 30,000 USD the plan holds its top 10,
       and stocks entering and leaving it, 42 times in 2025, cost 16 of the 19
@@ -117,7 +116,10 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Cost model: commission and FX for the chosen broker, plus spread and slippage.
       On 2025's real minutes a marketable ~2,000 USD order costs about 1.9 bps
       in commission and 1.3 bps against the decision price.
-- [ ] Guard rules applied in the backtest too.
+- [ ] Guard rules applied in the backtest too, `max_gross_exposure` included
+      when each order is sent: the band's cash rule at the open keeps nothing
+      back for costs, or for prices that rise before a buy fills (in 2025 cash
+      fell to 1.24 USD at 100,000 USD).
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
       buy-and-hold and equal-weight baselines.
 

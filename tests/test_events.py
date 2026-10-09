@@ -161,6 +161,12 @@ def test_daily_plan_uses_default_execution_settings():
     assert plan.execution == ExecutionSettings()
 
 
+@pytest.mark.parametrize("band_k", [-1.0, math.nan, math.inf])
+def test_the_band_is_a_number_of_days_and_not_negative(band_k):
+    with pytest.raises(ValueError, match="band_k"):
+        ExecutionSettings(band_k=band_k)
+
+
 def test_execution_settings_reject_threshold_above_one():
     with pytest.raises(ValueError):
         ExecutionSettings(theta0=1.5)
