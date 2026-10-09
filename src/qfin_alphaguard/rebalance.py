@@ -11,6 +11,7 @@ applies are Efe's (Phase 1, step 7b): _change for each stock and
 _pay_for_buys for the cash.
 """
 
+import math
 from collections.abc import Mapping
 
 from qfin_alphaguard.events import DailyPlan, ExecutionSettings
@@ -76,7 +77,16 @@ def _change(
        round(target * equity / price), unless the trade is worth less than
        settings.min_trade_usd; then return 0.
     """
-    raise NotImplementedError("Efe writes this: Phase 1, step 7b")
+    if target == 0:
+        return -held
+    current = held * price / equity
+    band = settings.band_k * volatility * max(target, current)
+    if abs(target - current) <= band:
+        return 0
+    change = round(target * equity / price) - held
+    if abs(change) * price < settings.min_trade_usd:
+        return 0
+    return change
 
 
 def _pay_for_buys(
@@ -93,4 +103,17 @@ def _pay_for_buys(
     whole shares. A buy worth less than min_trade_usd after the cut waits for
     another day. Sales are never changed.
     """
-    raise NotImplementedError("Efe writes this: Phase 1, step 7b")
+    sales = sum(-n * prices[ticker] for ticker, n in trades.items() if n < 0)
+    cost = sum(n * prices[ticker] for ticker, n in trades.items() if n > 0)
+    available = cash + sales
+    if cost <= available:
+        return trades
+    factor = max(available, 0.0) / cost
+    paid = {}
+    for ticker, n in trades.items():
+        if n > 0:
+            n = math.floor(n * factor)
+            if n * prices[ticker] < min_trade_usd:
+                continue
+        paid[ticker] = n
+    return paid
