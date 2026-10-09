@@ -258,6 +258,8 @@ class DailyPlan:
     model_version: str
     target_weights: Mapping[str, float]
     execution: ExecutionSettings = field(default_factory=ExecutionSettings)
+    # Each stock's daily volatility (0.012 for 1.2%), for the rebalancing band.
+    volatility: Mapping[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Copy first, so a later change to the caller's dict cannot reach the plan.
@@ -268,9 +270,17 @@ class DailyPlan:
         total = sum(weights.values())
         if total > 1 + 1e-9:  # small tolerance for floating-point rounding
             raise ValueError(f"weights sum to {total:.6f}; must be at most 1")
-        # frozen=True blocks normal assignment, so the read-only view is stored
+        volatility = dict(self.volatility)
+        for ticker, value in volatility.items():
+            if not (math.isfinite(value) and value > 0):
+                raise ValueError(f"volatility for {ticker} must be > 0, got {value!r}")
+        if volatility and not set(weights) <= set(volatility):
+            missing = sorted(set(weights) - set(volatility))
+            raise ValueError(f"no volatility for target stocks: {', '.join(missing)}")
+        # frozen=True blocks normal assignment, so the read-only views are stored
         # with object.__setattr__, once, while the object is being created.
         object.__setattr__(self, "target_weights", MappingProxyType(weights))
+        object.__setattr__(self, "volatility", MappingProxyType(volatility))
 
 
 @dataclass(frozen=True)

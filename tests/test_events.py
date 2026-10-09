@@ -189,3 +189,13 @@ def test_a_split_ratio_must_be_positive_and_not_one(ratio):
 def test_a_dividend_must_be_positive(amount):
     with pytest.raises(ValueError):
         Dividend("AAPL", date(2025, 2, 10), amount)
+
+
+def test_a_plans_volatility_must_be_positive():
+    with pytest.raises(ValueError, match="volatility"):
+        DailyPlan(PLAN_DAY, "v1", {"AAPL": 0.5}, volatility={"AAPL": 0.0})
+
+
+def test_a_plan_with_volatility_needs_it_for_every_target_stock():
+    with pytest.raises(ValueError, match="no volatility"):
+        DailyPlan(PLAN_DAY, "v1", {"AAPL": 0.5, "MSFT": 0.5}, volatility={"AAPL": 0.01})
