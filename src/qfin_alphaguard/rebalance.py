@@ -85,7 +85,8 @@ def _change(
     band = settings.band_k * volatility * max(target, current)
     if abs(target - current) <= band:
         return 0
-    change = round(target * equity / price) - held
+    edge = target - math.copysign(band, target - current)
+    change = round(edge * equity / price) - held
     if abs(change) * price < settings.min_trade_usd:
         return 0
     return change
