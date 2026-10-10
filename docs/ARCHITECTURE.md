@@ -9,10 +9,10 @@ NIGHTLY (Python, once a day)
   data ─► features ─► Alpha AI (μ, σ) ─► optimiser ─► daily_plan.json
                                                           │ before the open
 EVERY 1-MINUTE BAR (engine)                               ▼
-  IBKR 5 s bars ─► bar builder ─► features + ML score ─► strategy
+  live trades ───► bar builder ─► features + ML score ─► strategy
                                                           │ order intent
 EVERY ORDER (engine + risk)                               ▼
-  guard.yaml ─► Guard ─► OMS ─► (optional FPGA risk gate) ─► IBKR
+  guard.yaml ─► Guard ─► OMS ─► (optional FPGA risk gate) ─► Alpaca
                            │
                            └─► fills, PnL, every decision ─► log store ─► back to the nightly job
 ```
@@ -29,7 +29,7 @@ The engine starts in Python (Phase 3) and moves to C++ (Phase 4).
 | Optimiser | nightly | μ, Σ, constraints → target weights | CVXPY, Ledoit-Wolf covariance |
 | Strategy | every bar | plan + score + position → order intent | inside the engine |
 | Guard | every order + continuous monitoring | intent → approve, reduce or reject; halt | rules from `guard.yaml` |
-| Engine (OMS) | continuously, event-driven | approved order → broker; fill → position, PnL | Python (ib_async), then C++ |
+| Engine (OMS) | continuously, event-driven | approved order → broker; fill → position, PnL | Python (Alpaca API), then C++ |
 | Log store | event-driven + nightly | every decision → JSONL, compacted to Parquet | DuckDB |
 | FPGA | lab benchmark; optional live risk gate | market message or order → decision or approval | SystemVerilog, Vivado, Artix-7 |
 | Quantum (research) | offline | same portfolio problem → comparison with classical | Qiskit, `research/quantum` |
@@ -42,20 +42,21 @@ retail-broker strategy more profitable.
 
 | # | From → to | Content | Frequency | Format |
 | --- | --- | --- | --- | --- |
-| 1 | Providers → data layer | daily and intraday bars, macro series | nightly | EODHD, IBKR history, FRED → Parquet |
+| 1 | Providers → data layer | daily and intraday bars, macro series | nightly | EODHD, Alpaca SIP history, FRED → Parquet |
 | 2 | Data layer → features | clean point-in-time bars | nightly | DuckDB → Polars |
 | 3 | Features → Alpha AI | feature matrix + target | train weekly, predict nightly | Parquet |
 | 4 | Alpha AI → optimiser | μ and σ forecasts, model version | nightly | Parquet |
 | 5 | Optimiser → engine | `daily_plan.json`: target weights, each stock's volatility, execution settings | once, before the open | JSON, versioned |
 | 6 | `guard.yaml` → Guard | risk limits | only by hand, through a commit | YAML |
-| 7 | IBKR → engine | live prices as 5-second bars | continuous | TWS API via IB Gateway |
+| 7 | Data feed → engine | live trades, built into 1-minute bars | continuous | EODHD WebSocket (Cboe EDGX) or Alpaca (IEX) |
 | 8 | Inside the engine | 1-minute bar → features → score → intent | every bar | in memory |
-| 9 | Strategy → Guard → IBKR | order intent → approved order | per order | in memory, TWS API |
-| 10 | IBKR → engine | order status, fills | per event | TWS API |
+| 9 | Strategy → Guard → Alpaca | order intent → approved order | per order | in memory, Alpaca REST API |
+| 10 | Alpaca → engine | order status, fills | per event | Alpaca WebSocket |
 | 11 | Engine → log store → nightly job | decisions, fills, slippage, PnL | per event; read nightly | JSONL → Parquet |
 
-IBKR real-time bars are 5 seconds long; the engine builds each 1-minute bar
-from 12 of them.
+The live feed is a single exchange (decision 0008): its prices follow the
+consolidated tape closely over 5 minutes or more, its volume is a few percent
+of it. The engine builds each 1-minute bar from the feed's trades.
 
 ## Daily plan
 
@@ -187,8 +188,8 @@ orders that reduce positions that day.
    with a champion/challenger rule, optimise, write `daily_plan.json`. If any
    step fails, no plan is written.
 2. **Before the open:** the engine loads the plan and `guard.yaml`, checks the
-   IB Gateway connection, data freshness and positions. With no valid plan it
-   starts in reduce-only mode.
+   broker and data connections, data freshness and positions. With no valid
+   plan it starts in reduce-only mode.
 3. **First 5 minutes:** no trading (wide spreads at the open).
 4. **Every minute until 30 minutes before the close:** build the bar, update
    features, score, decide (send a child or wait), Guard, order. Every step is
