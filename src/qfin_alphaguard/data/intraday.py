@@ -1,23 +1,27 @@
 """1-minute bars for the trading universe and for ETFs, cut to the regular session.
 
 For each year, the stocks of that year's trading universe (decision 0005) get
-the year's 1-minute bars from EODHD, and the stocks that left the universe at
-the new year get January's, so that a backtest can sell them (minute_windows).
-Prices and volume are as traded, and only the minutes that start inside the
-regular session are kept (sessions.py). One Parquet file per stock and year,
-under data/raw/intraday/<ticker>/<year>.parquet.
+the year's 1-minute bars, and the stocks that left the universe at the new
+year get January's, so that a backtest can sell them (minute_windows). Prices
+and volume are as traded, and only the minutes that start inside the regular
+session are kept (sessions.py). One Parquet file per stock and year, under
+data/raw/intraday/<ticker>/<year>.parquet.
+
+Two providers sell the consolidated tape, EODHD and Alpaca (alpaca.py), and
+each lacks days, wholly or in part, that the other has (decision 0008). The
+stocks' minutes come from EODHD first; an ETF's, such as QQQ's for decision
+0011, from Alpaca first. The second provider is asked only for a year in
+which the first lacks a minute of some trading day's session, and each day's
+minutes then come whole from the one that has more of them (by_day). The
+file's `source` column says which.
 
 A provider may file a company's minutes under another of its tickers, such
 as META for FB_old; each says which codes to try (minute_codes). Every year
-of minutes is checked against the daily closes and kept only if they match:
-a check on the data, and on the company.
-
-An ETF's minutes take the same steps, from Alpaca (alpaca.py) instead, and
-are checked against EODHD's daily closes: QQQ, for the intraday strategy of
-decision 0011.
+of a provider's minutes is checked against the daily closes and kept only if
+they match: a check on the data, and on the company.
 """
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
@@ -46,11 +50,14 @@ VALID_MINUTE = (
     & (pl.col("volume") >= 0)
 )
 
+# A stored minute: a provider's bar, and which provider it came from.
+STORED_SCHEMA = {**MINUTE_SCHEMA, "source": pl.String}
+
 
 class MinuteClient(Protocol):
-    """Where minutes come from: EodhdClient, or AlpacaClient for an ETF."""
+    """A provider of minutes: EodhdClient or AlpacaClient."""
 
-    name: str
+    name: str  # stored in the source column, such as EODHD
 
     def minute_codes(self, code: str, history: IndexHistory) -> tuple[str, ...]: ...
 
@@ -63,13 +70,15 @@ class YearOfMinutes:
 
     ticker: str  # the daily code, such as FB_old
     year: int
-    source: str | None  # where the minutes came from, such as META; None if nowhere
+    # (provider, its code, days taken from it) for each provider whose minutes
+    # matched, such as ("EODHD", "META", 250); empty if none did
+    parts: tuple[tuple[str, str, int], ...]
     rows: int
     trading_days: int  # days with a daily bar, from 1 January to the last day asked
     matching: float  # share of the days with minutes whose last minute matched
     error: str | None = None  # why the download failed, if it did
     dropped: int = 0  # minutes that broke the Bar rules
-    days: int = 0  # trading days with minutes; EODHD lacks some, such as TSLA's
+    days: int = 0  # trading days with minutes from either provider
 
 
 def intraday_path(root: Path, ticker: str, year: int) -> Path:
@@ -140,8 +149,34 @@ def matching_share(minutes: pl.DataFrame, daily: pl.DataFrame) -> float:
     return both.select(near.mean()).item()
 
 
+def by_day(*sources: pl.DataFrame) -> pl.DataFrame:
+    """Each day's minutes from the source with the most of them, the first on a tie.
+
+    On an ordinary day the providers have the same minutes, so a day one of
+    them lacks, wholly or in part, comes from another. A day is never mixed:
+    on most days the two give the first minute a different volume (Alpaca's
+    is larger), and a day keeps to one provider's rules.
+    """
+    ranked = pl.concat(
+        [
+            frame.with_columns(
+                pl.col("start").dt.date().alias("day"), pl.lit(rank).alias("rank")
+            )
+            for rank, frame in enumerate(sources)
+        ]
+    )
+    best = (
+        ranked.group_by("day", "rank")
+        .len()
+        .sort("day", "len", "rank", descending=[False, True, False])
+        .unique("day", keep="first")
+        .drop("len")
+    )
+    return ranked.join(best, on=["day", "rank"]).drop("day", "rank").sort("start")
+
+
 def download_year(
-    client: MinuteClient,
+    clients: Sequence[MinuteClient],
     code: str,
     year: int,
     last_day: date,
@@ -151,35 +186,49 @@ def download_year(
     """One stock's regular-session minutes for one year, checked against `daily`.
 
     The minutes run from 1 January to `last_day` or the end of the year,
-    whichever comes first.
+    whichever comes first. The providers are asked in order, each under its
+    codes until one's minutes match the daily closes, and only while some
+    trading day still lacks a minute of its session. Each day's minutes come
+    from the provider that has more of them (by_day).
     """
     first, last = date(year, 1, 1), min(date(year, 12, 31), last_day)
     daily_bars = daily.filter(
         (pl.col("ticker") == code) & pl.col("date").is_between(first, last)
     )
-    for source in client.minute_codes(code, history):
-        minutes = regular_session(client.minute_bars(source, first, last))
-        valid = minutes.filter(VALID_MINUTE)
-        share = matching_share(valid, daily_bars)
-        if share >= MATCHING_DAYS:
-            stored = valid.with_columns(pl.lit(code).alias("ticker"))
-            return stored, YearOfMinutes(
-                code,
-                year,
-                source,
-                stored.height,
-                daily_bars.height,
-                share,
-                dropped=minutes.height - valid.height,
-                days=stored["start"].dt.date().n_unique(),
-            )
-    return pl.DataFrame(schema=MINUTE_SCHEMA), YearOfMinutes(
-        code, year, None, 0, daily_bars.height, 0.0
+    stored = pl.DataFrame(schema=STORED_SCHEMA)
+    codes = {}
+    dropped = 0
+    for client in clients:
+        if _every_minute(stored, daily_bars):
+            break
+        for source in client.minute_codes(code, history):
+            minutes = regular_session(client.minute_bars(source, first, last))
+            valid = minutes.filter(VALID_MINUTE)
+            if matching_share(valid, daily_bars) >= MATCHING_DAYS:
+                codes[client.name] = source
+                dropped += minutes.height - valid.height
+                labelled = valid.with_columns(
+                    pl.lit(code).alias("ticker"), pl.lit(client.name).alias("source")
+                )
+                stored = by_day(stored, labelled)
+                break
+    days_from = dict(
+        stored.group_by("source").agg(pl.col("start").dt.date().n_unique()).iter_rows()
+    )
+    return stored, YearOfMinutes(
+        code,
+        year,
+        tuple((name, source, days_from.get(name, 0)) for name, source in codes.items()),
+        stored.height,
+        daily_bars.height,
+        matching_share(stored, daily_bars),
+        dropped=dropped,
+        days=stored["start"].dt.date().n_unique(),
     )
 
 
 def backfill_minutes(
-    client: MinuteClient,
+    clients: Sequence[MinuteClient],
     daily: pl.DataFrame,
     history: IndexHistory,
     universes: dict[int, Iterable[str]],
@@ -190,14 +239,16 @@ def backfill_minutes(
 ) -> list[YearOfMinutes]:
     """Store the minutes each year of `universes` ({year: tickers}) needs.
 
-    minute_windows says which stocks and until which day. Stored minutes that
-    reach the stock's last daily bar in its window are complete and skipped,
-    so an interrupted run picks up where it stopped, and a year stored while
-    it was still running is downloaded again. Minutes missing inside a window
-    do not count: EODHD lacks some for good, and a new download would not
-    bring them. A year without matching minutes gets no file and is tried
-    again next time, when its sources may be known. A download that fails is
-    reported with its error and does not stop the others.
+    minute_windows says which stocks and until which day, and download_year
+    asks `clients` in order. Stored minutes that reach the stock's last daily
+    bar in its window are complete and skipped, so an interrupted run picks up
+    where it stopped, and a year stored while it was still running is
+    downloaded again. Minutes missing inside a window do not count: neither
+    provider has some, and a new download would not bring them. A year
+    without matching minutes gets no file and is tried again next time, when
+    its sources may be known. A download that fails, from either provider, is
+    reported with its error, keeps the year's old file, and does not stop the
+    others.
     """
     tasks = [
         (code, year, min(until, last_day))
@@ -209,9 +260,9 @@ def backfill_minutes(
     def run(task: tuple[str, int, date]) -> YearOfMinutes:
         code, year, until = task
         try:
-            minutes, summary = download_year(client, code, year, until, daily, history)
-        except RuntimeError as error:  # the source still failing after its retries
-            return YearOfMinutes(code, year, None, 0, 0, 0.0, error=str(error))
+            minutes, summary = download_year(clients, code, year, until, daily, history)
+        except RuntimeError as error:  # a provider still failing after its retries
+            return YearOfMinutes(code, year, (), 0, 0, 0.0, error=str(error))
         if not minutes.is_empty():
             path = intraday_path(root, code, year)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,8 +270,9 @@ def backfill_minutes(
         return summary
 
     done = []
-    # A few requests at a time: each is a few seconds and up to 10 MB, far
-    # below EODHD's limit of 1,000 requests a minute.
+    # A few requests at a time, each a second or more and up to 10 MB: below
+    # EODHD's limit of 1,000 requests a minute, and about Alpaca's of 200.
+    # Alpaca answers a faster pace with HTTP 429, which its client retries.
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for finished in as_completed(pool.submit(run, task) for task in tasks):
             summary = finished.result()
@@ -255,8 +307,16 @@ def minute_feed(
             {"ticker": list(needed), "until": list(needed.values())},
             schema={"ticker": pl.String, "until": pl.Date},
         )
+        # One file at a time: a file stored before the source column existed
+        # has one column fewer.
+        files = [
+            pl.scan_parquet(intraday_path(root, ticker, year)).select(
+                list(MINUTE_SCHEMA)
+            )
+            for ticker in needed
+        ]
         minutes = (
-            pl.scan_parquet([intraday_path(root, ticker, year) for ticker in needed])
+            pl.concat(files)
             .filter(pl.col("start").dt.date().is_between(first, last))
             .join(until, on="ticker")
             .filter(pl.col("start").dt.date() <= pl.col("until"))
@@ -280,12 +340,29 @@ def _has_minutes(path: Path) -> bool:
     return path.exists() and pl.scan_parquet(path).select(pl.len()).collect().item() > 0
 
 
+def _every_minute(minutes: pl.DataFrame, daily: pl.DataFrame) -> bool:
+    """`minutes` has every minute of the session on each day of `daily`."""
+    days = set(daily["date"].to_list())
+    if not days:
+        return True  # no trading day, so no minute is missing
+    have = dict(minutes.group_by(pl.col("start").dt.date()).len().iter_rows())
+    return all(
+        have.get(session.day, 0) == session.minutes
+        for session in sessions(min(days), max(days))
+        if session.day in days
+    )
+
+
 def _complete(
     root: Path, daily: pl.DataFrame, code: str, year: int, last: date
 ) -> bool:
-    """Stored minutes reach the stock's last daily bar from 1 January to `last`."""
+    """Stored minutes reach the stock's last daily bar from 1 January to `last`.
+
+    Minutes stored before the second provider filled holes have no source
+    column; they are downloaded again, once.
+    """
     path = intraday_path(root, code, year)
-    if not path.exists():
+    if not path.exists() or "source" not in pl.read_parquet_schema(path):
         return False
     stored = pl.scan_parquet(path).select(pl.col("start").max()).collect().item()
     bars = daily.filter(
