@@ -142,8 +142,9 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       back for costs, or for prices that rise before a buy fills (in 2025 cash
       fell to 1.24 USD at 100,000 USD).
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
-      buy-and-hold and equal-weight baselines. Capital levels: 500, 5,000 and
-      30,000 USD. Variants: volatility targeting and leverage, net of
+      buy-and-hold and equal-weight baselines, and the days: daily profit and
+      loss, the share of winning days, the worst day. Capital levels: 500,
+      5,000 and 30,000 USD. Variants: volatility targeting and leverage, net of
       borrowing costs (decision 0009).
 
 **Gate M1:** one command produces the same report from the same inputs every
@@ -154,7 +155,8 @@ time; results after costs compared with the baselines.
 Prove whether ML adds anything after costs. Slower during January exams.
 
 - [ ] Two targets: next-day return and volatility (for the optimiser); the
-      direction of the next 30 minutes (for timing).
+      direction of the next 30 minutes, only to time the plan's trades: it
+      never trades its own signal (decision 0010).
 - [ ] Purged walk-forward: drop training samples whose target horizon overlaps
       the test period, with an embargo before it.
 - [ ] Ridge and logistic regression first, then LightGBM; deep models only if
@@ -162,6 +164,10 @@ Prove whether ML adds anything after costs. Slower during January exams.
 - [ ] Feature parity test: batch and incremental calculations agree.
 - [ ] Model registry (version, training date, data range) and a
       champion/challenger rule.
+- [ ] Prequential evaluation: every model predicts first and learns after, on
+      all stocks together; retrained weekly, later daily, and promoted only by
+      the champion/challenger rule. No model updates itself after each signal
+      or for each stock (decision 0010).
 - [ ] Health check: if the score distribution drifts, fall back to timing without ML.
 
 **Gate M2:** two reports. Nightly model: Sharpe after costs against the plan
@@ -184,7 +190,7 @@ profit; this phase asks whether the system works correctly.
 - [ ] Reconciliation at open and close: broker positions equal engine positions.
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
-- [ ] Daily report: PnL, slippage, deviation from backtest.
+- [ ] Daily report: PnL, slippage, deviation from backtest, share of winning days.
 - [ ] At least 8 weeks of uninterrupted running (April–May).
 
 **Gate M3:** replaying the same days reproduces at least 95% of paper
