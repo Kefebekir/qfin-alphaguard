@@ -154,6 +154,21 @@ def test_a_renamed_company_gets_its_minutes_from_the_new_code():
     assert stored["ticker"].unique().to_list() == ["FB_old"]
 
 
+def test_an_etf_outside_the_index_is_stored_under_its_own_code(tmp_path):
+    # QQQ's minutes come from Alpaca (decision 0011); the index never had it.
+    day = date(2026, 10, 9)
+    history = IndexHistory((span("AAPL", "2000-01-03"),))
+    client = FakeMinuteClient({"QQQ": minutes("QQQ", [at(day, 19, 59)], [600.0])})
+
+    done = backfill_minutes(
+        client, daily("QQQ", [day], [600.0]), history, {2026: ("QQQ",)}, tmp_path, day
+    )
+
+    assert [(stored.ticker, stored.source) for stored in done] == [("QQQ", "QQQ")]
+    stored = pl.read_parquet(intraday_path(tmp_path, "QQQ", 2026))
+    assert stored["start"].to_list() == [at(day, 19, 59)]
+
+
 def test_a_year_without_matching_minutes_is_tried_again_next_time(tmp_path):
     day = date(2025, 3, 4)
     history = IndexHistory((span("AAA", "2000-01-03"),))

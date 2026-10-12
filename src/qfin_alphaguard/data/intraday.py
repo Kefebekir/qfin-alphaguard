@@ -1,4 +1,4 @@
-"""1-minute bars for the trading universe, cut to the regular session.
+"""1-minute bars for the trading universe and for ETFs, cut to the regular session.
 
 For each year, the stocks of that year's trading universe (decision 0005) get
 the year's 1-minute bars from EODHD, and the stocks that left the universe at
@@ -14,6 +14,10 @@ codes that joined the index on a day it left (renamed to) and those that left
 on a day it joined (renamed from). EODHD has no minutes under TICKER_old
 codes at all. Every year of minutes is checked against the daily closes and
 kept only if they match: a check on the data, and on the company.
+
+An ETF's minutes take the same steps, from Alpaca (alpaca.py) instead, and
+are checked against EODHD's daily closes: QQQ, for the intraday strategy of
+decision 0011.
 """
 
 import re
@@ -22,10 +26,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Protocol
 
 import polars as pl
 
-from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA, EodhdClient, eodhd_code
+from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA, eodhd_code
 from qfin_alphaguard.data.universe import IndexHistory
 from qfin_alphaguard.events import Bar
 from qfin_alphaguard.sessions import sessions
@@ -44,6 +49,12 @@ VALID_MINUTE = (
     & (pl.max_horizontal("open", "close") <= pl.col("high"))
     & (pl.col("volume") >= 0)
 )
+
+
+class MinuteClient(Protocol):
+    """Where minutes come from: EodhdClient, or AlpacaClient for an ETF."""
+
+    def minute_bars(self, code: str, first: date, last: date) -> pl.DataFrame: ...
 
 
 @dataclass(frozen=True)
@@ -147,7 +158,7 @@ def minute_sources(code: str, history: IndexHistory) -> tuple[str, ...]:
 
 
 def download_year(
-    client: EodhdClient,
+    client: MinuteClient,
     code: str,
     year: int,
     last_day: date,
@@ -185,7 +196,7 @@ def download_year(
 
 
 def backfill_minutes(
-    client: EodhdClient,
+    client: MinuteClient,
     daily: pl.DataFrame,
     history: IndexHistory,
     universes: dict[int, Iterable[str]],
@@ -216,7 +227,7 @@ def backfill_minutes(
         code, year, until = task
         try:
             minutes, summary = download_year(client, code, year, until, daily, history)
-        except RuntimeError as error:  # EODHD still failing after its retries
+        except RuntimeError as error:  # the source still failing after its retries
             return YearOfMinutes(code, year, None, 0, 0, 0.0, error=str(error))
         if not minutes.is_empty():
             path = intraday_path(root, code, year)
