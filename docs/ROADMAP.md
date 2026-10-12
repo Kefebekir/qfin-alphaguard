@@ -6,8 +6,11 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 8 is next:** Efe's timing without ML: each day's trade in a
-stock split into equal-spaced child orders.
+**Phase 1, step 7e is next:** fractional shares and Alpaca's costs (decision
+0008), before step 8's child orders are built on whole shares. Efe chose
+Alpaca to start real money with about 500 USD, and no leverage for the
+nightly plan for now (decision 0009). A second strategy, intraday momentum on
+the Nasdaq-100 (decision 0011), has its own steps in Phase 1b.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -25,15 +28,17 @@ stock split into equal-spaced child orders.
 | 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | done, #18 |
 | 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | done, #19 |
 | 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
-| 8. Timing without ML: equal-spaced child orders | Efe | next |
+| 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decision 0008) | Claude designs; Efe changes his rules | next |
+| 7f. Fill EODHD's minute holes from Alpaca's SIP history (decision 0008) | Claude | to do |
+| 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
 
 Phase 0 is done and Gate M0 is met (#1–#6): cleanup, README, event types,
 `CLAUDE.md`, `guard.yaml` and its loader, docs, CLI subcommands.
 
-Outside the code: open the IBKR live account early. The paper account is tied
-to it and approval can take time.
+Outside the code: the Alpaca paper account is open (9 October 2026); its keys
+are in the git-ignored `.env`.
 
 ## Goal and evidence
 
@@ -138,17 +143,45 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       back for costs, or for prices that rise before a buy fills (in 2025 cash
       fell to 1.24 USD at 100,000 USD).
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
-      buy-and-hold and equal-weight baselines.
+      buy-and-hold and equal-weight baselines, and the days: daily profit and
+      loss, the share of winning days, the worst day. Capital levels: 500,
+      5,000 and 30,000 USD. Variants: volatility targeting and leverage, net of
+      borrowing costs (decision 0009).
 
 **Gate M1:** one command produces the same report from the same inputs every
 time; results after costs compared with the baselines.
+
+### Phase 1b: Intraday momentum on the Nasdaq-100 (decision 0011)
+
+A second strategy beside the nightly plan: it follows the day's trend on the
+Nasdaq-100 and is flat at every close.
+
+- [ ] QQQ's 1-minute bars from Alpaca's SIP history into the store, checked
+      against EODHD's.
+- [ ] The strategy as its own `Strategy` in our engine: the Noise Area, VWAP,
+      decisions at HH:00 and HH:30, a size of min(cap, 2% / 14-day
+      volatility), flat at the close. Efe writes the trading rules; Claude
+      prepares the skeleton and the spec.
+- [ ] Backtest through our engine and simulated broker. It must reproduce
+      the research: 2016–2026, cap 2×, 18.8% a year, Sharpe ratio 1.51.
+- [ ] Guard limits for an intraday strategy, set by hand: round trips and
+      reversals allowed for it, a leverage cap of 2×, the daily loss limit.
+- [ ] Paper trading of QQQ on Alpaca's paper account for two to three
+      months, compared with the backtest every day.
+- [ ] A broker and instrument for real money from the UK: QQQ at Alpaca if
+      its UK accounts allow it, otherwise a Nasdaq-100 CFD or spread bet with
+      an API and small sizes.
+
+**Gate M1b:** the engine's backtest matches the research, and the paper
+results stay inside the backtest's range.
 
 ### Phase 2: Alpha AI v1 (7 December 2026 – 31 January 2027)
 
 Prove whether ML adds anything after costs. Slower during January exams.
 
 - [ ] Two targets: next-day return and volatility (for the optimiser); the
-      direction of the next 30 minutes (for timing).
+      direction of the next 30 minutes, only to time the plan's trades: it
+      never trades its own signal (decision 0010).
 - [ ] Purged walk-forward: drop training samples whose target horizon overlaps
       the test period, with an embargo before it.
 - [ ] Ridge and logistic regression first, then LightGBM; deep models only if
@@ -156,6 +189,10 @@ Prove whether ML adds anything after costs. Slower during January exams.
 - [ ] Feature parity test: batch and incremental calculations agree.
 - [ ] Model registry (version, training date, data range) and a
       champion/challenger rule.
+- [ ] Prequential evaluation: every model predicts first and learns after, on
+      all stocks together; retrained weekly, later daily, and promoted only by
+      the champion/challenger rule. No model updates itself after each signal
+      or for each stock (decision 0010).
 - [ ] Health check: if the score distribution drifts, fall back to timing without ML.
 
 **Gate M2:** two reports. Nightly model: Sharpe after costs against the plan
@@ -167,18 +204,18 @@ adds nothing" is a valid result; that part then runs without ML.
 Prove the live system behaves like the backtest. Eight weeks cannot prove
 profit; this phase asks whether the system works correctly.
 
-- [ ] Always-on server, IB Gateway with IBC for automatic login and restarts,
-      alerts, and the `live_trading` lock.
-- [ ] IBKR paper account and `ib_async`.
-- [ ] Live data: 5-second bars into 1-minute bars (at most 60 new bar requests
-      per 10 minutes).
+- [ ] Always-on server for the engine, alerts, and the `live_trading` lock.
+- [ ] Alpaca paper account and its API: orders by REST, fills by WebSocket.
+- [ ] Live data: trades from a free single-exchange feed (EODHD's EDGX
+      WebSocket or Alpaca's IEX) built into 1-minute bars, and compared with
+      the consolidated tape every day (decision 0008).
 - [ ] Order state machine: new → sent → acknowledged → partial → filled /
       cancelled / rejected; a unique client order id per order.
 - [ ] Guard live: every rule, halt and kill switch.
 - [ ] Reconciliation at open and close: broker positions equal engine positions.
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
-- [ ] Daily report: PnL, slippage, deviation from backtest.
+- [ ] Daily report: PnL, slippage, deviation from backtest, share of winning days.
 - [ ] At least 8 weeks of uninterrupted running (April–May).
 
 **Gate M3:** replaying the same days reproduces at least 95% of paper
@@ -187,8 +224,9 @@ for 8 weeks.
 
 ### Phase 3b: Small real money and scaling (June 2027 onwards)
 
-- [ ] Broker and account type (ISA or general, cash or margin).
-- [ ] Starting capital: a small part of the plan, an amount Efe can afford to lose.
+- [ ] Account type at Alpaca: cash or margin; leverage only through the gate
+      of decision 0009.
+- [ ] Starting capital: about 500 USD, an amount Efe can afford to lose.
 - [ ] `live_trading: true` only in this phase, set by hand.
 - [ ] Monthly report: net return, difference from benchmarks, expected range,
       slippage, Guard events.
@@ -202,7 +240,7 @@ expected range, no stop rule triggered; capital steps up one level.
 Move the live path to C++ and measure it. Moves to September–December if a
 summer internship takes priority.
 
-- [ ] C++20, CMake, GoogleTest; IBKR TWS API C++ client.
+- [ ] C++20, CMake, GoogleTest; a C++ client for the broker's REST and WebSocket API.
 - [ ] C++ copies of the features and Guard, reading the same `guard.yaml`.
 - [ ] ML inference through ONNX Runtime.
 - [ ] Golden test: a recorded trading day gives identical decisions in Python and C++.
@@ -257,12 +295,12 @@ PC ↔ board transfer time separately.
 | Scope creep | new layers before a phase ends | no phase starts before its gate; see Out of scope |
 | No edge | after costs, results do not beat the benchmarks | no real money; stop rules |
 | Overfitting | great backtest, poor paper results | purged walk-forward, simple models, no-ML baseline |
-| Underestimated costs | gross profit, net loss | cost model from Phase 1; orders of at least 1,000 USD |
-| Account and regulatory rules | intraday and settlement limits | US stocks; no same-day reversals; check IBKR rules before Phase 3b |
-| Broker API limits | rate limits, market orders only on some brokers | start on IBKR; test any other broker on its demo first |
+| Underestimated costs | gross profit, net loss | cost model from Phase 1; fills measured in paper trading; monthly fees counted against small capital |
+| Account and regulatory rules | intraday and settlement limits | US stocks; no same-day reversals; check Alpaca's rules before Phase 3b |
+| Broker API limits | rate limits; fractional orders are day orders | everything on Alpaca's paper account first |
 | Data quality | missing bars, split errors | validation layer, stale-data rule |
 | Optimistic paper fills | good on paper, worse live | conservative cost model; re-measure slippage in the first live month |
-| Broker connection | Gateway drops, subscriptions to renew | IBC, halt, reconciliation at open and close |
+| Broker connection | API or feed outages | halt on stale data, reconciliation at open and close |
 | University workload | pauses in January and May–June | passive work then: monitoring, reading, FPGA basics |
 | FPGA learning curve | weeks stuck in simulation | small modules, testbench first, start 5a early |
 

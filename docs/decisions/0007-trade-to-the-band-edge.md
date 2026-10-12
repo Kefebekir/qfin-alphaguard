@@ -38,9 +38,11 @@ depend on that.
 Run again with the band's own code (`trades_at_open`: whole shares, real
 cash, the previous close as the price) over the same years, the edge gave
 0.76 → 0.84 at 30,000 USD (95% interval +0.01 to +0.13) and 0.79 → 0.82 at
-100,000 USD (−0.02 to +0.07), with 22% and 26% fewer trades. With a commission-free broker's costs (1.45 bps a trade, no
-minimum, every stock the optimiser wants), the edge also did better: 0.79
-→ 0.82 at both capital levels.
+100,000 USD (−0.02 to +0.07), with 22% and 26% fewer trades.
+
+With a commission-free broker's costs (1.45 bps a trade, no minimum, every
+stock the optimiser wants), the edge also did better: 0.79 → 0.82 at both
+capital levels.
 
 How wide the band is matters less than where a trade stops. Trading to the
 target with k = 5, 10 or 20 changed the Sharpe ratio by at most 0.05; at

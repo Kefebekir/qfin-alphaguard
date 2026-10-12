@@ -1,6 +1,6 @@
 # 0002: Develop, paper trade and start live on Interactive Brokers
 
-- **Status:** accepted
+- **Status:** replaced by decision 0008 (Alpaca, fractional shares)
 - **Date:** 2026-10-07
 
 ## Context

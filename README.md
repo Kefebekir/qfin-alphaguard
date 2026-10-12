@@ -19,7 +19,7 @@ exactly what works today and what does not.
 | Phase 0: event types, risk configuration, repository skeleton | done |
 | Phase 1: event-driven backtester with costs and Guard rules | in progress |
 | Phase 2: ML forecasts and intraday execution timing | planned |
-| Phase 3: paper trading on Interactive Brokers | planned |
+| Phase 3: paper trading on Alpaca | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
@@ -141,7 +141,7 @@ IAM policies and the task definition template are in `infra/aws/`.
 Python 3.12, Polars, Parquet, DuckDB, NumPy, scikit-learn, CVXPY, pytest, ruff,
 Docker, AWS (ECR, ECS Fargate, EventBridge Scheduler, S3), GitHub Actions.
 
-Planned: the Interactive Brokers API, C++20, and SystemVerilog on an Artix-7 FPGA.
+Planned: the Alpaca API, C++20, and SystemVerilog on an Artix-7 FPGA.
 
 ## License
 
