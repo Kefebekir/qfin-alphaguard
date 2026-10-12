@@ -1,10 +1,15 @@
 import json
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import polars as pl
 import pytest
 
+from qfin_alphaguard import cli
 from qfin_alphaguard.cli import build_parser, main
+from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA
 from qfin_alphaguard.plan import plan_from_json
+from qfin_alphaguard.sessions import session_days, sessions
 
 AWS = Path(__file__).resolve().parents[1] / "infra" / "aws"
 TASK_DEFINITION = AWS / "task-definition.template.json"
@@ -64,6 +69,89 @@ def test_intraday_needs_the_daily_prices_first(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     assert main(["intraday"]) == 1
     assert "run `qfin ingest` first" in capsys.readouterr().err
+
+
+class FakeEodhd:
+    """Daily bars closing at 600 on every session asked for."""
+
+    def daily_bars(self, code, start, end):
+        days = session_days(start, end)
+        n = len(days)
+        return pl.DataFrame(
+            {
+                "date": days,
+                "ticker": [code] * n,
+                "close": [600.0] * n,
+                "adjustment": [1.0] * n,
+            }
+        )
+
+
+class FakeAlpaca:
+    """A minute closing at 600 at the end of every session asked for."""
+
+    def __init__(self):
+        self.asked = []
+
+    def minute_bars(self, code, first, last):
+        self.asked.append((code, first, last))
+        starts = [s.close - timedelta(minutes=1) for s in sessions(first, last)]
+        n = len(starts)
+        return pl.DataFrame(
+            {
+                "start": starts,
+                "ticker": [code] * n,
+                "open": [600.0] * n,
+                "high": [600.0] * n,
+                "low": [600.0] * n,
+                "close": [600.0] * n,
+                "volume": [100] * n,
+            },
+            schema=MINUTE_SCHEMA,
+        )
+
+
+def frozen_at(moment):
+    """The CLI's datetime, with now() fixed at `moment`."""
+
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return moment
+
+    return Frozen
+
+
+@pytest.mark.parametrize(
+    ("now", "last_day"),
+    [
+        # Monday 12 October's session ended at 20:00 UTC, and a request runs
+        # to the end of its last UTC day. Alpaca serves SIP minutes once they
+        # are 15 minutes old, so that day can be asked for from 00:15 UTC.
+        (datetime(2026, 10, 13, 0, 10, tzinfo=UTC), date(2026, 10, 11)),
+        (datetime(2026, 10, 13, 0, 20, tzinfo=UTC), date(2026, 10, 12)),
+    ],
+)
+def test_etf_minutes_asks_alpaca_only_for_days_it_may_serve(
+    now, last_day, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EODHD_API_KEY", "eodhd-key")
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "key-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "secret")
+    alpaca = FakeAlpaca()
+    monkeypatch.setattr(cli, "AlpacaClient", lambda key_id, secret: alpaca)
+    monkeypatch.setattr(cli, "EodhdClient", lambda key: FakeEodhd())
+    monkeypatch.setattr(cli, "datetime", frozen_at(now))
+
+    assert main(["etf-minutes", "QQQ", "--from-year", "2026"]) == 0
+
+    assert alpaca.asked == [("QQQ", date(2026, 1, 1), last_day)]
+    stored = pl.read_parquet(tmp_path / "data/raw/intraday/QQQ/2026.parquet")
+    assert stored["start"].dt.date().to_list() == session_days(
+        date(2026, 1, 1), last_day
+    )
+    assert "100% of them match the daily close" in capsys.readouterr().out
 
 
 GUARD = Path(__file__).resolve().parents[1] / "guard.yaml"

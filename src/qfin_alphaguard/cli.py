@@ -1,9 +1,10 @@
 """Command line entry point.
 
-    qfin ingest     load, validate and store daily prices (the nightly AWS job)
-    qfin intraday   download 1-minute bars for each year's trading universe
-    qfin plan       build a day's plan: the portfolio to hold, from the bars before it
-    qfin backtest   run the event-driven backtester (Phase 1, not built yet)
+    qfin ingest       load, validate and store daily prices (the nightly AWS job)
+    qfin intraday     download 1-minute bars for each year's trading universe
+    qfin etf-minutes  download ETFs' 1-minute bars from Alpaca, such as QQQ's
+    qfin plan         build a day's plan: the portfolio to hold, from the bars before it
+    qfin backtest     run the event-driven backtester (Phase 1, not built yet)
 
 The nightly AWS job runs the command in infra/aws/task-definition.template.json;
 a test checks that this CLI still accepts it.
@@ -15,6 +16,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from qfin_alphaguard.config import Config
+from qfin_alphaguard.data.alpaca import AlpacaClient, api_keys
 from qfin_alphaguard.data.eodhd import EodhdClient, api_key
 from qfin_alphaguard.data.ingest import load_prices, sp500_coverage
 from qfin_alphaguard.data.intraday import YearOfMinutes, backfill_minutes
@@ -74,6 +76,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--workers", type=int, default=4, help="requests to EODHD at a time"
     )
     intraday.set_defaults(run=_intraday)
+
+    etf = commands.add_parser(
+        "etf-minutes",
+        help="download ETFs' 1-minute bars from Alpaca, checked against EODHD's "
+        "daily closes",
+    )
+    etf.add_argument("symbols", nargs="+", help="the ETFs, such as QQQ")
+    etf.add_argument(
+        "--from-year",
+        type=int,
+        default=2016,
+        help="first year; Alpaca's history starts in 2016",
+    )
+    etf.add_argument(
+        "--to-year", type=int, help="last year; defaults to the year of the last day"
+    )
+    etf.set_defaults(run=_etf_minutes)
 
     plan = commands.add_parser(
         "plan", help="build a day's plan from the daily bars before it"
@@ -149,20 +168,6 @@ def _intraday(args: argparse.Namespace) -> int:
     today = datetime.now(UTC).date()
     years = range(args.from_year, (args.to_year or today.year) + 1)
     universes = trading_universes(daily, years)
-
-    def report(stored: YearOfMinutes) -> None:
-        if stored.error:
-            print(f"{stored.year} {stored.ticker:9} failed: {stored.error}", flush=True)
-            return
-        source = stored.source or "nowhere"
-        dropped = f", {stored.dropped} broken minutes dropped" if stored.dropped else ""
-        print(
-            f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
-            f" on {stored.days} of {stored.trading_days} days,"
-            f" {stored.matching:.0%} of them match the daily close{dropped}",
-            flush=True,
-        )
-
     done = backfill_minutes(
         EodhdClient(api_key()),
         daily,
@@ -171,8 +176,55 @@ def _intraday(args: argparse.Namespace) -> int:
         config.raw_dir,
         today,
         workers=args.workers,
-        report=report,
+        report=_report_year,
     )
+    return _summary(done)
+
+
+def _etf_minutes(args: argparse.Namespace) -> int:
+    config = Config()
+    # Alpaca's free plan refuses SIP minutes less than 15 minutes old, and a
+    # request runs to the end of its last UTC day. So the last day is the one
+    # before the UTC day of 16 minutes ago: a session is stored from the next
+    # UTC day on.
+    last_day = (datetime.now(UTC) - timedelta(minutes=16)).date() - timedelta(1)
+    years = range(args.from_year, (args.to_year or last_day.year) + 1)
+    eodhd = EodhdClient(api_key())
+    alpaca = AlpacaClient(*api_keys())
+    done = []
+    for symbol in args.symbols:
+        # EODHD's daily bars say which days had a session, and each day's
+        # last minute must match their close, as for the stocks.
+        daily = eodhd.daily_bars(symbol, date(years.start, 1, 1), last_day)
+        done += backfill_minutes(
+            alpaca,
+            daily,
+            sp500(),  # an ETF is not in the index: its own code is its only source
+            {year: (symbol,) for year in years},
+            config.raw_dir,
+            last_day,
+            workers=2,  # Alpaca allows 200 requests a minute
+            report=_report_year,
+        )
+    return _summary(done)
+
+
+def _report_year(stored: YearOfMinutes) -> None:
+    if stored.error:
+        print(f"{stored.year} {stored.ticker:9} failed: {stored.error}", flush=True)
+        return
+    source = stored.source or "nowhere"
+    dropped = f", {stored.dropped} broken minutes dropped" if stored.dropped else ""
+    print(
+        f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
+        f" on {stored.days} of {stored.trading_days} days,"
+        f" {stored.matching:.0%} of them match the daily close{dropped}",
+        flush=True,
+    )
+
+
+def _summary(done: list[YearOfMinutes]) -> int:
+    """Print what was stored and what was not; 1 if a download failed."""
     failed = [f"{stored.ticker} {stored.year}" for stored in done if stored.error]
     missing = [
         f"{stored.ticker} {stored.year}"
@@ -185,7 +237,7 @@ def _intraday(args: argparse.Namespace) -> int:
         if stored.source and stored.days < stored.trading_days
     ]
     print(
-        f"stored {len(done) - len(failed) - len(missing)} stock-years; "
+        f"stored {len(done) - len(failed) - len(missing)} ticker-years; "
         f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}; "
         f"days without minutes: {short or 'none'}"
     )

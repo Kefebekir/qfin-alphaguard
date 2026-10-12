@@ -45,6 +45,7 @@ uv run ruff format .                  # format
 uv run qfin ingest --synthetic        # run the data pipeline without network access
 uv run --env-file .env qfin ingest    # real data; needs EODHD_API_KEY in .env
 uv run --env-file .env qfin intraday  # 1-minute bars, after ingest
+uv run --env-file .env qfin etf-minutes QQQ  # QQQ's 1-minute bars from Alpaca
 uv run qfin plan                      # the next session's target portfolio, after ingest
 ```
 
@@ -66,8 +67,8 @@ Both ruff commands must pass before a commit.
   interface
 - `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that
   loads and checks them
-- `src/qfin_alphaguard/data/`: download, validation, S&P 500 membership by date,
-  splits and dividends, Parquet and DuckDB
+- `src/qfin_alphaguard/data/`: downloads from EODHD and Alpaca, validation,
+  S&P 500 membership by date, splits and dividends, Parquet and DuckDB
 - `src/qfin_alphaguard/features/`, `estimation/`, `optimize/`: returns,
   covariance and the optimiser
 - `infra/aws/`: the nightly ECS Fargate job that runs `qfin`
