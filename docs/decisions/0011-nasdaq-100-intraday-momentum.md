@@ -1,0 +1,108 @@
+# 0011: Add intraday momentum on the Nasdaq-100 as a second strategy
+
+- **Status:** accepted
+- **Date:** 2026-10-12
+
+## Context
+
+Efe wants a model that reads the day ahead, trades a few times a day and uses
+leverage for a large return. Decision 0010 showed that forecasting single
+stocks minute by minute loses to costs. A different idea has a literature
+behind it: index futures and ETFs trend within the day. The move up to late
+afternoon predicts the last half hour (Gao, Han, Li and Zhou, 2018;
+Baltussen, Da, Lammers and Martens, 2021). The explanation is that dealers in
+options and leveraged ETFs hedge in the direction of the day's move.
+Zarattini, Aziz and Barbon (2024, "Beat the Market") trade it on SPY:
+
+- **The Noise Area.** Its band is the average absolute move from the open at
+  each minute over the last 14 days, around the open and the previous close.
+- **Trades.** At each HH:00 and HH:30 the strategy goes long above the band
+  and short below it. The band or VWAP, whichever is tighter, is the trailing
+  stop. Everything is closed by the end of the day.
+- **Size.** min(4, 2% / the last 14 days' volatility).
+
+The paper reports 19.6% a year and a Sharpe ratio of 1.33 for 2007 – April
+2024.
+
+**How it was tested:**
+
+- **Data.** 1-minute bars from 2016 to October 2026, from Alpaca's SIP
+  history, checked against EODHD's.
+- **Execution.** The paper's rules, filled at the next minute's open, at
+  Alpaca's costs (0.001 USD a share plus 0.15 bps a side).
+- **Out of sample.** May 2024 to October 2026 is out of sample: the paper's
+  data end in April 2024.
+- **Replication.** The paper's own example days (31 January, 29 April and
+  20 January 2022) reproduce. On SPY, 2016 – April 2024 gives 18.4% a year
+  and a Sharpe ratio of 1.25 at the paper's costs.
+
+| Instrument, up to 4× | 2016–2026: a year, Sharpe | May 2024 – Oct 2026: a year, Sharpe |
+| --- | --- | --- |
+| **QQQ (Nasdaq-100)** | **21.4%, 1.40** | **18.1%, 1.16** |
+| SPY (S&P 500) | 13.5%, 0.95 | −0.1%, 0.06 |
+| DIA (Dow) | −1.4%, −0.04 | −2.9%, −0.17 |
+| IWM (Russell 2000) | 0.6%, 0.11 | −10.0%, −0.65 |
+| The trading universe's 50 stocks, 1× | −5.3%, −1.64 | −4.0%, −1.23 |
+
+The simpler rule (the first half hour picks the side of the last) lost on SPY
+and QQQ after costs: Sharpe −0.35 and −0.22.
+
+**On QQQ, the result holds up under every check:**
+
+- **Leverage cap:**
+
+  | Cap | A year, worst drawdown | Sharpe | Out of sample |
+  | --- | --- | --- | --- |
+  | 1× | 12.3%, −7% | 1.51 | 1.20 |
+  | 2× | 18.8%, −14% | 1.51 | 1.24 |
+  | 4× | 21.4%, −22% | 1.40 | 1.16 |
+
+  For the 2× cap, the 95% bootstrap interval of the Sharpe ratio is 1.03 to
+  1.97 over 2016–2026, and 0.12 to 2.17 out of sample alone.
+- **Parameters:** a lookback of 7–30 days, decisions every 15–60 minutes, a
+  volatility target of 1–2.5% and caps of 1–3× give Sharpe ratios of 1.18 to
+  1.51 over 2016–2026, and 0.74 to 1.24 out of sample.
+- **Years:** 10 of 11 were positive; 2016 lost 6% at 4×, and 2025 made 6%.
+- **Execution:**
+  - Filling 1 or 2 minutes late gives Sharpe ratios of 1.39 and 1.28 (2×).
+  - Closing at 15:59 instead of the close changes nothing.
+  - EODHD's minutes give the same out-of-sample result (15.7% and 1.21
+    against 16.2% and 1.24).
+- **Its days:** only 26% of days win, but 67% of months do. The worst month
+  lost 6.7% and the worst day 3.9% (2×).
+
+Why only the Nasdaq-100 is not proven. The largest leveraged ETFs (TQQQ,
+SQQQ) and heavy options trading are on it, which fits the hedging story.
+Single stocks reverse within the day instead (0010).
+
+## Decision
+
+- **A second strategy.** Intraday momentum on the Nasdaq-100 runs beside the
+  nightly plan, with the paper's rules, sized at min(cap, 2% / 14-day
+  volatility), and flat at every close.
+- **Cap of 2×** for this strategy. Its leverage is intraday and costs no
+  interest, unlike the overnight leverage decision 0009 measured. The cap is
+  set by hand in `guard.yaml` before any real money.
+- **Proven in our engine before anything else.** It is built as its own
+  `Strategy` in our engine and must reproduce these numbers in our backtest.
+  Then it trades QQQ on Alpaca's paper account for two to three months.
+- **Real money waits for two things:**
+  - a broker and instrument a UK resident may trade with small capital
+    through an API: QQQ at Alpaca if its UK accounts allow it (US ETFs are
+    usually closed to UK retail investors under PRIIPs), otherwise a
+    Nasdaq-100 CFD or spread bet with small sizes;
+  - paper results inside the backtest's range.
+
+## Consequences
+
+- **Guard.** `no_same_day_reversal` and `max_trades_per_symbol_day: 3` forbid
+  this strategy's round trips and reversals. Efe sets limits for it by hand,
+  with the Guard work of step 9.
+- **Expect less live than in the backtest.** SPY's edge vanished after
+  publication, and QQQ's could too. If live results fall below the
+  backtest's range, the strategy stops (Phase 3b's stop rules).
+- **Machine learning** is tried here first as a filter or size for the day
+  (volatility, dealer gamma), measured against the plain rules (Phase 2).
+- **Data.** QQQ's minutes come from Alpaca's free SIP history.
+- **Not used:** single stocks, DIA, IWM and the first-half-hour rule, which
+  failed the tests above.

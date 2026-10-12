@@ -8,8 +8,9 @@ week alongside university.
 
 **Phase 1, step 7e is next:** fractional shares and Alpaca's costs (decision
 0008), before step 8's child orders are built on whole shares. Efe chose
-Alpaca to start real money with about 500 USD, and no leverage for now
-(decision 0009).
+Alpaca to start real money with about 500 USD, and no leverage for the
+nightly plan for now (decision 0009). A second strategy, intraday momentum on
+the Nasdaq-100 (decision 0011), has its own steps in Phase 1b.
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -149,6 +150,30 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 
 **Gate M1:** one command produces the same report from the same inputs every
 time; results after costs compared with the baselines.
+
+### Phase 1b: Intraday momentum on the Nasdaq-100 (decision 0011)
+
+A second strategy beside the nightly plan: it follows the day's trend on the
+Nasdaq-100 and is flat at every close.
+
+- [ ] QQQ's 1-minute bars from Alpaca's SIP history into the store, checked
+      against EODHD's.
+- [ ] The strategy as its own `Strategy` in our engine: the Noise Area, VWAP,
+      decisions at HH:00 and HH:30, a size of min(cap, 2% / 14-day
+      volatility), flat at the close. Efe writes the trading rules; Claude
+      prepares the skeleton and the spec.
+- [ ] Backtest through our engine and simulated broker. It must reproduce
+      the research: 2016–2026, cap 2×, 18.8% a year, Sharpe ratio 1.51.
+- [ ] Guard limits for an intraday strategy, set by hand: round trips and
+      reversals allowed for it, a leverage cap of 2×, the daily loss limit.
+- [ ] Paper trading of QQQ on Alpaca's paper account for two to three
+      months, compared with the backtest every day.
+- [ ] A broker and instrument for real money from the UK: QQQ at Alpaca if
+      its UK accounts allow it, otherwise a Nasdaq-100 CFD or spread bet with
+      an API and small sizes.
+
+**Gate M1b:** the engine's backtest matches the research, and the paper
+results stay inside the backtest's range.
 
 ### Phase 2: Alpha AI v1 (7 December 2026 – 31 January 2027)
 
