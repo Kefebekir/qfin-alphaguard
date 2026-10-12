@@ -13,8 +13,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
-from numbers import Integral
+from numbers import Real
 from types import MappingProxyType
+
+# Alpaca takes share quantities with up to 9 decimals (decision 0012).
+SHARE_DECIMALS = 9
+
+
+def round_shares(quantity: float) -> float:
+    """A number of shares rounded to what the broker takes.
+
+    Floating point leaves crumbs: 0.1 + 0.2 is 0.30000000000000004 shares.
+    Rounded, it is 0.3, so sums of fills add up and a sold position is 0.
+    """
+    return round(quantity, SHARE_DECIMALS)
 
 
 class Side(Enum):
@@ -38,11 +50,21 @@ def _require_price(name: str, value: float) -> None:
         raise ValueError(f"{name} must be a positive number, got {value!r}")
 
 
-def _require_shares(name: str, value: int) -> None:
-    # Integral accepts Python and NumPy integers but not 2.5, so a fractional
-    # quantity has to be rounded on purpose before it reaches an order.
-    if not isinstance(value, Integral) or value <= 0:
-        raise ValueError(f"{name} must be a positive whole number, got {value!r}")
+def _require_shares(name: str, value: float) -> None:
+    # A quantity with more decimals than the broker takes has to be rounded on
+    # purpose (round_shares) before it reaches an order or a fill. Real accepts
+    # Python and NumPy numbers, but not Decimal; a bool is a number in Python,
+    # but never a quantity.
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, Real)
+        or not (math.isfinite(value) and value > 0)
+        or round_shares(value) != value
+    ):
+        raise ValueError(
+            f"{name} must be a positive number of shares with at most "
+            f"{SHARE_DECIMALS} decimals, got {value!r}"
+        )
 
 
 def _require_side(value: Side) -> None:
@@ -112,7 +134,7 @@ class OrderIntent:
 
     ticker: str
     side: Side
-    quantity: int  # always positive; the direction lives in `side`
+    quantity: float  # shares, always positive; the direction lives in `side`
     limit_price: float
     time: datetime
     reason: str = ""  # short note for the log, e.g. "slice 1 of 2"
@@ -154,9 +176,9 @@ class Fill:
     client_order_id: str
     ticker: str
     side: Side
-    quantity: int
+    quantity: float
     price: float
-    commission: float
+    commission: float  # every charge besides the price: commission and fees
     time: datetime
 
     def __post_init__(self) -> None:

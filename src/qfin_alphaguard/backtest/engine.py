@@ -41,6 +41,7 @@ from qfin_alphaguard.events import (
     RiskEvent,
     Side,
     Split,
+    round_shares,
 )
 from qfin_alphaguard.guard.check import GuardDecision, RiskCheck
 from qfin_alphaguard.portfolio import Portfolio
@@ -83,7 +84,7 @@ class BacktestResult:
     log: tuple[Record, ...]  # every decision and what came of it, in order
     closes: tuple[SessionClose, ...]  # one per session: the daily values
     cash: float
-    positions: Mapping[str, int]
+    positions: Mapping[str, float]
 
     def fingerprint(self) -> str:
         """A hash of the log. The same inputs must always give the same one."""
@@ -113,7 +114,7 @@ def run_backtest(
 @dataclass
 class _OpenOrder:
     order: Order
-    remaining: int
+    remaining: float
 
 
 class _Engine:
@@ -184,8 +185,7 @@ class _Engine:
                 if action.ticker in self.last_prices:
                     self.last_prices[action.ticker] /= action.ratio
                 if held:
-                    price = self.last_prices.get(action.ticker, 0.0)
-                    self.portfolio.split(action.ticker, action.ratio, price)
+                    self.portfolio.split(action.ticker, action.ratio)
             elif held:
                 self.portfolio.dividend(action.ticker, action.amount)
             if held:
@@ -223,7 +223,8 @@ class _Engine:
                 f"left on {fill.client_order_id}"
             )
         self.portfolio.apply(fill)
-        entry.remaining -= fill.quantity
+        # Rounded, so 0.1 and then 0.2 shares fill an order of 0.3 exactly.
+        entry.remaining = round_shares(entry.remaining - fill.quantity)
         if entry.remaining == 0:
             del self.open[fill.client_order_id]
         self.log.append(fill)

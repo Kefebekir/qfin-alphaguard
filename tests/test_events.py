@@ -1,6 +1,7 @@
 import math
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime, timedelta, timezone
+from decimal import Decimal
 
 import numpy as np
 import pytest
@@ -18,6 +19,7 @@ from qfin_alphaguard.events import (
     Side,
     Signal,
     Split,
+    round_shares,
 )
 
 T = datetime(2027, 4, 12, 14, 35, tzinfo=UTC)
@@ -102,14 +104,43 @@ def test_signal_rejects_naive_time():
         Signal("AAPL", NAIVE, 0.5, "v1")
 
 
-@pytest.mark.parametrize("quantity", [0, -5, 2.5])
-def test_quantity_must_be_positive_whole_shares(quantity):
-    with pytest.raises(ValueError):
+@pytest.mark.parametrize(
+    "quantity", [2.5, 0.123456789, 10, np.int64(10), np.float64(0.5)]
+)
+def test_quantity_may_be_a_fraction_with_up_to_9_decimals(quantity):
+    # Alpaca takes fractional shares to 9 decimals (decision 0012).
+    assert make_intent(quantity=quantity).quantity == quantity
+
+
+@pytest.mark.parametrize(
+    "quantity",
+    [
+        0,
+        -5,
+        -0.5,
+        math.nan,
+        math.inf,
+        0.1 + 0.2,  # 0.30000000000000004: more decimals than a broker takes
+        0.0000000001,  # a tenth of the smallest step
+        True,  # a bool is a number in Python, but not a quantity
+        Decimal("1.5"),
+    ],
+)
+def test_quantity_must_be_a_positive_number_of_shares_to_9_decimals(quantity):
+    with pytest.raises(ValueError, match="at most 9 decimals"):
         make_intent(quantity=quantity)
 
 
-def test_numpy_integers_count_as_whole_shares():
-    assert make_intent(quantity=np.int64(10)).quantity == 10
+def test_a_fill_takes_fractional_shares_too():
+    assert Fill("q-1", "AAPL", Side.SELL, 0.5, 100.0, 0.0, T).quantity == 0.5
+    with pytest.raises(ValueError, match="at most 9 decimals"):
+        Fill("q-1", "AAPL", Side.SELL, 0.1 + 0.2, 100.0, 0.0, T)
+
+
+def test_round_shares_cleans_floating_point_crumbs():
+    assert round_shares(0.1 + 0.2) == 0.3
+    assert round_shares(1 / 3) == 0.333333333
+    assert round_shares(0.3 - 0.1 - 0.2) == 0
 
 
 def test_side_must_be_the_enum_not_a_string():

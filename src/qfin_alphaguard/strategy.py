@@ -30,7 +30,7 @@ class View:
     now: datetime
     session: Session
     cash: float
-    positions: Mapping[str, int]  # shares held; tickers with none are absent
+    positions: Mapping[str, float]  # shares held, maybe fractional; none: absent
     last_prices: Mapping[str, float]  # the latest close seen for each ticker
     open_orders: Sequence[Order]  # sent and not yet filled or cancelled
 
