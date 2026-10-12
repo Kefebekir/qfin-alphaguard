@@ -164,7 +164,8 @@ Nasdaq-100 and is flat at every close.
       volatility), flat at the close. Efe writes the trading rules; Claude
       prepares the skeleton and the spec.
 - [ ] Backtest through our engine and simulated broker. It must reproduce
-      the research: 2016–2026, cap 2×, 18.8% a year, Sharpe ratio 1.51.
+      the research: 2016–2026, cap 2×, 18.3% a year, Sharpe ratio 1.47,
+      with the minute holes filled (decision 0011's update).
 - [ ] Guard limits for an intraday strategy, set by hand: round trips and
       reversals allowed for it, a leverage cap of 2×, the daily loss limit.
 - [ ] Paper trading of QQQ on Alpaca's paper account for two to three

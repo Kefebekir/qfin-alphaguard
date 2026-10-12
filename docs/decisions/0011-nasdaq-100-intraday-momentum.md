@@ -2,6 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-12
+- **Updated:** 2026-10-12, with QQQ's missing minutes filled (at the end)
 
 ## Context
 
@@ -107,6 +108,38 @@ Single stocks reverse within the day instead (0010).
   backtest's range, the strategy stops (Phase 3b's stop rules).
 - **Machine learning** is tried here first as a filter or size for the day
   (volatility, dealer gamma), measured against the plain rules (Phase 2).
-- **Data.** QQQ's minutes come from Alpaca's free SIP history.
+- **Data.** QQQ's minutes come from Alpaca's free SIP history, and EODHD's
+  fill the days Alpaca lacks.
 - **Not used:** single stocks, DIA, IWM and the first-half-hour rule, which
   failed the tests above.
+
+## Update: QQQ's missing minutes filled
+
+Alpaca's QQQ minutes lack four days, which step 7f fills from EODHD's:
+
+- **2 and 3 May 2018.** Alpaca has only the opening minute.
+- **2 and 22 February 2016.** Alpaca lacks 9 and 50 minutes.
+
+The research above ran with these holes. It could not trade on 3 May
+2018, and on 4 May it took the opening minute for the previous close.
+With the days filled, 13 days' results change: the filled days and some
+in the weeks after them, whose noise area uses them. The totals drop a
+little:
+
+| Cap | 2016–2026: a year, Sharpe | Before |
+| --- | --- | --- |
+| 1× | 12.0%, 1.48 | 12.3%, 1.51 |
+| 2× | 18.3%, 1.47 | 18.8%, 1.51 |
+| 4× | 20.8%, 1.37 | 21.4%, 1.40 |
+
+- **Out of sample:** the results from May 2024 do not change.
+- **Parameters:** the 13 settings give Sharpe ratios of 1.16 to 1.48
+  (before: 1.18 to 1.51).
+- **Years:** 10 of 11 are still positive. 2018 made 62% at 4× instead of
+  70%.
+- **Its days at 2×:** 26% of days and 67% of months win. The worst month
+  lost 6.7% and the worst day 3.9%, as before.
+- **Not run again:** the bootstrap and the execution checks. The Sharpe
+  ratio moved by 0.04, well inside the bootstrap interval of 1.03 to 1.97.
+
+The decision stands.
