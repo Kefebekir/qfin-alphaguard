@@ -10,7 +10,8 @@ week alongside university.
 0008), before step 8's child orders are built on whole shares. Efe chose
 Alpaca to start real money with about 500 USD, and no leverage for the
 nightly plan for now (decision 0009). A second strategy, intraday momentum on
-the Nasdaq-100 (decision 0011), has its own steps in Phase 1b.
+the Nasdaq-100 (decision 0011), has its own steps in Phase 1b; the first is
+done: QQQ's 1-minute bars are in the store (#22).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -29,7 +30,7 @@ the Nasdaq-100 (decision 0011), has its own steps in Phase 1b.
 | 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | done, #19 |
 | 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
 | 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decision 0008) | Claude designs; Efe changes his rules | next |
-| 7f. Fill EODHD's minute holes from Alpaca's SIP history (decision 0008) | Claude | to do |
+| 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | to do |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
@@ -156,8 +157,8 @@ time; results after costs compared with the baselines.
 A second strategy beside the nightly plan: it follows the day's trend on the
 Nasdaq-100 and is flat at every close.
 
-- [ ] QQQ's 1-minute bars from Alpaca's SIP history into the store, checked
-      against EODHD's.
+- [x] QQQ's 1-minute bars from Alpaca's SIP history into the store, checked
+      against EODHD's: `qfin etf-minutes QQQ` (#22).
 - [ ] The strategy as its own `Strategy` in our engine: the Noise Area, VWAP,
       decisions at HH:00 and HH:30, a size of min(cap, 2% / 14-day
       volatility), flat at the close. Efe writes the trading rules; Claude
