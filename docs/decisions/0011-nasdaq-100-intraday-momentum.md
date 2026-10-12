@@ -27,14 +27,18 @@ The paper reports 19.6% a year and a Sharpe ratio of 1.33 for 2007 – April
 **How it was tested:**
 
 - **Data.** 1-minute bars from 2016 to October 2026, from Alpaca's SIP
-  history, checked against EODHD's.
+  history. QQQ's bars match EODHD's from March 2024, the months both have.
 - **Execution.** The paper's rules, filled at the next minute's open, at
   Alpaca's costs (0.001 USD a share plus 0.15 bps a side).
 - **Out of sample.** May 2024 to October 2026 is out of sample: the paper's
   data end in April 2024.
-- **Replication.** The paper's own example days (31 January, 29 April and
-  20 January 2022) reproduce. On SPY, 2016 – April 2024 gives 18.4% a year
-  and a Sharpe ratio of 1.25 at the paper's costs.
+- **Replication.**
+  - The paper's example days give the same positions: long on 31 January
+    2022 and short on 29 April 2022, both held to the close.
+  - On 20 January 2022 the long closes at 13:30 instead of the paper's
+    13:00. At 13:00 the price was 2 cents above our VWAP.
+  - On SPY, 2016 – April 2024 gives 18.4% a year and a Sharpe ratio of 1.25
+    at the paper's costs. The paper's sample is longer: it starts in 2007.
 
 | Instrument, up to 4× | 2016–2026: a year, Sharpe | May 2024 – Oct 2026: a year, Sharpe |
 | --- | --- | --- |
@@ -68,7 +72,7 @@ and QQQ after costs: Sharpe −0.35 and −0.22.
   - Closing at 15:59 instead of the close changes nothing.
   - EODHD's minutes give the same out-of-sample result (15.7% and 1.21
     against 16.2% and 1.24).
-- **Its days:** only 26% of days win, but 67% of months do. The worst month
+- **Its days:** only 26% of days win, but 68% of months do. The worst month
   lost 6.7% and the worst day 3.9% (2×).
 
 Why only the Nasdaq-100 is not proven. The largest leveraged ETFs (TQQQ,
