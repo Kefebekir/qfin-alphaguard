@@ -469,6 +469,35 @@ def test_partial_fills_add_up_to_the_order():
     assert records(result, Cancellation) == []  # nothing left open at the close
 
 
+def test_fractional_partial_fills_close_the_order_exactly():
+    # 0.3 - 0.1 is 0.19999999999999998 in floating point: without rounding, a
+    # second fill of 0.2 would seem to exceed what is left of the order.
+    class InParts(NextOpenBroker):
+        def __init__(self, parts):
+            super().__init__()
+            self.parts = list(parts)
+
+        def on_bar(self, bar):
+            fills = []
+            for order in list(self.waiting.values()):
+                if order.intent.ticker != bar.ticker or order.sent_at > bar.start:
+                    continue
+                part = self.parts.pop(0)
+                fills.append(replace(self.fill(order, bar), quantity=part))
+                if not self.parts:
+                    del self.waiting[order.client_order_id]
+            return fills
+
+    strategy = Script({at(1): lambda view: [buy(view, quantity=0.3)]})
+    feed = [bar("A", minute) for minute in range(5)]
+
+    result = run(feed, strategy, InParts([0.1, 0.2]))
+
+    assert [fill.quantity for fill in records(result, Fill)] == [0.1, 0.2]
+    assert result.positions == {"A": 0.3}
+    assert records(result, Cancellation) == []  # nothing left open at the close
+
+
 def test_a_round_trip_books_cash_and_commissions():
     strategy = Script(
         {at(1): lambda view: [buy(view, quantity=10)], at(2): lambda view: [sell(view)]}

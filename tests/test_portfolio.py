@@ -64,41 +64,52 @@ def test_cash_must_be_a_finite_number():
 def test_held_shares_follow_a_split():
     portfolio = Portfolio(0.0)
     portfolio.apply(fill(Side.BUY, 10, 1_100.0))
-    portfolio.split("A", 10.0, price=110.0)
+    portfolio.split("A", 10.0)
     assert portfolio.positions == {"A": 100}
     assert portfolio.value({"A": 110.0}) == pytest.approx(-11_000.0 + 11_000.0)
 
 
-def test_a_fraction_of_a_share_left_by_a_split_is_paid_in_cash():
+def test_a_split_keeps_the_fraction_of_a_share_it_leaves():
+    # Alpaca keeps the fraction rather than paying it in cash (decision 0012).
     portfolio = Portfolio(0.0)
     portfolio.apply(fill(Side.BUY, 3, 90.0))
-    portfolio.split("A", 1.5, price=60.0)  # 4.5 shares: 4 kept, half a share paid
-    assert portfolio.positions == {"A": 4}
-    assert portfolio.cash == pytest.approx(-270.0 + 30.0)
+    portfolio.split("A", 1.5)
+    assert portfolio.positions == {"A": 4.5}
+    assert portfolio.cash == pytest.approx(-270.0)
 
 
-def test_a_split_does_not_lose_a_share_to_floating_point_rounding():
+def test_a_split_does_not_leave_floating_point_crumbs():
     # A 15% stock dividend is a 23-for-20 split; 100 * 1.15 is 114.99999999999999
-    # in floating point, which must still make 115 shares, not 114 and some cash.
+    # in floating point, which must still make 115 shares.
     portfolio = Portfolio(0.0)
     portfolio.apply(fill(Side.BUY, 100, 23.0))
-    portfolio.split("A", 1.15, price=20.0)
+    portfolio.split("A", 1.15)
     assert portfolio.positions == {"A": 115}
-    assert portfolio.cash == pytest.approx(-2_300.0)
 
 
-def test_a_reverse_split_keeps_whole_shares():
+def test_a_reverse_split_of_3_shares_at_1_for_3_leaves_exactly_one():
     portfolio = Portfolio(0.0)
     portfolio.apply(fill(Side.BUY, 3, 10.0))
-    portfolio.split("A", 1 / 3, price=30.0)
+    portfolio.split("A", 1 / 3)
     assert portfolio.positions == {"A": 1}
-    assert portfolio.cash == pytest.approx(-30.0)
 
 
 def test_a_split_of_a_stock_not_held_changes_nothing():
     portfolio = Portfolio(100.0)
-    portfolio.split("A", 10.0, price=1.0)
+    portfolio.split("A", 10.0)
     assert (portfolio.positions, portfolio.cash) == ({}, 100.0)
+
+
+def test_fractional_fills_add_up_and_a_position_sold_to_nothing_disappears():
+    portfolio = Portfolio(100.0)
+    portfolio.apply(fill(Side.BUY, 0.1, 10.0))
+    portfolio.apply(fill(Side.BUY, 0.2, 10.0))
+    assert portfolio.positions == {"A": 0.3}  # not 0.30000000000000004
+
+    portfolio.apply(fill(Side.SELL, 0.3, 10.0))
+
+    assert portfolio.positions == {}
+    assert portfolio.cash == pytest.approx(100.0)
 
 
 def test_a_dividend_is_paid_per_share_held_and_charged_to_a_short():

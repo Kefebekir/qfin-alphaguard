@@ -1,14 +1,16 @@
 """Cash and shares held, changed by fills and by corporate actions.
 
 Prices are as traded, so a split changes the share count, and a dividend is
-paid into cash on its ex-date.
+paid into cash on its ex-date. Shares may be fractional (decision 0012): every
+change is rounded to the broker's precision, so fills add up exactly and a
+position sold to nothing disappears.
 """
 
 import math
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from qfin_alphaguard.events import Fill, Side
+from qfin_alphaguard.events import Fill, Side, round_shares
 
 
 class Portfolio:
@@ -16,9 +18,9 @@ class Portfolio:
         if not math.isfinite(cash):
             raise ValueError(f"cash must be a finite number, got {cash!r}")
         self._cash = float(cash)
-        self._positions: dict[str, int] = {}
+        self._positions: dict[str, float] = {}
         # Built once: a read-only window that always shows the current positions.
-        self.positions: Mapping[str, int] = MappingProxyType(self._positions)
+        self.positions: Mapping[str, float] = MappingProxyType(self._positions)
 
     @property
     def cash(self) -> float:
@@ -27,28 +29,28 @@ class Portfolio:
     def apply(self, fill: Fill) -> None:
         """Book a fill: shares in or out, and its value and commission in cash."""
         shares = fill.quantity if fill.side is Side.BUY else -fill.quantity
-        held = self._positions.get(fill.ticker, 0) + shares
+        held = round_shares(self._positions.get(fill.ticker, 0) + shares)
         if held:
             self._positions[fill.ticker] = held
         else:
             del self._positions[fill.ticker]
         self._cash -= shares * fill.price + fill.commission
 
-    def split(self, ticker: str, ratio: float, price: float) -> None:
-        """Shares follow a split; a fraction of a share is paid in cash at `price`.
+    def split(self, ticker: str, ratio: float) -> None:
+        """Shares follow a split, fractions included.
 
-        `price` is per new share. Brokers pay such fractions as "cash in lieu".
+        Alpaca has kept the fractions a split leaves since 2021, rather than
+        paying them in cash (decision 0012). Rounding keeps 3 shares at
+        1-for-3 one share, not 0.999...
         """
         held = self._positions.get(ticker, 0)
         if not held:
             return
-        exact = round(held * ratio, 9)  # so 3 shares at 1-for-3 make 1, not 0.999...
-        whole = math.trunc(exact)
-        if whole:
-            self._positions[ticker] = whole
+        after = round_shares(held * ratio)
+        if after:
+            self._positions[ticker] = after
         else:
             del self._positions[ticker]
-        self._cash += (exact - whole) * price
 
     def dividend(self, ticker: str, amount: float) -> None:
         """Cash for each share held; a short position pays it instead."""

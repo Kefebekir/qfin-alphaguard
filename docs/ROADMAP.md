@@ -6,12 +6,14 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 7e is next:** fractional shares and Alpaca's costs (decision
-0008), before step 8's child orders are built on whole shares. Efe chose
-Alpaca to start real money with about 500 USD, and no leverage for the
-nightly plan for now (decision 0009). A second strategy, intraday momentum on
-the Nasdaq-100 (decision 0011), has its own steps in Phase 1b; the first is
-done: QQQ's 1-minute bars are in the store (#22).
+**Phase 1, step 7e is under way:** fractional shares and Alpaca's costs
+(decisions 0008 and 0012). The event types, the books and the engine take
+fractions (#24); the simulated broker and the band, Efe's rules, come next,
+before step 8's child orders. Efe chose Alpaca to start real money with
+about 500 USD, and no leverage for the nightly plan for now (decision 0009).
+A second strategy, intraday momentum on the Nasdaq-100 (decision 0011), has
+its own steps in Phase 1b; the first is done: QQQ's 1-minute bars are in the
+store (#22).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -29,7 +31,7 @@ done: QQQ's 1-minute bars are in the store (#22).
 | 7b. The band: which gaps to trade at the open, in whole shares (decision 0006) | Efe | done, #18 |
 | 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | done, #19 |
 | 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
-| 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decision 0008) | Claude designs; Efe changes his rules | next |
+| 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decisions 0008 and 0012) | Claude designs; Efe changes his rules | types and books done, #24; broker and band next |
 | 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | done, #23 |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
