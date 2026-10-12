@@ -30,7 +30,7 @@ done: QQQ's 1-minute bars are in the store (#22).
 | 7c. 1-minute bars for stocks that leave the universe, so they can be sold | Claude | done, #19 |
 | 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
 | 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decision 0008) | Claude designs; Efe changes his rules | next |
-| 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | to do |
+| 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | done, #23 |
 | 8. Timing without ML: equal-spaced child orders | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
@@ -164,7 +164,8 @@ Nasdaq-100 and is flat at every close.
       volatility), flat at the close. Efe writes the trading rules; Claude
       prepares the skeleton and the spec.
 - [ ] Backtest through our engine and simulated broker. It must reproduce
-      the research: 2016–2026, cap 2×, 18.8% a year, Sharpe ratio 1.51.
+      the research: 2016–2026, cap 2×, 18.3% a year, Sharpe ratio 1.47,
+      with the minute holes filled (decision 0011's update).
 - [ ] Guard limits for an intraday strategy, set by hand: round trips and
       reversals allowed for it, a leverage cap of 2×, the daily loss limit.
 - [ ] Paper trading of QQQ on Alpaca's paper account for two to three

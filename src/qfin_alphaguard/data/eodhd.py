@@ -1,4 +1,4 @@
-"""Daily prices from EODHD (eodhd.com), including stocks that have left the exchange.
+"""Daily prices and 1-minute bars from EODHD (eodhd.com), stocks that left included.
 
 The API key is read from the EODHD_API_KEY environment variable. Locally it
 lives in the git-ignored .env file (`uv run --env-file .env qfin ingest`); on
@@ -18,6 +18,8 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 
 import polars as pl
+
+from qfin_alphaguard.data.universe import IndexHistory
 
 BASE_URL = "https://eodhd.com/api"
 ATTEMPTS = 4  # for a rate limit (429), a server error (5xx) or a network error
@@ -62,6 +64,8 @@ def eodhd_code(ticker: str) -> str:
 
 
 class EodhdClient:
+    name = "EODHD"
+
     def __init__(
         self,
         key: str,
@@ -136,6 +140,31 @@ class EodhdClient:
             "volume",
             adjustment.alias("adjustment"),
         )
+
+    def minute_codes(self, code: str, history: IndexHistory) -> tuple[str, ...]:
+        """EODHD codes that may hold `code`'s 1-minute bars, to try in order.
+
+        EODHD files a renamed company's 1-minute history under one of its
+        tickers, not always the one in the daily data: FB_old's minutes are
+        under META. So a stock's own code is tried first, then the codes that
+        joined the index on a day it left (renamed to) and those that left on
+        a day it joined (renamed from). EODHD has no minutes under TICKER_old
+        codes at all, and none for some companies whatever the code, such as
+        DowDuPont (DWDP).
+        """
+        old = re.fullmatch(r"(.+)_old\d*", code)
+        ticker = (old.group(1) if old else code).replace("-", ".")
+        own = history.spans_of(ticker)
+        left = {span.end for span in own if span.end is not None}
+        joined = {span.start for span in own}
+        renamed_to = sorted(
+            {eodhd_code(s.ticker) for s in history.spans if s.start in left} - {code}
+        )
+        renamed_from = sorted(
+            {eodhd_code(s.ticker) for s in history.spans if s.end in joined} - {code}
+        )
+        first = () if old else (code,)  # EODHD has no minutes under _old codes
+        return tuple(dict.fromkeys((*first, *renamed_to, *renamed_from)))
 
     def minute_bars(self, code: str, first: date, last: date) -> pl.DataFrame:
         """1-minute bars from `first` to `last`, both included, as traded.

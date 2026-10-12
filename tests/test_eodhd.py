@@ -13,6 +13,7 @@ from qfin_alphaguard.data.eodhd import (
     api_key,
     eodhd_code,
 )
+from qfin_alphaguard.data.universe import IndexHistory, Membership
 
 KEY = "secret-key-123"
 
@@ -152,6 +153,47 @@ def test_minute_bars_are_asked_for_in_windows_and_come_back_in_utc():
     assert len(fake.urls) == 2
     assert dict(bars.schema) == MINUTE_SCHEMA
     assert bars["start"].to_list() == [bar, later]  # the repeated minute once
+
+
+def span(ticker, start, end=None):
+    return Membership(
+        ticker, date.fromisoformat(start), date.fromisoformat(end) if end else None
+    )
+
+
+def test_a_current_code_holds_its_own_minutes():
+    history = IndexHistory((span("AAPL", "2000-01-03"),))
+    assert EodhdClient(KEY).minute_codes("AAPL", history) == ("AAPL",)
+
+
+def test_a_renamed_company_also_tries_the_code_it_became():
+    # DowDuPont (DWDP) became DD on 3 June 2019.
+    history = IndexHistory(
+        (
+            span("DD", "1996-01-02", "2017-09-01"),
+            span("DWDP", "2017-09-01", "2019-06-03"),
+            span("DD", "2019-06-03"),
+        )
+    )
+    assert EodhdClient(KEY).minute_codes("DWDP", history) == ("DWDP", "DD")
+
+
+def test_a_renamed_company_is_looked_for_under_the_code_that_replaced_it():
+    history = IndexHistory(
+        (
+            span("FB", "2013-12-23", "2022-06-09"),
+            span("META", "2022-06-09"),
+            span("XOM", "2000-01-03"),
+        )
+    )
+    assert EodhdClient(KEY).minute_codes("FB_old", history) == ("META",)
+
+
+def test_an_old_company_nobody_replaced_that_day_has_no_code():
+    history = IndexHistory(
+        (span("CHK", "2000-01-03", "2020-06-22"), span("XOM", "2000-01-03"))
+    )
+    assert EodhdClient(KEY).minute_codes("CHK_old", history) == ()
 
 
 def test_splits_are_new_shares_per_old_share():

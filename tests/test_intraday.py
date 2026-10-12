@@ -1,20 +1,21 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import polars as pl
 
 from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA
 from qfin_alphaguard.data.intraday import (
     backfill_minutes,
+    by_day,
     download_year,
     intraday_path,
     matching_share,
     minute_feed,
-    minute_sources,
     minute_windows,
     regular_session,
 )
 from qfin_alphaguard.data.universe import IndexHistory, Membership
 from qfin_alphaguard.events import Bar
+from qfin_alphaguard.sessions import sessions
 
 
 def at(day, hour, minute):
@@ -38,6 +39,17 @@ def minutes(ticker, starts, closes=None):
     )
 
 
+def whole_session(ticker, day):
+    """Every minute of the day's session, closing at 100."""
+    (session,) = sessions(day, day)
+    starts = [session.open + timedelta(minutes=k) for k in range(session.minutes)]
+    return minutes(ticker, starts)
+
+
+def labelled(frame, source):
+    return frame.with_columns(pl.lit(source).alias("source"))
+
+
 def daily(ticker, days, traded_closes, adjustment=1.0):
     n = len(days)
     return pl.DataFrame(
@@ -46,7 +58,13 @@ def daily(ticker, days, traded_closes, adjustment=1.0):
             "ticker": [ticker] * n,
             "close": [close * adjustment for close in traded_closes],
             "adjustment": [adjustment] * n,
-        }
+        },
+        schema={
+            "date": pl.Date,
+            "ticker": pl.String,
+            "close": pl.Float64,
+            "adjustment": pl.Float64,
+        },
     )
 
 
@@ -56,12 +74,24 @@ def span(ticker, start, end=None):
     )
 
 
-class FakeMinuteClient:
-    """Stands in for EodhdClient: the given minutes for each code."""
+HISTORY = IndexHistory((span("AAA", "2000-01-03"),))
 
-    def __init__(self, by_code):
+
+class FakeMinuteClient:
+    """Stands in for a provider: the given minutes for each code.
+
+    A stock's minutes are looked for under its own code, or under the codes
+    `codes` gives for it.
+    """
+
+    def __init__(self, by_code, codes=None, name="EODHD"):
         self.by_code = by_code
+        self.codes = codes or {}
+        self.name = name
         self.asked = []
+
+    def minute_codes(self, code, history):
+        return self.codes.get(code, (code,))
 
     def minute_bars(self, code, first, last):
         self.asked.append(code)
@@ -96,52 +126,187 @@ def test_the_last_minute_must_match_the_daily_close_as_traded():
     assert matching_share(bars, daily("NFLX", [day], [1200.0], adjustment=0.1)) == 0.0
 
 
-def test_a_current_code_is_its_own_source():
-    history = IndexHistory((span("AAPL", "2000-01-03"),))
-    assert minute_sources("AAPL", history) == ("AAPL",)
-
-
-def test_a_renamed_company_also_tries_the_code_it_became():
-    # DowDuPont (DWDP) became DD on 3 June 2019.
-    history = IndexHistory(
-        (
-            span("DD", "1996-01-02", "2017-09-01"),
-            span("DWDP", "2017-09-01", "2019-06-03"),
-            span("DD", "2019-06-03"),
-        )
+def test_each_day_comes_whole_from_the_source_with_more_minutes():
+    days = [date(2018, 3, 5), date(2018, 3, 6), date(2018, 3, 7)]
+    first = labelled(
+        minutes("AAA", [at(days[0], 15, 0), at(days[0], 15, 1), at(days[1], 15, 0)]),
+        "EODHD",
     )
-    assert minute_sources("DWDP", history) == ("DWDP", "DD")
-
-
-def test_a_renamed_company_is_looked_for_under_the_code_that_replaced_it():
-    history = IndexHistory(
-        (
-            span("FB", "2013-12-23", "2022-06-09"),
-            span("META", "2022-06-09"),
-            span("XOM", "2000-01-03"),
-        )
+    second = labelled(
+        minutes(
+            "AAA",
+            [
+                at(days[0], 15, 0),
+                at(days[1], 15, 0),
+                at(days[1], 15, 1),
+                at(days[2], 15, 0),
+            ],
+        ),
+        "Alpaca",
     )
-    assert minute_sources("FB_old", history) == ("META",)
+
+    picked = by_day(first, second)
+
+    # The first has more of 5 March, the second more of 6 March and all of 7 March.
+    assert picked.select("start", "source").rows() == [
+        (at(days[0], 15, 0), "EODHD"),
+        (at(days[0], 15, 1), "EODHD"),
+        (at(days[1], 15, 0), "Alpaca"),
+        (at(days[1], 15, 1), "Alpaca"),
+        (at(days[2], 15, 0), "Alpaca"),
+    ]
 
 
-def test_an_old_company_nobody_replaced_that_day_has_no_source():
-    history = IndexHistory(
-        (span("CHK", "2000-01-03", "2020-06-22"), span("XOM", "2000-01-03"))
+def test_a_tied_day_comes_from_the_first_source_and_is_not_mixed():
+    day = date(2018, 3, 5)
+    first = labelled(minutes("AAA", [at(day, 15, 0)], [100.0]), "EODHD")
+    second = labelled(minutes("AAA", [at(day, 15, 1)], [101.0]), "Alpaca")
+
+    picked = by_day(first, second)
+
+    assert picked.select("start", "source").rows() == [(at(day, 15, 0), "EODHD")]
+
+
+def test_the_second_provider_fills_the_days_the_first_lacks():
+    days = [date(2018, 3, 5), date(2018, 3, 6)]
+    eodhd = FakeMinuteClient({"AAA": minutes("AAA", [at(days[0], 20, 59)])})
+    alpaca = FakeMinuteClient(
+        {"AAA": minutes("AAA", [at(day, 20, 59) for day in days])}, name="Alpaca"
     )
-    assert minute_sources("CHK_old", history) == ()
+
+    stored, summary = download_year(
+        (eodhd, alpaca),
+        "AAA",
+        2018,
+        date(2026, 10, 8),
+        daily("AAA", days, [100.0, 100.0]),
+        HISTORY,
+    )
+
+    assert stored.select(pl.col("start").dt.date(), "source").rows() == [
+        (days[0], "EODHD"),
+        (days[1], "Alpaca"),
+    ]
+    assert summary.parts == (("EODHD", "AAA", 1), ("Alpaca", "AAA", 1))
+    assert (summary.rows, summary.days, summary.trading_days) == (2, 2, 2)
 
 
-def test_a_renamed_company_gets_its_minutes_from_the_new_code():
+def test_the_second_provider_is_not_asked_when_the_first_has_every_minute():
+    day = date(2018, 3, 6)
+    eodhd = FakeMinuteClient({"AAA": whole_session("AAA", day)})
+    alpaca = FakeMinuteClient({}, name="Alpaca")
+
+    stored, summary = download_year(
+        (eodhd, alpaca),
+        "AAA",
+        2018,
+        date(2026, 10, 8),
+        daily("AAA", [day], [100.0]),
+        HISTORY,
+    )
+
+    assert alpaca.asked == []
+    assert stored.height == 390
+    assert summary.parts == (("EODHD", "AAA", 1),)
+
+
+def test_a_day_the_first_provider_has_only_in_part_comes_from_the_second():
+    day = date(2018, 3, 6)
+    eodhd = FakeMinuteClient(
+        {"AAA": minutes("AAA", [at(day, 20, 58), at(day, 20, 59)])}
+    )
+    alpaca = FakeMinuteClient(
+        {"AAA": minutes("AAA", [at(day, 20, 57), at(day, 20, 58), at(day, 20, 59)])},
+        name="Alpaca",
+    )
+
+    stored, summary = download_year(
+        (eodhd, alpaca),
+        "AAA",
+        2018,
+        date(2026, 10, 8),
+        daily("AAA", [day], [100.0]),
+        HISTORY,
+    )
+
+    assert stored["source"].to_list() == ["Alpaca"] * 3
+    assert summary.parts == (("EODHD", "AAA", 0), ("Alpaca", "AAA", 1))
+
+
+def test_a_year_without_daily_bars_asks_no_provider():
+    client = FakeMinuteClient({"AAA": minutes("AAA", [at(date(2018, 3, 6), 20, 59)])})
+
+    stored, summary = download_year(
+        (client,), "AAA", 2018, date(2026, 10, 8), daily("AAA", [], []), HISTORY
+    )
+
+    assert client.asked == []
+    assert stored.is_empty()
+    assert summary.parts == ()
+
+
+def test_broken_minutes_are_counted_from_every_provider():
+    day = date(2018, 3, 6)
+    bars = minutes("AAA", [at(day, 20, 58), at(day, 20, 59)])
+    broken = bars.with_columns(  # the first minute closes above its high
+        pl.when(pl.col("start") == at(day, 20, 58))
+        .then(101.0)
+        .otherwise(pl.col("close"))
+        .alias("close")
+    )
+    eodhd = FakeMinuteClient({"AAA": broken})
+    alpaca = FakeMinuteClient({"AAA": broken}, name="Alpaca")
+
+    _, summary = download_year(
+        (eodhd, alpaca),
+        "AAA",
+        2018,
+        date(2026, 10, 8),
+        daily("AAA", [day], [100.0]),
+        HISTORY,
+    )
+
+    assert summary.dropped == 2
+
+
+def test_a_stock_the_first_provider_lacks_wholly_comes_from_the_second():
+    # EODHD has no minutes for the old Chesapeake; Alpaca has them under CHK.
+    day = date(2017, 3, 1)
+    eodhd = FakeMinuteClient({})
+    alpaca = FakeMinuteClient(
+        {"CHK": minutes("CHK", [at(day, 20, 59)], [5.57])},
+        codes={"CHK_old": ("CHK",)},
+        name="Alpaca",
+    )
+
+    stored, summary = download_year(
+        (eodhd, alpaca),
+        "CHK_old",
+        2017,
+        date(2026, 10, 8),
+        daily("CHK_old", [day], [5.57]),
+        HISTORY,
+    )
+
+    assert summary.parts == (("Alpaca", "CHK", 1),)
+    assert stored.select("ticker", "source").rows() == [("CHK_old", "Alpaca")]
+
+
+def test_a_renamed_company_gets_its_minutes_from_the_code_that_matches():
     day = date(2018, 3, 6)  # winter time: the session runs 14:30 to 21:00 UTC
     history = IndexHistory(
         (span("FB", "2013-12-23", "2022-06-09"), span("META", "2022-06-09"))
     )
     client = FakeMinuteClient(
-        {"META": minutes("META", [at(day, 15, 0), at(day, 20, 59)], [180.0, 182.0])}
+        {
+            "ANF": minutes("ANF", [at(day, 20, 59)], [30.0]),  # another company
+            "META": minutes("META", [at(day, 15, 0), at(day, 20, 59)], [180.0, 182.0]),
+        },
+        codes={"FB_old": ("ANF", "META")},
     )
 
     stored, summary = download_year(
-        client,
+        (client,),
         "FB_old",
         2018,
         date(2026, 10, 8),
@@ -149,35 +314,43 @@ def test_a_renamed_company_gets_its_minutes_from_the_new_code():
         history,
     )
 
-    assert summary.source == "META"
+    assert summary.parts == (("EODHD", "META", 1),)
     assert (summary.rows, summary.matching) == (2, 1.0)
     assert stored["ticker"].unique().to_list() == ["FB_old"]
 
 
 def test_an_etf_outside_the_index_is_stored_under_its_own_code(tmp_path):
-    # QQQ's minutes come from Alpaca (decision 0011); the index never had it.
+    # QQQ's minutes come from Alpaca first (decision 0011); the index never had it.
     day = date(2026, 10, 9)
     history = IndexHistory((span("AAPL", "2000-01-03"),))
-    client = FakeMinuteClient({"QQQ": minutes("QQQ", [at(day, 19, 59)], [600.0])})
-
-    done = backfill_minutes(
-        client, daily("QQQ", [day], [600.0]), history, {2026: ("QQQ",)}, tmp_path, day
+    client = FakeMinuteClient(
+        {"QQQ": minutes("QQQ", [at(day, 19, 59)], [600.0])}, name="Alpaca"
     )
 
-    assert [(stored.ticker, stored.source) for stored in done] == [("QQQ", "QQQ")]
+    done = backfill_minutes(
+        (client,),
+        daily("QQQ", [day], [600.0]),
+        history,
+        {2026: ("QQQ",)},
+        tmp_path,
+        day,
+    )
+
+    assert [(stored.ticker, stored.parts) for stored in done] == [
+        ("QQQ", (("Alpaca", "QQQ", 1),))
+    ]
     stored = pl.read_parquet(intraday_path(tmp_path, "QQQ", 2026))
     assert stored["start"].to_list() == [at(day, 19, 59)]
 
 
 def test_a_year_without_matching_minutes_is_tried_again_next_time(tmp_path):
     day = date(2025, 3, 4)
-    history = IndexHistory((span("AAA", "2000-01-03"),))
     client = FakeMinuteClient({"AAA": minutes("AAA", [at(day, 20, 59)], [50.0])})
     prices = daily("AAA", [day], [100.0])  # the minutes do not match
 
     for _ in range(2):
         backfill_minutes(
-            client, prices, history, {2025: ("AAA",)}, tmp_path, date(2026, 10, 8)
+            (client,), prices, HISTORY, {2025: ("AAA",)}, tmp_path, date(2026, 10, 8)
         )
 
     assert not intraday_path(tmp_path, "AAA", 2025).exists()
@@ -198,26 +371,49 @@ def test_a_failed_download_is_reported_and_the_others_go_on(tmp_path):
     prices = pl.concat([daily("AAA", [day], [100.0]), daily("BAD", [day], [100.0])])
 
     done = backfill_minutes(
-        client, prices, history, {2025: ("AAA", "BAD")}, tmp_path, date(2026, 10, 8)
+        (client,), prices, history, {2025: ("AAA", "BAD")}, tmp_path, date(2026, 10, 8)
     )
 
     by_ticker = {stored.ticker: stored for stored in done}
-    assert by_ticker["AAA"].source == "AAA"
+    assert by_ticker["AAA"].parts == (("EODHD", "AAA", 1),)
     assert "HTTP 500" in by_ticker["BAD"].error
     assert intraday_path(tmp_path, "AAA", 2025).exists()
+
+
+def test_a_failing_second_provider_fails_the_year_and_keeps_its_old_file(tmp_path):
+    days = [date(2025, 3, 4), date(2025, 3, 5)]
+    store(tmp_path, "AAA", 2025, [at(days[0], 20, 59)])  # stored on 4 March
+
+    class Failing(FakeMinuteClient):
+        def minute_bars(self, code, first, last):
+            raise RuntimeError("Alpaca request for AAA failed: HTTP 500")
+
+    eodhd = FakeMinuteClient({"AAA": minutes("AAA", [at(day, 20, 59) for day in days])})
+
+    done = backfill_minutes(
+        (eodhd, Failing({}, name="Alpaca")),
+        daily("AAA", days, [100.0, 100.0]),
+        HISTORY,
+        {2025: ("AAA",)},
+        tmp_path,
+        date(2026, 10, 8),
+    )
+
+    assert "HTTP 500" in done[0].error
+    stored = pl.read_parquet(intraday_path(tmp_path, "AAA", 2025))
+    assert stored["start"].to_list() == [at(days[0], 20, 59)]
 
 
 def test_a_year_stored_while_it_was_running_is_downloaded_again(tmp_path):
     # Stored on 4 March 2025, when that was the latest day; 5 March came later.
     days = [date(2025, 3, 4), date(2025, 3, 5)]
-    history = IndexHistory((span("AAA", "2000-01-03"),))
     store(tmp_path, "AAA", 2025, [at(days[0], 20, 59)])
     client = FakeMinuteClient({"AAA": minutes("AAA", [at(d, 20, 59) for d in days])})
 
     done = backfill_minutes(
-        client,
+        (client,),
         daily("AAA", days, [100.0, 100.0]),
-        history,
+        HISTORY,
         {2025: ("AAA",)},
         tmp_path,
         date(2026, 10, 8),
@@ -227,6 +423,25 @@ def test_a_year_stored_while_it_was_running_is_downloaded_again(tmp_path):
     assert (done[0].days, done[0].trading_days) == (2, 2)
     stored = pl.read_parquet(intraday_path(tmp_path, "AAA", 2025))
     assert stored["start"].dt.date().to_list() == days
+
+
+def test_minutes_stored_before_the_source_column_are_downloaded_again(tmp_path):
+    day = date(2025, 3, 4)
+    store(tmp_path, "AAA", 2025, [at(day, 20, 59)], source=None)  # up to date
+    client = FakeMinuteClient({"AAA": minutes("AAA", [at(day, 20, 59)])})
+
+    backfill_minutes(
+        (client,),
+        daily("AAA", [day], [100.0]),
+        HISTORY,
+        {2025: ("AAA",)},
+        tmp_path,
+        date(2026, 10, 8),
+    )
+
+    assert client.asked == ["AAA"]
+    stored = pl.read_parquet(intraday_path(tmp_path, "AAA", 2025))
+    assert stored["source"].to_list() == ["EODHD"]
 
 
 def test_a_year_needs_its_universe_all_year_and_the_stocks_that_left_until_january():
@@ -256,7 +471,7 @@ def test_a_stock_that_left_the_universe_gets_its_minutes_for_january(tmp_path):
     )
 
     backfill_minutes(
-        client,
+        (client,),
         prices,
         history,
         {2024: ("OLD",), 2025: ("NEW",)},
@@ -271,14 +486,18 @@ def test_a_stock_that_left_the_universe_gets_its_minutes_for_january(tmp_path):
 
 
 def test_the_summary_counts_the_trading_days_that_have_minutes():
-    # EODHD lacks some days for good: TSLA's from July 2023 to May 2024.
+    # A provider can lack days: EODHD lacks TSLA's from July 2023 to May 2024.
     days = [date(2018, 3, 5), date(2018, 3, 6), date(2018, 3, 7)]
-    history = IndexHistory((span("AAA", "2000-01-03"),))
     one_day = minutes("AAA", [at(days[0], 20, 58), at(days[0], 20, 59)])
     client = FakeMinuteClient({"AAA": one_day})
 
     _, summary = download_year(
-        client, "AAA", 2018, date(2026, 10, 8), daily("AAA", days, [100.0] * 3), history
+        (client,),
+        "AAA",
+        2018,
+        date(2026, 10, 8),
+        daily("AAA", days, [100.0] * 3),
+        HISTORY,
     )
 
     # Two minutes on one of three days, and that day matches its close.
@@ -286,17 +505,36 @@ def test_the_summary_counts_the_trading_days_that_have_minutes():
     assert summary.matching == 1.0
 
 
+def test_the_summary_gives_the_share_of_stored_days_that_match():
+    # Two weeks of February 2018, winter time: the session ends at 21:00 UTC.
+    days = [date(2018, 2, 5) + timedelta(d) for d in (0, 1, 2, 3, 4, 7, 8, 9, 10, 11)]
+    closes = [100.0] * 9 + [150.0]  # the last day ends far from its daily close
+    client = FakeMinuteClient(
+        {"AAA": minutes("AAA", [at(d, 20, 59) for d in days], closes)}
+    )
+
+    _, summary = download_year(
+        (client,),
+        "AAA",
+        2018,
+        date(2026, 10, 8),
+        daily("AAA", days, [100.0] * 10),
+        HISTORY,
+    )
+
+    assert summary.matching == 0.9  # still enough to keep them
+
+
 def test_minutes_that_do_not_match_the_daily_closes_are_not_kept():
     day = date(2018, 3, 6)
-    history = IndexHistory((span("AAA", "2000-01-03"),))
     client = FakeMinuteClient({"AAA": minutes("AAA", [at(day, 20, 59)], [50.0])})
 
     stored, summary = download_year(
-        client, "AAA", 2018, date(2026, 10, 8), daily("AAA", [day], [100.0]), history
+        (client,), "AAA", 2018, date(2026, 10, 8), daily("AAA", [day], [100.0]), HISTORY
     )
 
     assert stored.is_empty()
-    assert summary.source is None
+    assert summary.parts == ()
 
 
 def test_backfill_skips_finished_years_and_writes_one_file_per_stock_and_year(
@@ -311,12 +549,10 @@ def test_backfill_skips_finished_years_and_writes_one_file_per_stock_and_year(
         }
     )
     prices = pl.concat([daily("AAA", [day], [100.0]), daily("BBB", [day], [50.0])])
-    finished = intraday_path(tmp_path, "AAA", 2025)
-    finished.parent.mkdir(parents=True)
-    minutes("AAA", [at(day, 20, 59)]).write_parquet(finished)
+    store(tmp_path, "AAA", 2025, [at(day, 20, 59)])
 
     done = backfill_minutes(
-        client, prices, history, {2025: ("AAA", "BBB")}, tmp_path, date(2026, 10, 8)
+        (client,), prices, history, {2025: ("AAA", "BBB")}, tmp_path, date(2026, 10, 8)
     )
 
     assert [stored.ticker for stored in done] == ["BBB"]
@@ -326,7 +562,6 @@ def test_backfill_skips_finished_years_and_writes_one_file_per_stock_and_year(
 
 def test_minutes_that_break_the_bar_rules_are_dropped_and_counted():
     day = date(2018, 3, 6)
-    history = IndexHistory((span("AAA", "2000-01-03"),))
     bars = minutes("AAA", [at(day, 20, 58), at(day, 20, 59)], [100.0, 100.0])
     broken = bars.with_columns(  # the first minute closes above its high
         pl.when(pl.col("start") == at(day, 20, 58))
@@ -337,17 +572,19 @@ def test_minutes_that_break_the_bar_rules_are_dropped_and_counted():
     client = FakeMinuteClient({"AAA": broken})
 
     stored, summary = download_year(
-        client, "AAA", 2018, date(2026, 10, 8), daily("AAA", [day], [100.0]), history
+        (client,), "AAA", 2018, date(2026, 10, 8), daily("AAA", [day], [100.0]), HISTORY
     )
 
     assert stored["start"].to_list() == [at(day, 20, 59)]
     assert summary.dropped == 1
 
 
-def store(root, ticker, year, starts, closes=None):
+def store(root, ticker, year, starts, closes=None, source="EODHD"):
+    """Stored minutes; source=None stores them as before the source column."""
     path = intraday_path(root, ticker, year)
     path.parent.mkdir(parents=True, exist_ok=True)
-    minutes(ticker, starts, closes).write_parquet(path)
+    frame = minutes(ticker, starts, closes)
+    (labelled(frame, source) if source else frame).write_parquet(path)
 
 
 def test_the_feed_gives_bars_in_time_order_then_ticker_order(tmp_path):
@@ -365,6 +602,16 @@ def test_the_feed_gives_bars_in_time_order_then_ticker_order(tmp_path):
     ]
     assert all(isinstance(bar, Bar) and bar.seconds == 60 for bar in bars)
     assert bars[0].start == at(day, 14, 30)  # a UTC time, as every event needs
+
+
+def test_the_feed_reads_files_stored_before_and_after_the_source_column(tmp_path):
+    day = date(2025, 3, 4)
+    store(tmp_path, "AAA", 2025, [at(day, 14, 30)], source=None)
+    store(tmp_path, "BBB", 2025, [at(day, 14, 30)], source="Alpaca")
+
+    bars = list(minute_feed(tmp_path, {2025: ("AAA", "BBB")}, day, day))
+
+    assert [bar.ticker for bar in bars] == ["AAA", "BBB"]
 
 
 def test_the_feed_keeps_to_the_days_asked_for_and_skips_missing_files(tmp_path):

@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -71,40 +72,64 @@ def test_intraday_needs_the_daily_prices_first(tmp_path, monkeypatch, capsys):
     assert "run `qfin ingest` first" in capsys.readouterr().err
 
 
-class FakeEodhd:
-    """Daily bars closing at 600 on every session asked for."""
+def session_closes(code, first, last, close=600.0):
+    """Daily bars closing at `close` on every session from `first` to `last`."""
+    days = session_days(first, last)
+    n = len(days)
+    return pl.DataFrame(
+        {
+            "date": days,
+            "ticker": [code] * n,
+            "close": [close] * n,
+            "adjustment": [1.0] * n,
+        }
+    )
+
+
+class FakeProvider:
+    """Stands in for EodhdClient or AlpacaClient.
+
+    It has a minute at the end of each session, at the day's close as traded
+    in `daily`, except on the days in `lacks`.
+    """
+
+    def __init__(self, name, daily, lacks=()):
+        self.name = name
+        self.daily = daily
+        self.lacks = list(lacks)
+        self.asked = []
 
     def daily_bars(self, code, start, end):
-        days = session_days(start, end)
-        n = len(days)
-        return pl.DataFrame(
-            {
-                "date": days,
-                "ticker": [code] * n,
-                "close": [600.0] * n,
-                "adjustment": [1.0] * n,
-            }
+        return self.daily.filter(
+            (pl.col("ticker") == code) & pl.col("date").is_between(start, end)
         )
 
-
-class FakeAlpaca:
-    """A minute closing at 600 at the end of every session asked for."""
-
-    def __init__(self):
-        self.asked = []
+    def minute_codes(self, code, history):
+        return (code,)
 
     def minute_bars(self, code, first, last):
         self.asked.append((code, first, last))
-        starts = [s.close - timedelta(minutes=1) for s in sessions(first, last)]
-        n = len(starts)
+        days = self.daily_bars(code, first, last).filter(
+            ~pl.col("date").is_in(self.lacks)
+        )
+        closes = dict(
+            zip(days["date"], days["close"] / days["adjustment"], strict=True)
+        )
+        ends = [
+            (s.close - timedelta(minutes=1), closes[s.day])
+            for s in sessions(first, last)
+            if s.day in closes
+        ]
+        n = len(ends)
+        prices = [price for _, price in ends]
         return pl.DataFrame(
             {
-                "start": starts,
+                "start": [start for start, _ in ends],
                 "ticker": [code] * n,
-                "open": [600.0] * n,
-                "high": [600.0] * n,
-                "low": [600.0] * n,
-                "close": [600.0] * n,
+                "open": prices,
+                "high": prices,
+                "low": prices,
+                "close": prices,
                 "volume": [100] * n,
             },
             schema=MINUTE_SCHEMA,
@@ -122,6 +147,12 @@ def frozen_at(moment):
     return Frozen
 
 
+def with_keys(monkeypatch):
+    monkeypatch.setenv("EODHD_API_KEY", "eodhd-key")
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "key-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "secret")
+
+
 @pytest.mark.parametrize(
     ("now", "last_day"),
     [
@@ -132,25 +163,27 @@ def frozen_at(moment):
         (datetime(2026, 10, 13, 0, 20, tzinfo=UTC), date(2026, 10, 12)),
     ],
 )
-def test_etf_minutes_asks_alpaca_only_for_days_it_may_serve(
+def test_etf_minutes_ask_alpaca_first_and_only_for_days_it_may_serve(
     now, last_day, tmp_path, monkeypatch, capsys
 ):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("EODHD_API_KEY", "eodhd-key")
-    monkeypatch.setenv("ALPACA_API_KEY_ID", "key-id")
-    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "secret")
-    alpaca = FakeAlpaca()
+    with_keys(monkeypatch)
+    closes = session_closes("QQQ", date(2026, 1, 1), date(2026, 12, 31))
+    alpaca = FakeProvider("Alpaca", closes)
+    eodhd = FakeProvider("EODHD", closes)
     monkeypatch.setattr(cli, "AlpacaClient", lambda key_id, secret: alpaca)
-    monkeypatch.setattr(cli, "EodhdClient", lambda key: FakeEodhd())
+    monkeypatch.setattr(cli, "EodhdClient", lambda key: eodhd)
     monkeypatch.setattr(cli, "datetime", frozen_at(now))
 
     assert main(["etf-minutes", "QQQ", "--from-year", "2026"]) == 0
 
-    assert alpaca.asked == [("QQQ", date(2026, 1, 1), last_day)]
+    # One minute a session is not every minute, so EODHD is asked too.
+    assert alpaca.asked == eodhd.asked == [("QQQ", date(2026, 1, 1), last_day)]
     stored = pl.read_parquet(tmp_path / "data/raw/intraday/QQQ/2026.parquet")
     assert stored["start"].dt.date().to_list() == session_days(
         date(2026, 1, 1), last_day
     )
+    assert set(stored["source"]) == {"Alpaca"}  # the first, on every tied day
     assert "100% of them match the daily close" in capsys.readouterr().out
 
 
@@ -164,6 +197,36 @@ def synthetic_bars(tmp_path, monkeypatch, capsys):
     assert main(["ingest", "--synthetic"]) == 0
     capsys.readouterr()  # only what the test's own commands print is checked
     return tmp_path
+
+
+def test_intraday_takes_eodhd_first_and_fills_its_holes_from_alpaca(
+    synthetic_bars, monkeypatch, capsys
+):
+    raw = synthetic_bars / "data" / "raw"
+    shutil.copy(raw / "prices_synthetic.parquet", raw / "prices.parquet")
+    daily = pl.read_parquet(raw / "prices.parquet")
+    hole = date(2024, 3, 4)
+    eodhd = FakeProvider("EODHD", daily, lacks=[hole])
+    alpaca = FakeProvider("Alpaca", daily)
+    with_keys(monkeypatch)
+    monkeypatch.setattr(cli, "EodhdClient", lambda key: eodhd)
+    monkeypatch.setattr(cli, "AlpacaClient", lambda key_id, secret: alpaca)
+    # Ten minutes into 2025, UTC: Alpaca cannot serve 31 December yet.
+    monkeypatch.setattr(
+        cli, "datetime", frozen_at(datetime(2025, 1, 1, 0, 10, tzinfo=UTC))
+    )
+
+    assert main(["intraday", "--from-year", "2024", "--to-year", "2024"]) == 0
+
+    assert {last for _, _, last in eodhd.asked + alpaca.asked} == {date(2024, 12, 30)}
+    stored = pl.read_parquet(raw / "intraday" / "AAPL" / "2024.parquet")
+    on_hole = pl.col("start").dt.date() == hole
+    assert stored.filter(on_hole)["source"].to_list() == ["Alpaca"]
+    assert set(stored.filter(~on_hole)["source"]) == {"EODHD"}
+    assert stored["start"].dt.date().to_list() == session_days(
+        date(2024, 1, 1), date(2024, 12, 30)
+    )
+    assert "days from EODHD" in capsys.readouterr().out
 
 
 def run_plan(*options):

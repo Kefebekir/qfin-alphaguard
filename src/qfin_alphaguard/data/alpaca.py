@@ -12,6 +12,7 @@ to place an order.
 import http.client
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -22,10 +23,16 @@ from datetime import date
 import polars as pl
 
 from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA
+from qfin_alphaguard.data.universe import IndexHistory
 
 BARS_URL = "https://data.alpaca.markets/v2/stocks/bars"
 ATTEMPTS = 4  # for a rate limit (429), a server error (5xx) or a network error
 PAGE_SIZE = 10_000  # the most bars Alpaca sends in one answer
+
+# Alpaca follows a company through a change of ticker: Priceline's minutes are
+# under PCLN and BKNG alike, and Facebook's under FB and META. Altaba's are the
+# exception found: before June 2017 they are only under Yahoo's ticker.
+EARLIER_TICKERS = {"AABA": ("YHOO",)}
 
 
 def api_keys() -> tuple[str, str]:
@@ -41,6 +48,8 @@ def api_keys() -> tuple[str, str]:
 
 
 class AlpacaClient:
+    name = "Alpaca"
+
     def __init__(
         self,
         key_id: str,
@@ -75,6 +84,16 @@ class AlpacaClient:
         # Raised outside the except blocks, so nothing chained to it carries
         # the request and its keys.
         raise RuntimeError(f"Alpaca request for {params['symbols']} failed: {problem}")
+
+    def minute_codes(self, code: str, history: IndexHistory) -> tuple[str, ...]:
+        """Alpaca's tickers that may hold `code`'s 1-minute bars, to try in order.
+
+        The daily data's code without its _old suffix (CHK_old's minutes are
+        under CHK) and with a dot for a class share (BRK.B), then any earlier
+        ticker Alpaca keeps apart. The index history is not needed.
+        """
+        ticker = re.sub(r"_old\d*$", "", code).replace("-", ".")
+        return (ticker, *EARLIER_TICKERS.get(code, ()))
 
     def minute_bars(self, code: str, first: date, last: date) -> pl.DataFrame:
         """1-minute bars from `first` to `last` (UTC days), both included, as traded.

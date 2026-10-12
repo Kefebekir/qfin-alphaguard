@@ -44,7 +44,7 @@ uv run ruff check .                   # lint
 uv run ruff format .                  # format
 uv run qfin ingest --synthetic        # run the data pipeline without network access
 uv run --env-file .env qfin ingest    # real data; needs EODHD_API_KEY in .env
-uv run --env-file .env qfin intraday  # 1-minute bars, after ingest
+uv run --env-file .env qfin intraday  # 1-minute bars from EODHD and Alpaca, after ingest
 uv run --env-file .env qfin etf-minutes QQQ  # QQQ's 1-minute bars from Alpaca
 uv run qfin plan                      # the next session's target portfolio, after ingest
 ```

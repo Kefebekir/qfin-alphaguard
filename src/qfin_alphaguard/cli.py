@@ -12,6 +12,7 @@ a test checks that this CLI still accepts it.
 
 import argparse
 import sys
+from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -165,16 +166,17 @@ def _intraday(args: argparse.Namespace) -> int:
         print(f"{daily_path} not found; run `qfin ingest` first", file=sys.stderr)
         return 1
     daily = read_prices(daily_path)
-    today = datetime.now(UTC).date()
-    years = range(args.from_year, (args.to_year or today.year) + 1)
+    last_day = _last_minute_day()
+    years = range(args.from_year, (args.to_year or last_day.year) + 1)
     universes = trading_universes(daily, years)
     done = backfill_minutes(
-        EodhdClient(api_key()),
+        # EODHD first for the stocks; Alpaca fills its holes (decision 0008).
+        (EodhdClient(api_key()), AlpacaClient(*api_keys())),
         daily,
         sp500(),
         universes,
         config.raw_dir,
-        today,
+        last_day,
         workers=args.workers,
         report=_report_year,
     )
@@ -183,11 +185,7 @@ def _intraday(args: argparse.Namespace) -> int:
 
 def _etf_minutes(args: argparse.Namespace) -> int:
     config = Config()
-    # Alpaca's free plan refuses SIP minutes less than 15 minutes old, and a
-    # request runs to the end of its last UTC day. So the last day is the one
-    # before the UTC day of 16 minutes ago: a session is stored from the next
-    # UTC day on.
-    last_day = (datetime.now(UTC) - timedelta(minutes=16)).date() - timedelta(1)
+    last_day = _last_minute_day()
     years = range(args.from_year, (args.to_year or last_day.year) + 1)
     eodhd = EodhdClient(api_key())
     alpaca = AlpacaClient(*api_keys())
@@ -197,7 +195,7 @@ def _etf_minutes(args: argparse.Namespace) -> int:
         # last minute must match their close, as for the stocks.
         daily = eodhd.daily_bars(symbol, date(years.start, 1, 1), last_day)
         done += backfill_minutes(
-            alpaca,
+            (alpaca, eodhd),  # Alpaca first for an ETF (decision 0011)
             daily,
             sp500(),  # an ETF is not in the index: its own code is its only source
             {year: (symbol,) for year in years},
@@ -209,15 +207,26 @@ def _etf_minutes(args: argparse.Namespace) -> int:
     return _summary(done)
 
 
+def _last_minute_day() -> date:
+    """The last day whose minutes both providers serve.
+
+    Alpaca's free plan refuses SIP minutes less than 15 minutes old, and a
+    request runs to the end of its last UTC day. So the last day is the one
+    before the UTC day of 16 minutes ago: a session is stored from the next
+    UTC day on.
+    """
+    return (datetime.now(UTC) - timedelta(minutes=16)).date() - timedelta(1)
+
+
 def _report_year(stored: YearOfMinutes) -> None:
     if stored.error:
         print(f"{stored.year} {stored.ticker:9} failed: {stored.error}", flush=True)
         return
-    source = stored.source or "nowhere"
+    parts = ", ".join(f"{name} ({code}) {days}" for name, code, days in stored.parts)
     dropped = f", {stored.dropped} broken minutes dropped" if stored.dropped else ""
     print(
-        f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes from {source:9}"
-        f" on {stored.days} of {stored.trading_days} days,"
+        f"{stored.year} {stored.ticker:9} {stored.rows:>7} minutes on {stored.days}"
+        f" of {stored.trading_days} days, days from {parts or 'nowhere'};"
         f" {stored.matching:.0%} of them match the daily close{dropped}",
         flush=True,
     )
@@ -229,15 +238,21 @@ def _summary(done: list[YearOfMinutes]) -> int:
     missing = [
         f"{stored.ticker} {stored.year}"
         for stored in done
-        if not stored.source and not stored.error
+        if not stored.parts and not stored.error
     ]
     short = [
         f"{stored.ticker} {stored.year} ({stored.days} of {stored.trading_days} days)"
         for stored in done
-        if stored.source and stored.days < stored.trading_days
+        if stored.parts and stored.days < stored.trading_days
     ]
+    by_provider = Counter()
+    for stored in done:
+        for name, _, days in stored.parts:
+            by_provider[name] += days
+    provided = ", ".join(f"{name} {days:,}" for name, days in by_provider.items())
     print(
         f"stored {len(done) - len(failed) - len(missing)} ticker-years; "
+        f"days from {provided or 'nowhere'}; "
         f"without matching minutes: {missing or 'none'}; failed: {failed or 'none'}; "
         f"days without minutes: {short or 'none'}"
     )
