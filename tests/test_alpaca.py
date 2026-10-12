@@ -9,6 +9,7 @@ import pytest
 
 from qfin_alphaguard.data.alpaca import PAGE_SIZE, AlpacaClient, api_keys
 from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA
+from qfin_alphaguard.data.universe import IndexHistory, Membership
 
 KEY_ID = "key-id-123"
 SECRET = "secret-key-456"
@@ -162,6 +163,24 @@ def test_gives_up_after_repeated_server_errors():
     with pytest.raises(RuntimeError, match="HTTP 500"):
         alpaca.minute_bars("QQQ", date(2026, 10, 9), date(2026, 10, 9))
     assert len(fake.requests) == 4
+
+
+HISTORY = IndexHistory((Membership("AAPL", date(2000, 1, 3), None),))
+
+
+@pytest.mark.parametrize(
+    ("code", "tickers"),
+    [
+        ("QQQ", ("QQQ",)),
+        ("BRK-B", ("BRK.B",)),  # Alpaca writes class shares with a dot
+        ("CHK_old", ("CHK",)),  # the old Chesapeake, under its own ticker
+        ("FB_old", ("FB",)),
+        ("AABA", ("AABA", "YHOO")),  # Altaba before June 2017 is only under YHOO
+    ],
+)
+def test_a_stock_is_looked_for_under_its_tickers_at_alpaca(code, tickers):
+    alpaca, _ = client()
+    assert alpaca.minute_codes(code, HISTORY) == tickers
 
 
 def test_the_keys_come_from_the_environment(monkeypatch):

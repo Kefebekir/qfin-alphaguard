@@ -9,7 +9,6 @@ from qfin_alphaguard.data.intraday import (
     intraday_path,
     matching_share,
     minute_feed,
-    minute_sources,
     minute_windows,
     regular_session,
 )
@@ -57,11 +56,21 @@ def span(ticker, start, end=None):
 
 
 class FakeMinuteClient:
-    """Stands in for EodhdClient: the given minutes for each code."""
+    """Stands in for EodhdClient: the given minutes for each code.
 
-    def __init__(self, by_code):
+    A stock's minutes are looked for under its own code, or under the codes
+    `codes` gives for it.
+    """
+
+    name = "EODHD"
+
+    def __init__(self, by_code, codes=None):
         self.by_code = by_code
+        self.codes = codes or {}
         self.asked = []
+
+    def minute_codes(self, code, history):
+        return self.codes.get(code, (code,))
 
     def minute_bars(self, code, first, last):
         self.asked.append(code)
@@ -96,48 +105,17 @@ def test_the_last_minute_must_match_the_daily_close_as_traded():
     assert matching_share(bars, daily("NFLX", [day], [1200.0], adjustment=0.1)) == 0.0
 
 
-def test_a_current_code_is_its_own_source():
-    history = IndexHistory((span("AAPL", "2000-01-03"),))
-    assert minute_sources("AAPL", history) == ("AAPL",)
-
-
-def test_a_renamed_company_also_tries_the_code_it_became():
-    # DowDuPont (DWDP) became DD on 3 June 2019.
-    history = IndexHistory(
-        (
-            span("DD", "1996-01-02", "2017-09-01"),
-            span("DWDP", "2017-09-01", "2019-06-03"),
-            span("DD", "2019-06-03"),
-        )
-    )
-    assert minute_sources("DWDP", history) == ("DWDP", "DD")
-
-
-def test_a_renamed_company_is_looked_for_under_the_code_that_replaced_it():
-    history = IndexHistory(
-        (
-            span("FB", "2013-12-23", "2022-06-09"),
-            span("META", "2022-06-09"),
-            span("XOM", "2000-01-03"),
-        )
-    )
-    assert minute_sources("FB_old", history) == ("META",)
-
-
-def test_an_old_company_nobody_replaced_that_day_has_no_source():
-    history = IndexHistory(
-        (span("CHK", "2000-01-03", "2020-06-22"), span("XOM", "2000-01-03"))
-    )
-    assert minute_sources("CHK_old", history) == ()
-
-
-def test_a_renamed_company_gets_its_minutes_from_the_new_code():
+def test_a_renamed_company_gets_its_minutes_from_the_code_that_matches():
     day = date(2018, 3, 6)  # winter time: the session runs 14:30 to 21:00 UTC
     history = IndexHistory(
         (span("FB", "2013-12-23", "2022-06-09"), span("META", "2022-06-09"))
     )
     client = FakeMinuteClient(
-        {"META": minutes("META", [at(day, 15, 0), at(day, 20, 59)], [180.0, 182.0])}
+        {
+            "ANF": minutes("ANF", [at(day, 20, 59)], [30.0]),  # another company
+            "META": minutes("META", [at(day, 15, 0), at(day, 20, 59)], [180.0, 182.0]),
+        },
+        codes={"FB_old": ("ANF", "META")},
     )
 
     stored, summary = download_year(

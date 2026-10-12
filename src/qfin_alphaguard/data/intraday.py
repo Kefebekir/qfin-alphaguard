@@ -7,20 +7,16 @@ Prices and volume are as traded, and only the minutes that start inside the
 regular session are kept (sessions.py). One Parquet file per stock and year,
 under data/raw/intraday/<ticker>/<year>.parquet.
 
-EODHD files a renamed company's 1-minute history under one of its tickers,
-not always the one in the daily data: FB_old's minutes are under META, and
-DowDuPont's (DWDP) under DD. So a stock's own code is tried first, then the
-codes that joined the index on a day it left (renamed to) and those that left
-on a day it joined (renamed from). EODHD has no minutes under TICKER_old
-codes at all. Every year of minutes is checked against the daily closes and
-kept only if they match: a check on the data, and on the company.
+A provider may file a company's minutes under another of its tickers, such
+as META for FB_old; each says which codes to try (minute_codes). Every year
+of minutes is checked against the daily closes and kept only if they match:
+a check on the data, and on the company.
 
 An ETF's minutes take the same steps, from Alpaca (alpaca.py) instead, and
 are checked against EODHD's daily closes: QQQ, for the intraday strategy of
 decision 0011.
 """
 
-import re
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -30,7 +26,7 @@ from typing import Protocol
 
 import polars as pl
 
-from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA, eodhd_code
+from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA
 from qfin_alphaguard.data.universe import IndexHistory
 from qfin_alphaguard.events import Bar
 from qfin_alphaguard.sessions import sessions
@@ -53,6 +49,10 @@ VALID_MINUTE = (
 
 class MinuteClient(Protocol):
     """Where minutes come from: EodhdClient, or AlpacaClient for an ETF."""
+
+    name: str
+
+    def minute_codes(self, code: str, history: IndexHistory) -> tuple[str, ...]: ...
 
     def minute_bars(self, code: str, first: date, last: date) -> pl.DataFrame: ...
 
@@ -140,23 +140,6 @@ def matching_share(minutes: pl.DataFrame, daily: pl.DataFrame) -> float:
     return both.select(near.mean()).item()
 
 
-def minute_sources(code: str, history: IndexHistory) -> tuple[str, ...]:
-    """EODHD codes that may hold `code`'s 1-minute bars, to try in order."""
-    old = re.fullmatch(r"(.+)_old\d*", code)
-    ticker = (old.group(1) if old else code).replace("-", ".")
-    own = history.spans_of(ticker)
-    left = {span.end for span in own if span.end is not None}
-    joined = {span.start for span in own}
-    renamed_to = sorted(
-        {eodhd_code(s.ticker) for s in history.spans if s.start in left} - {code}
-    )
-    renamed_from = sorted(
-        {eodhd_code(s.ticker) for s in history.spans if s.end in joined} - {code}
-    )
-    first = () if old else (code,)  # EODHD has no minutes under _old codes
-    return tuple(dict.fromkeys((*first, *renamed_to, *renamed_from)))
-
-
 def download_year(
     client: MinuteClient,
     code: str,
@@ -174,7 +157,7 @@ def download_year(
     daily_bars = daily.filter(
         (pl.col("ticker") == code) & pl.col("date").is_between(first, last)
     )
-    for source in minute_sources(code, history):
+    for source in client.minute_codes(code, history):
         minutes = regular_session(client.minute_bars(source, first, last))
         valid = minutes.filter(VALID_MINUTE)
         share = matching_share(valid, daily_bars)

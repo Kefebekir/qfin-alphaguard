@@ -90,8 +90,13 @@ class FakeEodhd:
 class FakeAlpaca:
     """A minute closing at 600 at the end of every session asked for."""
 
+    name = "Alpaca"
+
     def __init__(self):
         self.asked = []
+
+    def minute_codes(self, code, history):
+        return (code,)
 
     def minute_bars(self, code, first, last):
         self.asked.append((code, first, last))
