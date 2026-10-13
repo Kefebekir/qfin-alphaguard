@@ -167,6 +167,29 @@ prices, open orders), so the same `Strategy` class can run live in Phase 3.
 Guard sees the same View, which also says when each price was seen and what
 the account was worth at the last close.
 
+## The backtest command
+
+`qfin backtest` (`backtest/run.py` and `backtest/report.py`, decision 0015)
+replays the nightly plan on the stored data only, never on a fresh download:
+
+1. **Days:** from the first session with a year of daily returns before it,
+   5 January 2016, to the last with both daily bars and minutes.
+2. **Plans:** one a day, from the daily bars before it. Every capital above a
+   few dozen dollars gets the same plans, so they are built once.
+3. **Trading:** the minutes of each year's universe (and of the stocks that
+   left it, until the end of January), EqualSpaced, Guard, and the simulated
+   broker at Alpaca's costs.
+4. **Corporate actions:** the splits and dividends of the stocks the backtest
+   can hold, on the days it can hold them. A Delisting falls on the first
+   session a stock has no minutes after having had them, and pays out a held
+   stock at its last price.
+5. **The report:**
+   - performance and trading costs at each capital;
+   - the same stocks at equal weight, and SPY, over the same sessions and
+     before costs;
+   - the stock-days on which the plan held a stock without minutes;
+   - each run's fingerprint. The same inputs give the same report.
+
 ## Risk file
 
 Only Efe changes this file, by hand and through a commit. The Python Guard,

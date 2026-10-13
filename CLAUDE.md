@@ -47,6 +47,7 @@ uv run --env-file .env qfin ingest    # real data; needs EODHD_API_KEY in .env
 uv run --env-file .env qfin intraday  # 1-minute bars from EODHD and Alpaca, after ingest
 uv run --env-file .env qfin etf-minutes QQQ  # QQQ's 1-minute bars from Alpaca
 uv run qfin plan                      # the next session's target portfolio, after ingest
+uv run qfin backtest                  # the plan on the stored minutes, against SPY; after intraday
 ```
 
 CI runs ruff, the tests and a Docker build on every push and pull request.
@@ -65,8 +66,8 @@ Both ruff commands must pass before a commit.
   open, and how many shares
 - `src/qfin_alphaguard/execution.py`: when the day's trades go out; the
   equal-spaced child orders that Phase 2's timing model has to beat
-- `src/qfin_alphaguard/backtest/`: the event loop and the simulated broker's
-  interface
+- `src/qfin_alphaguard/backtest/`: the event loop, the simulated broker, and
+  `qfin backtest`'s runs and report
 - `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that
   loads and checks them
 - `src/qfin_alphaguard/data/`: downloads from EODHD and Alpaca, validation,

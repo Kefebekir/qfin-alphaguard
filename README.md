@@ -17,15 +17,43 @@ exactly what works today and what does not.
 | Docker image and scheduled AWS run | done |
 | Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
 | Phase 0: event types, risk configuration, repository skeleton | done |
-| Phase 1: event-driven backtester with costs and Guard rules | in progress |
+| Phase 1: event-driven backtester with costs and Guard rules | ten steps done; first report below |
 | Phase 2: ML forecasts and intraday execution timing | planned |
 | Phase 3: paper trading on Alpaca | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
-Phase 1 is in progress: [docs/ROADMAP.md](docs/ROADMAP.md) says which of its steps
-work today. Nothing from Phase 2 onwards exists yet.
+Phase 1's ten steps are done, and `qfin backtest` gives the first full report
+(below). [docs/ROADMAP.md](docs/ROADMAP.md) says what remains before its gate.
+Nothing from Phase 2 onwards exists yet.
+
+## First results
+
+`qfin backtest` replays the nightly plan on the stored 1-minute bars from 5
+January 2016 to 8 October 2026, with Alpaca's costs and Guard. The baselines
+are before costs:
+- the same stocks at equal weight, bought anew each 1 January and held;
+- SPY.
+
+| | A year | Volatility | Sharpe | Max drawdown |
+| --- | --- | --- | --- | --- |
+| The plan, 500 USD | +10.6% | 12.8% | 0.85 | −23.4% |
+| The plan, 30,000 USD | +10.8% | 12.8% | 0.86 | −23.3% |
+| The same stocks, equal weight | +17.5% | 19.3% | 0.93 | −31.7% |
+| SPY | +15.2% | 17.7% | 0.89 | −33.7% |
+
+**The plan loses to both baselines.** It is the least-variance mix of each
+year's 50 most liquid S&P 500 stocks.
+- It takes about a quarter less risk than SPY, but earns 4.5 points a year
+  less.
+- Its Sharpe ratio is lower than both baselines', so taking more risk would
+  not close the gap.
+- Costs are not the reason: 0.05–0.20% a year.
+
+The goal is still to beat both baselines after costs; Phase 2's forecasts
+are the next attempt
+([decision 0015](docs/decisions/0015-the-backtest-and-its-first-report.md)).
 
 ## How it works
 
@@ -116,6 +144,12 @@ uv run qfin ingest --synthetic
 
 # run it on real market data: needs an EODHD API key in .env (EODHD_API_KEY=...)
 uv run --env-file .env qfin ingest
+
+# 1-minute bars for each year's trading universe: needs Alpaca's keys in .env too
+uv run --env-file .env qfin intraday
+
+# replay the nightly plan on the stored bars and report it against the baselines
+uv run qfin backtest
 ```
 
 ## Deployment
@@ -126,8 +160,9 @@ The data pipeline runs on AWS every weekday morning:
 - **EventBridge Scheduler** starts it as an **ECS Fargate** task at 06:45 London
   time, Tuesday to Saturday, so each run picks up the previous trading day's close.
 - The task runs `qfin ingest`: it downloads daily prices from **EODHD** for every
-  stock that has been in the S&P 500 since 2015, validates them and writes Parquet
-  to **S3** (with versioning, so every day's file is kept).
+  stock that has been in the S&P 500 since 2015, and for SPY, the backtest's
+  benchmark; validates them and writes Parquet to **S3** (with versioning, so
+  every day's file is kept).
 - The EODHD key is kept in **SSM Parameter Store** and handed to the task as a
   secret.
 - Logs go to **CloudWatch Logs**.
