@@ -245,7 +245,7 @@ class ExecutionSettings:
     # (decision 0006).
     band_k: float = 10.0
     max_children: int = 3  # the day's change is split into at most this many orders
-    min_trade_usd: float = 1000.0  # no order smaller than this
+    min_trade_usd: float = 1.0  # no smaller order: Alpaca's smallest buy (0012)
     theta0: float = 0.6  # score threshold at the start of the day, falls to -theta0
     min_gap_min: int = 30  # minutes between two orders in the same stock
     start_after_open_min: int = 5  # skip the noisy first minutes after the open

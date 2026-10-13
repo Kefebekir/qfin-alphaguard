@@ -19,11 +19,10 @@ PRICES = generate_prices(Config())  # 30 stocks, 2015 to 2024, all index members
 DAY = date(2024, 6, 3)
 
 
-@pytest.mark.parametrize(
-    ("capital", "count"), [(100_000, 33), (30_000, 10), (10_000, 3), (500, 1)]
-)
+@pytest.mark.parametrize(("capital", "count"), [(500, 166), (30, 10), (2, 1)])
 def test_capital_sets_how_many_stocks_are_held(capital, count):
-    # Each position must be big enough for 3 orders of at least 1,000 USD.
+    # Each position must be big enough for 3 orders of at least 1 USD, Alpaca's
+    # smallest buy (decision 0012): only a tiny account is limited.
     assert positions_for(capital, ExecutionSettings()) == count
 
 
@@ -64,14 +63,15 @@ def test_no_stock_gets_more_than_the_weight_limit():
 
 
 def test_capital_limits_the_number_of_stocks():
-    plan = build_plan(PRICES, DAY, capital=30_000, max_weight=0.25)
+    # 30 USD holds at most ten positions of three 1 USD orders.
+    plan = build_plan(PRICES, DAY, capital=30, max_weight=0.25)
     assert len(plan.target_weights) <= 10
     assert sum(plan.target_weights.values()) == pytest.approx(1.0)
 
 
 def test_too_little_capital_for_the_limit_keeps_the_rest_in_cash():
-    # 10,000 USD holds 3 stocks; at most 25% each, so 25% stays in cash.
-    plan = build_plan(PRICES, DAY, capital=10_000, max_weight=0.25)
+    # 10 USD holds 3 stocks; at most 25% each, so 25% stays in cash.
+    plan = build_plan(PRICES, DAY, capital=10, max_weight=0.25)
     assert sorted(plan.target_weights.values()) == pytest.approx([0.25, 0.25, 0.25])
 
 

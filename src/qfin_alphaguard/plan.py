@@ -9,7 +9,9 @@ For trading day D, using only the daily bars before D:
    with the least variance, no stock above Guard's max_weight
 4. at most as many stocks as the capital can hold: each position must be big
    enough to build in max_children orders of min_trade_usd. The optimiser's
-   largest weights are kept and the portfolio solved again on them.
+   largest weights are kept and the portfolio solved again on them. With
+   Alpaca's 1 USD minimum (decision 0012), only an account of a few dozen
+   dollars is limited.
 
 The plan also carries each stock's own daily volatility, the standard
 deviation of its returns in the same window, for the band that decides at the
