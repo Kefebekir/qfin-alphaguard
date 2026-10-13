@@ -68,7 +68,8 @@ the daily bars before the day: the minimum-variance portfolio of the year's
 trading universe, with Ledoit-Wolf covariance over the last 252 sessions and no
 stock above Guard's `max_weight`. It holds at most
 `floor(capital / (max_children · min_trade_usd))` stocks, so that each can be
-built in `max_children` orders: 10 at 30,000 USD. Each stock's own daily
+built in `max_children` orders; with Alpaca's 1 USD minimum (decision 0012)
+that limits only an account of a few dozen dollars. Each stock's own daily
 volatility, the standard deviation of its returns over the same 252 sessions,
 goes with the plan for the band (decision 0006).
 
@@ -83,10 +84,11 @@ goes with the plan for the band (decision 0006).
   "execution": {
     "band_k": 10.0,
     "max_children": 3,
-    "min_trade_usd": 1000,
+    "min_trade_usd": 1,
+    "min_day_usd": 20,
     "theta0": 0.6,
     "min_gap_min": 30,
-    "start_after_open_min": 5,
+    "start_after_open_min": 60,
     "deadline_before_close_min": 30
   }
 }
@@ -96,7 +98,7 @@ goes with the plan for the band (decision 0006).
 
 The intraday layer never changes the target; it only chooses when to close
 the gap between the current position and the plan. Fewer, larger orders keep
-commissions low and avoid same-day reversals, and the model's value becomes
+fees low and avoid same-day reversals, and the model's value becomes
 measurable: execution price against arrival price, compared with an
 equal-spaced schedule that uses no model.
 
@@ -106,31 +108,35 @@ account value E, price p, shares held n, ML score s in [-1, 1]:
 ```
 b_i   = band_k · σ_i · max(w_i, c_i)                  the stock's own band
 e_i   = w_i − b_i · sign(w_i − c_i)                   the band's edge
-Δ_i   = round(e_i · E / p_i) − n_i                    shares to trade today, if |w_i − c_i| > b_i
-N_i   = min(max_children, floor(|Δ_i| · p_i / min_trade_usd))   number of child orders
+Δ_i   = e_i · E / p_i − n_i, to 9 decimals           shares to trade today, if |w_i − c_i| > b_i
+N_i   = max(1, min(max_children, floor(|Δ_i| · p_i / min_trade_usd)))   number of child orders
 u_i,t = s_i,t · sign(Δ_i)                             score in the trade's direction
 θ(t)  = theta0 · (1 − 2 · (t − t0) / (T − t0))        threshold, falls from theta0 to −theta0
 send a child order when u_i,t ≥ θ(t)
 ```
 
-1. **At the open:** compute Δ (`rebalance.trades_at_open`). Skip the stock if
-   its weight gap is within its own band, `band_k` days of its daily volatility
-   times the larger of its target and current weight (decision 0006), or the
-   trade is below `min_trade_usd`. Otherwise trade only as far as the band's
-   edge (decision 0007). A stock the plan dropped is sold completely. Buys are
-   paid from cash and the day's sales; when those fall short, every buy is cut
-   by the same factor.
+1. **At 10:30,** `start_after_open_min` after the open, when the opening
+   spreads have narrowed (decision 0013): compute Δ (`rebalance.trades_at_open`)
+   at the latest prices. Skip the stock if its weight gap is within its own
+   band, `band_k` days of its daily volatility times the larger of its target
+   and current weight (decision 0006), or the trade is below `min_trade_usd`.
+   Otherwise trade only as far as the band's edge (decision 0007). A stock the
+   plan dropped is sold completely. Buys are paid from cash and the day's
+   sales; when those fall short, every buy is cut by the same factor. The
+   day's trades wait together until they are worth at least `min_day_usd`.
 2. **Split** the trade into at most `max_children` child orders of at least
    `min_trade_usd` each.
 3. **Every bar:** send a child when u ≥ θ(t), at least `min_gap_min` minutes
-   after the previous one in the same stock; otherwise wait.
+   after the previous one in the same stock; otherwise wait. Without the
+   model (step 8), the children go at equal intervals from 10:30 to the
+   deadline.
 4. **Deadline:** `deadline_before_close_min` minutes before the close, send
    what is left. If the model fails its health check, fall back to
    equal-spaced children.
 5. **Guard** approves, reduces or rejects each child. No order in the opposite
    direction in the same stock on the same day.
-6. **Order:** a limit order within `price_collar_bps` of the last price; an
-   unfilled order is reconsidered on the next bar.
+6. **Order:** a limit order within `price_collar_bps` of the last price. What
+   a child leaves unfilled goes with the next child.
 
 ## Backtest event loop
 

@@ -198,6 +198,19 @@ def test_the_band_is_a_number_of_days_and_not_negative(band_k):
         ExecutionSettings(band_k=band_k)
 
 
+def test_the_plan_trades_from_10_30_and_on_days_worth_20_usd():
+    # Decision 0013: the spreads are wide at the open, and Alpaca's fees are
+    # rounded up per day.
+    settings = ExecutionSettings()
+    assert (settings.start_after_open_min, settings.min_day_usd) == (60, 20.0)
+
+
+@pytest.mark.parametrize("min_day_usd", [-1.0, math.nan, math.inf])
+def test_the_day_minimum_must_be_a_number_of_dollars(min_day_usd):
+    with pytest.raises(ValueError, match="min_day_usd"):
+        ExecutionSettings(min_day_usd=min_day_usd)
+
+
 def test_execution_settings_reject_threshold_above_one():
     with pytest.raises(ValueError):
         ExecutionSettings(theta0=1.5)

@@ -6,12 +6,14 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 8 is next:** equal-spaced child orders. Step 7e is done: the
-backtest trades fractional shares at Alpaca's costs (decisions 0008 and 0012,
-#24 and #25). Efe chose Alpaca to start real money with about 500 USD, and
-no leverage for the nightly plan for now (decision 0009). A second strategy,
-intraday momentum on the Nasdaq-100 (decision 0011), has its own steps in
-Phase 1b; the first is done: QQQ's 1-minute bars are in the store (#22).
+**Phase 1, step 8 is next:** equal-spaced child orders, three from 10:30;
+a day's trades wait until they are worth 20 USD (decision 0013). Step 7e is
+done: the backtest trades fractional shares at Alpaca's costs (decisions
+0008 and 0012, #24 and #25). Efe chose Alpaca to start real money with
+about 500 USD, and no leverage for the nightly plan for now (decision 0009).
+A second strategy, intraday momentum on the Nasdaq-100 (decision 0011), has
+its own steps in Phase 1b; the first is done: QQQ's 1-minute bars are in the
+store (#22).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -31,7 +33,7 @@ Phase 1b; the first is done: QQQ's 1-minute bars are in the store (#22).
 | 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
 | 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decisions 0008 and 0012) | Claude designs; Efe's rules | done, #24 and #25 |
 | 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | done, #23 |
-| 8. Timing without ML: equal-spaced child orders | Efe | to do |
+| 8. Timing without ML: equal-spaced child orders (decision 0013) | Efe | to do |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
 
@@ -131,11 +133,15 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       stock while it ranks within the top 12) halved the trades over
       2017–2026 without raising the Sharpe ratio (decision 0007); measure it
       again in the step 10 backtest.
-- [ ] Timing without ML: equal-spaced child orders.
-- [ ] Choose `max_children` and `min_gap_min` in the backtest, net of
-      commissions (for example 1, 2, 3, 5 or 10 child orders; 0 to 60 minutes
-      apart), with walk-forward tests, instead of keeping the Phase 0 guesses.
-      Guard's limits stay hand-set safety limits, not tuned for profit.
+- [ ] Timing without ML: equal-spaced child orders, three from 10:30 to
+      15:30; a day's trades wait until they are worth 20 USD together
+      (decision 0013).
+- [ ] Confirm decision 0013's schedule in the step 10 backtest, net of
+      costs, with walk-forward tests. Its measurements: the number of
+      orders hardly matters, the half spread at 09:35 is twice that of
+      10:30, and at 500 USD days of at least 20 USD cut Alpaca's fees from
+      0.80% to 0.29% a year. Guard's limits stay hand-set safety limits,
+      not tuned for profit.
 - [x] Cost model: the broker's commission and fees, plus spread and slippage;
       Alpaca's fees since step 7e (decision 0012). On 2025's real minutes a
       marketable ~2,000 USD order costs about 1.3 bps against the decision
@@ -144,6 +150,9 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       when each order is sent: the band's cash rule at the open keeps nothing
       back for costs, or for prices that rise before a buy fills (in 2025 cash
       fell to 1.24 USD at 100,000 USD).
+- [ ] A held stock whose prices end, as TWTR's did when it was taken private
+      for cash and VIAC's after it became PARA, is turned into cash at its
+      last price; otherwise it stays in the books for ever (decision 0013).
 - [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
       buy-and-hold and equal-weight baselines, and the days: daily profit and
       loss, the share of winning days, the worst day. Capital levels: 500,
@@ -197,6 +206,11 @@ Prove whether ML adds anything after costs. Slower during January exams.
       the champion/challenger rule. No model updates itself after each signal
       or for each stock (decision 0010).
 - [ ] Health check: if the score distribution drifts, fall back to timing without ML.
+- [ ] Revisit Guard's limit of 3 orders a stock a day. Efe expects to raise
+      it once a timing model shows a measured gain from more orders; with
+      decision 0010's signal, 31 orders beat 3 by 1.26 bps a trade
+      (decision 0013). The change is Efe's, by hand in `guard.yaml`, with
+      a decision record.
 
 **Gate M2:** two reports. Nightly model: Sharpe after costs against the plan
 without ML. Intraday model: execution cost against equal-spaced timing. "ML

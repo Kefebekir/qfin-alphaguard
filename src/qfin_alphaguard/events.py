@@ -246,9 +246,12 @@ class ExecutionSettings:
     band_k: float = 10.0
     max_children: int = 3  # the day's change is split into at most this many orders
     min_trade_usd: float = 1.0  # no smaller order: Alpaca's smallest buy (0012)
+    # A day's trades wait together until they are worth this, so Alpaca's
+    # smallest day of fees, 2 cents, is at most 0.1% of them (decision 0013).
+    min_day_usd: float = 20.0
     theta0: float = 0.6  # score threshold at the start of the day, falls to -theta0
     min_gap_min: int = 30  # minutes between two orders in the same stock
-    start_after_open_min: int = 5  # skip the noisy first minutes after the open
+    start_after_open_min: int = 60  # skip the wide spreads after the open (0013)
     deadline_before_close_min: int = 30  # send what is left this long before close
 
     def __post_init__(self) -> None:
@@ -262,6 +265,11 @@ class ExecutionSettings:
         if self.min_trade_usd <= 0:
             raise ValueError(
                 f"min_trade_usd must be positive, got {self.min_trade_usd}"
+            )
+        # A NaN would compare false with every day's total and never trade.
+        if not (math.isfinite(self.min_day_usd) and self.min_day_usd >= 0):
+            raise ValueError(
+                f"min_day_usd must be a number >= 0, got {self.min_day_usd!r}"
             )
         if not (0 < self.theta0 <= 1):
             raise ValueError(f"theta0 must be in (0, 1], got {self.theta0}")
