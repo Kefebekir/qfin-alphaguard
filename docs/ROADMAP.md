@@ -6,14 +6,17 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 9 is next:** Guard's rules in the backtest. Step 8 is done:
-the band's trades go out in equal-spaced child orders, three from 10:30 to
-15:30, once a day's trades are worth 20 USD together (decision 0013, #26 and
-#27). The backtest trades fractional shares at Alpaca's costs (decisions 0008
-and 0012). Efe chose Alpaca to start real money with about 500 USD, and no
-leverage for the nightly plan for now (decision 0009). A second strategy,
-intraday momentum on the Nasdaq-100 (decision 0011), has its own steps in
-Phase 1b; the first is done: QQQ's 1-minute bars are in the store (#22).
+**Phase 1, step 10 is next:** `qfin backtest`, the report against
+buy-and-hold and equal weight. Step 9 is done: Guard checks every order
+against `guard.yaml`, and the strategy keeps within its limits (decision
+0014, #28). The band's trades go out in equal-spaced child orders, three from
+10:30 to 15:30, once a day's trades are worth 20 USD together (decision 0013,
+#26 and #27). The backtest trades fractional shares at Alpaca's costs
+(decisions 0008 and 0012). Efe chose Alpaca to start real money with about
+500 USD, and no leverage for the nightly plan for now (decision 0009). A
+second strategy, intraday momentum on the Nasdaq-100 (decision 0011), has its
+own steps in Phase 1b; the first is done: QQQ's 1-minute bars are in the
+store (#22).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -34,7 +37,7 @@ Phase 1b; the first is done: QQQ's 1-minute bars are in the store (#22).
 | 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decisions 0008 and 0012) | Claude designs; Efe's rules | done, #24 and #25 |
 | 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | done, #23 |
 | 8. Timing without ML: equal-spaced child orders (decision 0013) | Efe | done, #27 |
-| 9. Guard rules in the backtest | Efe | to do |
+| 9. Guard rules in the backtest (decision 0014) | Claude; Efe's limits in `guard.yaml` | done, #28 |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
 
 Phase 0 is done and Gate M0 is met (#1–#6): cleanup, README, event types,
@@ -145,10 +148,14 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       Alpaca's fees since step 7e (decision 0012). On 2025's real minutes a
       marketable ~2,000 USD order costs about 1.3 bps against the decision
       price; IBKR would have added 1.9 bps of commission.
-- [ ] Guard rules applied in the backtest too, `max_gross_exposure` included
-      when each order is sent: the band's cash rule at the open keeps nothing
-      back for costs, or for prices that rise before a buy fills (in 2025 cash
-      fell to 1.24 USD at 100,000 USD).
+- [x] Guard rules applied in the backtest too, `max_gross_exposure` included
+      when each order is sent (decision 0014, step 9). Buys count at their
+      limits and an open sale frees no cash, so the account never borrows;
+      without Guard it closed a day of 2025 with −1.15 USD of cash at 30,000
+      USD.
+- [ ] The simulated broker fills a fractional buy under 1 USD, which Alpaca
+      refuses. Only a buy Guard cuts can be that small: 4 in 2025, at 30,000
+      and 5,000 USD (decision 0014).
 - [ ] A held stock whose prices end, as TWTR's did when it was taken private
       for cash and VIAC's after it became PARA, is turned into cash at its
       last price; otherwise it stays in the books for ever (decision 0013).
@@ -227,7 +234,10 @@ profit; this phase asks whether the system works correctly.
       the consolidated tape every day (decision 0008).
 - [ ] Order state machine: new → sent → acknowledged → partial → filled /
       cancelled / rejected; a unique client order id per order.
-- [ ] Guard live: every rule, halt and kill switch.
+- [ ] Guard live: every rule, halt and kill switch. The View's price times
+      come from the feed and its last close value from the broker's equity;
+      Efe decides whether the daily loss limit halts the engine until he
+      restarts it (decision 0014).
 - [ ] Reconciliation at open and close: broker positions equal engine positions.
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
