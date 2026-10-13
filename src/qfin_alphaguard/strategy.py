@@ -7,7 +7,7 @@ The same strategy class therefore runs on history and, from Phase 3, live.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from types import MappingProxyType
 
@@ -20,11 +20,11 @@ Decision = OrderIntent | Cancellation
 
 @dataclass(frozen=True)
 class View:
-    """What a strategy may know at `now`. Read-only.
+    """What a strategy, or Guard, may know at `now`. Read-only.
 
-    `positions` and `last_prices` are read-only windows onto the engine's
-    books, not copies: use a View during the call it is given in and do not
-    keep it, because they show the latest state when read later.
+    `positions`, `last_prices` and `price_times` are read-only windows onto
+    the engine's books, not copies: use a View during the call it is given in
+    and do not keep it, because they show the latest state when read later.
     """
 
     now: datetime
@@ -33,12 +33,17 @@ class View:
     positions: Mapping[str, float]  # shares held, maybe fractional; none: absent
     last_prices: Mapping[str, float]  # the latest close seen for each ticker
     open_orders: Sequence[Order]  # sent and not yet filled or cancelled
+    # When each last price was seen, the end of its bar: Guard's stale data rule.
+    price_times: Mapping[str, datetime] = field(default_factory=dict)
+    # The account's value at the last session's close, and the starting cash
+    # before the first: what Guard's daily loss limit is measured from.
+    last_close_value: float | None = None
 
     def __post_init__(self) -> None:
         if self.now.tzinfo is None or self.now.utcoffset() != timedelta(0):
             raise ValueError(f"now must be a UTC datetime, got {self.now!r}")
         # Read-only even when built from plain dicts; wrapping does not copy.
-        for name in ("positions", "last_prices"):
+        for name in ("positions", "last_prices", "price_times"):
             if not isinstance(getattr(self, name), MappingProxyType):
                 object.__setattr__(self, name, MappingProxyType(getattr(self, name)))
         object.__setattr__(self, "open_orders", tuple(self.open_orders))

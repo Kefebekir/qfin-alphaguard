@@ -559,6 +559,40 @@ def test_session_close_records_cash_and_value():
     )
 
 
+def test_the_view_says_when_each_price_was_seen():
+    seen = {}
+
+    class Watches(Script):
+        def on_bars(self, bars, view):
+            seen[view.now] = dict(view.price_times)
+            return ()
+
+    run([bar("A", 0), bar("B", 0), bar("A", 1)], Watches())
+
+    assert seen[at(1)] == {"A": at(1), "B": at(1)}
+    assert seen[at(2)] == {"A": at(2), "B": at(1)}  # no bar for B in minute two
+
+
+def test_the_last_close_value_is_the_starting_cash_then_each_close():
+    seen = []
+
+    class Watches(Script):
+        def on_session_start(self, view):
+            seen.append(view.last_close_value)
+
+    strategy = Watches({at(1): lambda view: [buy(view, quantity=10)]})
+    feed = [
+        bar("A", 0),
+        bar("A", 1, open=110.0, close=115.0),  # bought at 110, closes at 115
+        bar("A", 0, open=120.0, day_open=NEXT_OPEN),
+    ]
+
+    result = run(feed, strategy, NextOpenBroker(commission=0.0))
+
+    assert result.closes[0].value == 10_050.0
+    assert seen == [10_000.0, 10_050.0]
+
+
 # --- Splits and dividends --------------------------------------------------
 
 
