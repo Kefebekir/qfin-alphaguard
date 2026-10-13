@@ -168,10 +168,10 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       USD (`qfin backtest`, decision 0015).
 - [ ] Report variants: volatility targeting and leverage, net of borrowing
       costs (decision 0009).
-- [ ] One broken bar stops the nightly ingest. On 13 October 2026 EODHD's bar
-      of LUMN for the 12th opened at 5.25, above its high of 5.05; validation
-      failed, so neither the AWS job nor a local `qfin ingest` wrote anything.
-      Decide whether such a bar is dropped with a warning instead.
+- [x] One broken bar stopped the nightly ingest. On 13 October 2026 EODHD's
+      bar of LUMN for the 12th opened at 5.25, above its high of 5.05, and
+      validation failed. Such a bar's high and low are now widened to its open
+      and close, with a warning (decision 0016).
 
 **Gate M1:** one command produces the same report from the same inputs every
 time; results after costs compared with the baselines. Both hold with
