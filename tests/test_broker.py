@@ -9,24 +9,24 @@ from qfin_alphaguard.guard.check import GuardDecision
 from qfin_alphaguard.strategy import Strategy
 
 OPEN = datetime(2026, 10, 6, 13, 30, tzinfo=UTC)
-# Only the half spread, so the price rules can be read without commissions.
-PRICES_ONLY = CostModel(
-    per_share=0, minimum=0, maximum_share=0, fx_bps=0, half_spread_bps=1.0
-)
+# Only the half spread, so the price rules can be read without fees.
+PRICES_ONLY = CostModel(sec_fee_rate=0, cat_per_share=0, half_spread_bps=1.0)
+# Alpaca's fees, and no half spread, so the fills are at round prices.
+FEES_ONLY = CostModel(half_spread_bps=0)
 
 
-def at(minute):
-    return OPEN + timedelta(minutes=minute)
+def at(minute, day=0):
+    return OPEN + timedelta(days=day, minutes=minute)
 
 
-def order(side, quantity, limit, sent=0, ticker="A", number=1):
-    intent = OrderIntent(ticker, side, quantity, limit, at(sent))
-    return Order(f"bt-{number:07d}", intent, at(sent))
+def order(side, quantity, limit, sent=0, ticker="A", number=1, day=0):
+    intent = OrderIntent(ticker, side, quantity, limit, at(sent, day))
+    return Order(f"bt-{number:07d}", intent, at(sent, day))
 
 
-def bar(minute, open, high, low, close=None, volume=100_000, ticker="A"):
+def bar(minute, open, high, low, close=None, volume=100_000, ticker="A", day=0):
     close = open if close is None else close
-    return Bar(ticker, at(minute), 60, open, high, low, close, volume)
+    return Bar(ticker, at(minute, day), 60, open, high, low, close, volume)
 
 
 def broker(*orders, costs=PRICES_ONLY, participation=0.1):
@@ -122,11 +122,35 @@ def test_at_most_a_tenth_of_the_bars_volume_fills_and_the_rest_waits():
     assert simulated.waiting == {}  # filled completely: it stops waiting
 
 
-def test_nothing_fills_when_a_tenth_of_the_volume_is_less_than_a_share():
-    assert (
-        broker(order(Side.BUY, 10, 101.0)).on_bar(bar(0, 100.0, 100.5, 99.5, volume=9))
-        == []
-    )
+def test_a_tenth_of_the_volume_fills_even_when_it_is_less_than_a_share():
+    simulated = broker(order(Side.BUY, 10, 101.0))
+    (fill,) = simulated.on_bar(bar(0, 100.0, 100.5, 99.5, volume=9))
+    assert fill.quantity == 0.9
+
+
+def test_nothing_fills_on_a_bar_without_volume():
+    simulated = broker(order(Side.BUY, 10, 101.0))
+    assert simulated.on_bar(bar(0, 100.0, 100.5, 99.5, volume=0)) == []
+
+
+def test_a_fractional_order_fills_whole_and_stops_waiting():
+    simulated = broker(order(Side.BUY, 0.37, 101.0))
+    (fill,) = simulated.on_bar(bar(0, 100.0, 100.5, 99.5))
+    assert fill.quantity == 0.37
+    assert simulated.waiting == {}
+
+
+def test_fractional_parts_add_up_to_the_order_exactly():
+    # 0.3 + 0.3 + 0.3 is 0.8999999999999999 in floating point; rounded, the
+    # last part is 0.1, not 0.10000000000000009, which no fill could carry.
+    simulated = broker(order(Side.BUY, 1, 101.0))
+    shares = [
+        fill.quantity
+        for minute in range(4)
+        for fill in simulated.on_bar(bar(minute, 100.0, 100.5, 99.5, volume=3))
+    ]
+    assert shares == [0.3, 0.3, 0.3, 0.1]
+    assert simulated.waiting == {}
 
 
 def test_older_orders_fill_first():
@@ -142,44 +166,67 @@ def test_a_cancelled_order_never_fills():
     assert simulated.on_bar(bar(0, 100.0, 100.5, 99.5)) == []
 
 
-# --- Costs (IBKR Tiered, decision 0002) --------------------------------------
+# --- Costs (Alpaca, decision 0012) -------------------------------------------
 
 
-def test_a_small_order_pays_the_minimum():
-    assert CostModel().commission(10, 100.0, first_fill=True) == pytest.approx(0.35)
+def test_a_buy_owes_only_the_cat_fee():
+    fees = CostModel().fees(Side.BUY, 10, 100.0)
+    assert fees == pytest.approx({"SEC": 0.0, "CAT": 10 * 0.000003})
 
 
-def test_a_large_order_pays_per_share():
-    assert CostModel().commission(1_000, 10.0, first_fill=True) == pytest.approx(3.50)
+def test_a_sale_owes_the_sec_fee_on_its_value_and_the_cat_fee():
+    fees = CostModel().fees(Side.SELL, 10, 100.0)
+    assert fees == pytest.approx({"SEC": 1_000 * 0.0000206, "CAT": 10 * 0.000003})
 
 
-def test_commission_is_at_most_one_percent_of_the_value():
-    # 1,000 shares at 0.20 USD: 3.50 per share, capped at 1% of 200 USD.
-    assert CostModel().commission(1_000, 0.20, first_fill=True) == pytest.approx(2.00)
+def test_fees_are_owed_on_the_exact_fractional_quantity():
+    fees = CostModel().fees(Side.SELL, 0.5, 100.0)
+    assert fees == pytest.approx({"SEC": 50 * 0.0000206, "CAT": 0.5 * 0.000003})
 
 
-def test_the_minimum_is_paid_once_per_order():
-    assert CostModel().commission(10, 100.0, first_fill=False) == pytest.approx(0.035)
-
-
-def test_currency_conversion_is_added_on_the_value():
-    trading_212 = CostModel(fx_bps=15)
-    assert trading_212.commission(10, 100.0, first_fill=True) == pytest.approx(
-        0.35 + 1.50
+def test_a_buy_pays_a_cent_of_cat_fee_and_nothing_else():
+    (fill,) = broker(order(Side.BUY, 10, 101.0), costs=FEES_ONLY).on_bar(
+        bar(0, 100.0, 100.5, 99.5)
     )
+    assert fill.commission == pytest.approx(0.01)
 
 
-def test_partial_fills_pay_the_minimum_only_on_the_first():
-    simulated = broker(order(Side.BUY, 12, 101.0), costs=CostModel(half_spread_bps=0))
-    fills = [
-        fill
-        for minute in range(3)
-        for fill in simulated.on_bar(bar(minute, 100.0, 100.5, 99.5, volume=50))
-    ]
-    assert [round(fill.commission, 4) for fill in fills] == [0.35, 0.0175, 0.007]
+def test_the_first_fill_of_a_day_pays_each_fee_rounded_up_to_the_cent():
+    # SEC fee 0.0206 USD, up to 0.03; CAT fee 0.00003 USD, up to 0.01.
+    (fill,) = broker(order(Side.SELL, 10, 99.0), costs=FEES_ONLY).on_bar(
+        bar(0, 100.0, 100.5, 99.5)
+    )
+    assert fill.commission == pytest.approx(0.04)
 
 
-@pytest.mark.parametrize("name", ["per_share", "minimum", "fx_bps", "half_spread_bps"])
+def test_later_fills_that_day_pay_what_takes_a_total_past_another_cent():
+    # The day's SEC fees come to 0.0412 USD, charged 0.05; the CAT fees to
+    # 0.00006 USD, charged 0.01. The first sale paid 0.03 and 0.01.
+    first = order(Side.SELL, 10, 99.0, number=1)
+    second = order(Side.SELL, 10, 99.0, number=2)
+    fills = broker(first, second, costs=FEES_ONLY).on_bar(bar(0, 100.0, 100.5, 99.5))
+    assert [fill.commission for fill in fills] == pytest.approx([0.04, 0.02])
+
+
+def test_each_day_starts_its_fee_totals_afresh():
+    simulated = broker(order(Side.SELL, 10, 99.0), costs=FEES_ONLY)
+    simulated.on_bar(bar(0, 100.0, 100.5, 99.5))
+    simulated.submit(order(Side.SELL, 10, 99.0, number=2, day=1))
+    (next_day,) = simulated.on_bar(bar(0, 100.0, 100.5, 99.5, day=1))
+    assert next_day.commission == pytest.approx(0.04)
+
+
+def test_a_day_total_of_whole_cents_is_not_rounded_up_again():
+    # SEC fees of 0.10 and 0.20 USD add up to 0.30000000000000004 in floating
+    # point, which must still be charged as 30 cents, not 31.
+    costs = CostModel(sec_fee_rate=0.0001, cat_per_share=0, half_spread_bps=0)
+    first = order(Side.SELL, 10, 99.0, number=1)  # 1,000 USD sold
+    second = order(Side.SELL, 20, 99.0, number=2)  # 2,000 USD sold
+    fills = broker(first, second, costs=costs).on_bar(bar(0, 100.0, 100.5, 99.5))
+    assert [fill.commission for fill in fills] == pytest.approx([0.10, 0.20])
+
+
+@pytest.mark.parametrize("name", ["sec_fee_rate", "cat_per_share", "half_spread_bps"])
 def test_costs_cannot_be_negative(name):
     with pytest.raises(ValueError, match=name):
         CostModel(**{name: -0.01})
@@ -222,5 +269,7 @@ def test_the_broker_keeps_the_engines_contract():
     result = run_backtest(feed, RoundTrip(), NextBarBroker(), Allow(), cash=10_000.0)
 
     bought, sold = 10 * 100.0 * 1.0001, 10 * 101.0 * 0.9999
+    # The buy pays a cent of CAT fee; the sale 0.0208 USD of SEC fee, charged
+    # 0.03, and nothing more of CAT fee, whose day total is still under a cent.
     assert result.positions == {}
-    assert result.cash == pytest.approx(10_000.0 - bought - 0.35 + sold - 0.35)
+    assert result.cash == pytest.approx(10_000.0 - bought - 0.01 + sold - 0.03)

@@ -1,17 +1,18 @@
 """What the backtest needs from a simulated broker.
 
 NextBarBroker below is the simulated broker, with its fill rules and costs
-(Phase 1, step 6). The engine checks every fill it reports against the
-contract in SimulatedBroker and stops the backtest if one breaks it.
+(Phase 1, step 6; Alpaca's costs and fractional shares since step 7e). The
+engine checks every fill it reports against the contract in SimulatedBroker
+and stops the backtest if one breaks it.
 """
 
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
-from qfin_alphaguard.events import Bar, Fill, Order, Side
+from qfin_alphaguard.events import Bar, Fill, Order, Side, round_shares
 
 
 class SimulatedBroker(Protocol):
@@ -43,40 +44,27 @@ class SimulatedBroker(Protocol):
 
 @dataclass(frozen=True)
 class CostModel:
-    """What a fill costs besides its price. Defaults: IBKR Tiered (decision 0002)."""
+    """What a fill costs besides its price: Alpaca's (decision 0012).
 
-    per_share: float = 0.0035  # USD per share, up to 300,000 shares a month
-    minimum: float = 0.35  # USD per order, paid on its first fill
-    maximum_share: float = 0.01  # commission is at most 1% of a fill's value
-    fx_bps: float = 0.0  # currency conversion: 0 when USD is held, 15 at Trading 212
+    No commission. Two regulatory fees, which Alpaca adds up per day and
+    rounds up to the cent (NextBarBroker.charge): the SEC fee on the value of
+    each sale, and the CAT fee on every share bought or sold.
+    """
+
+    sec_fee_rate: float = 0.0000206  # SEC fee: this share of each sale's value
+    cat_per_share: float = 0.000003  # CAT fee: USD per share bought or sold
     half_spread_bps: float = 1.0  # what a marketable order pays over the traded price
 
     def __post_init__(self) -> None:
-        for name in (
-            "per_share",
-            "minimum",
-            "maximum_share",
-            "fx_bps",
-            "half_spread_bps",
-        ):
+        for name in ("sec_fee_rate", "cat_per_share", "half_spread_bps"):
             value = getattr(self, name)
             if not (math.isfinite(value) and value >= 0):
                 raise ValueError(f"{name} must be a finite number >= 0, got {value!r}")
 
-    def commission(self, quantity: int, price: float, first_fill: bool) -> float:
-        """Commission and currency conversion for one fill, in USD.
-
-        - the broker charges per_share for each share; the first fill of an
-          order pays at least `minimum`; and the commission is at most
-          maximum_share of the fill's value (quantity * price)
-        - currency conversion adds fx_bps of the fill's value on top
-        """
-        value = quantity * price
-        broker = self.per_share * quantity
-        if first_fill:
-            broker = max(broker, self.minimum)
-        broker = min(broker, self.maximum_share * value)
-        return broker + self.fx_bps / 10_000 * value
+    def fees(self, side: Side, quantity: float, price: float) -> dict[str, float]:
+        """Each fee one fill owes, in USD, before the day's rounding."""
+        sec = self.sec_fee_rate * quantity * price if side is Side.SELL else 0.0
+        return {"SEC": sec, "CAT": self.cat_per_share * quantity}
 
 
 class NextBarBroker:
@@ -90,7 +78,10 @@ class NextBarBroker:
         self.costs = costs or CostModel()
         self.participation = participation  # most of a bar's volume one order takes
         self.waiting: dict[str, Order] = {}  # open orders by id, oldest first
-        self.filled: dict[str, int] = {}  # shares filled so far, by order id
+        self.filled: dict[str, float] = {}  # shares filled so far, by order id
+        self.fee_day: date | None = None  # the day the two totals below are for
+        self.owed: dict[str, float] = {}  # each fee's exact total that day
+        self.charged: dict[str, float] = {}  # what was charged of each fee that day
 
     def submit(self, order: Order) -> None:
         self.waiting[order.client_order_id] = order
@@ -116,11 +107,11 @@ class NextBarBroker:
 
 
         Quantity: what is left of the order, but at most `participation` of the
-        bar's volume, rounded down; nothing if that is 0. The rest waits.
+        bar's volume, in shares to 9 decimals; nothing if that is 0. The rest
+        waits.
 
-        Commission: self.costs.commission(quantity, price, first_fill), where
-        first_fill says whether this is the order's first fill. An order that
-        is completely filled stops waiting.
+        Commission: the fees the fill adds to the day's, rounded up to the
+        cent (charge). An order that is completely filled stops waiting.
         """
         fills = []
         half_spread = self.costs.half_spread_bps / 10_000
@@ -143,11 +134,10 @@ class NextBarBroker:
             else:
                 continue
             left = intent.quantity - self.filled[client_order_id]
-            quantity = min(left, math.floor(self.participation * bar.volume))
+            quantity = round_shares(min(left, self.participation * bar.volume))
             if quantity == 0:
                 continue
-            first_fill = self.filled[client_order_id] == 0
-            commission = self.costs.commission(quantity, price, first_fill)
+            commission = self.charge(intent.side, quantity, price, time)
             fills.append(
                 Fill(
                     client_order_id,
@@ -159,7 +149,30 @@ class NextBarBroker:
                     time,
                 )
             )
-            self.filled[client_order_id] += quantity
+            self.filled[client_order_id] = round_shares(
+                self.filled[client_order_id] + quantity
+            )
             if self.filled[client_order_id] == intent.quantity:
                 del self.waiting[client_order_id]
         return fills
+
+    def charge(
+        self, side: Side, quantity: float, price: float, time: datetime
+    ) -> float:
+        """What a fill pays in fees: how far it takes each day total, in cents.
+
+        Alpaca adds each fee up per day and charges the total rounded up to
+        the cent. So the day's first fill pays at least a cent of each fee it
+        owes, and a later fill only what takes a total past another cent.
+        """
+        if time.date() != self.fee_day:
+            self.fee_day, self.owed, self.charged = time.date(), {}, {}
+        charge = 0.0
+        for name, amount in self.costs.fees(side, quantity, price).items():
+            self.owed[name] = self.owed.get(name, 0.0) + amount
+            # Rounded before going up, or floating point would make 30 cents,
+            # 30.000000000000004, into 31.
+            total = math.ceil(round(self.owed[name] * 100, 6)) / 100
+            charge += total - self.charged.get(name, 0.0)
+            self.charged[name] = total
+        return charge
