@@ -33,14 +33,23 @@ def test_the_base_strategy_does_nothing():
 
 
 def test_a_view_cannot_be_changed():
-    seen = view()
+    seen = view(price_times={"A": T})
     with pytest.raises(FrozenInstanceError):
         seen.cash = 1e9
     with pytest.raises(TypeError):
         seen.positions["A"] = 1_000
     with pytest.raises(TypeError):
         seen.last_prices["A"] = 0.01
+    with pytest.raises(TypeError):
+        seen.price_times["A"] = T + timedelta(hours=1)
     assert isinstance(seen.open_orders, tuple)
+
+
+def test_a_view_need_not_say_when_prices_were_seen_or_the_last_close():
+    # A strategy can do without them; Guard cannot, and the engine always sets them.
+    seen = view()
+    assert dict(seen.price_times) == {}
+    assert seen.last_close_value is None
 
 
 def test_a_view_needs_a_utc_time():

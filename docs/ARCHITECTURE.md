@@ -129,12 +129,14 @@ send a child order when u_i,t ≥ θ(t)
 3. **Every bar:** send a child when u ≥ θ(t), at least `min_gap_min` minutes
    after the previous one in the same stock; otherwise wait. Without the
    model (step 8), the children go at equal intervals from 10:30 to the
-   deadline.
+   deadline. Either way, a child goes only on a bar of its own stock, at most
+   `max_orders_per_min` go in a minute, and on a day with sales each buy goes
+   a minute after them, so the sales' cash is there (decision 0014).
 4. **Deadline:** `deadline_before_close_min` minutes before the close, send
    what is left. If the model fails its health check, fall back to
    equal-spaced children.
-5. **Guard** approves, reduces or rejects each child. No order in the opposite
-   direction in the same stock on the same day.
+5. **Guard** approves, reduces or rejects each child (decision 0014). No order
+   in the opposite direction in the same stock on the same day.
 6. **Order:** a limit order within `price_collar_bps` of the last price. What
    a child leaves unfilled goes with the next child.
 
@@ -157,11 +159,13 @@ outside its bar, is priced where the bar never traded, breaks its limit, or
 exceeds what is left of the order, and if Guard changes anything but the
 quantity. At each close it cancels open orders and logs the portfolio's value. At each
 open, before the strategy hears of the session, it applies that day's splits
-(held shares and the last price follow the ratio; a fraction of a share is paid
-in cash) and dividends (cash per share held), derived from the daily bars in
-`data/corporate.py`.
+(held shares and the last price follow the ratio, fractions included, as at
+Alpaca: decision 0012) and dividends (cash per share held), derived from the
+daily bars in `data/corporate.py`.
 The strategy sees only a read-only `View` (time, session, cash, positions, last
 prices, open orders), so the same `Strategy` class can run live in Phase 3.
+Guard sees the same View, which also says when each price was seen and what
+the account was worth at the last close.
 
 ## Risk file
 
@@ -184,6 +188,23 @@ daily_loss_limit_pct: 2.0      # no new orders after a 2% intraday loss
 stale_data_sec: 15             # no trading on data older than 15 seconds
 live_trading: false            # set to true by hand for a live account
 ```
+
+Guard (`guard/rules.py`) judges each order on the View and on the orders it
+let through itself that day (decision 0014):
+
+- **Dropped** (in this order): after a loss of `daily_loss_limit_pct` since
+  the last close, for the rest of the day; on a price older than
+  `stale_data_sec`; on a limit price outside `price_collar_bps`; after
+  `max_orders_per_min` orders in the last 60 seconds,
+  `max_trades_per_symbol_day` orders in the stock today, or an order in the
+  stock the other way today.
+- **Cut** to the smallest quantity these allow: `max_order_usd`; no sale of
+  more than is held and not already in open sales; `max_weight` for the
+  stock; `max_gross_exposure` for the account. Buys count at their limit
+  prices, and an open sale frees no cash until it fills, so the account never
+  borrows.
+- **`live_trading`** is checked by the live engine before it connects
+  (Phase 3).
 
 If a daily plan breaks `guard.yaml`, the engine rejects it and only allows
 orders that reduce positions that day.

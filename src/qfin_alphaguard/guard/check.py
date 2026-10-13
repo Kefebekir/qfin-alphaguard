@@ -1,8 +1,8 @@
 """The shape of Guard's answer about one order intent, and the interface it meets.
 
-Every intent a strategy makes passes Guard before it can become an order. The
-rules are Phase 1, step 9; this module fixes what Guard answers, so the
-backtest and the live engine can rely on it.
+Every intent a strategy makes passes Guard before it can become an order.
+Guard and its rules are in rules.py; this module fixes what Guard answers, so
+the backtest and the live engine can rely on it.
 """
 
 from dataclasses import dataclass

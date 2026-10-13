@@ -17,9 +17,10 @@ The engine is the referee. It checks every fill against the broker contract
 (backtest/broker.py) and every Guard answer against GuardDecision, and stops
 with an error rather than go on with a backtest whose results would be wrong.
 At each session close it cancels the open orders, values the portfolio and
-logs both. At each session open, before the strategy hears of the session, it
-applies that day's splits and dividends (data/corporate.py): prices are as
-traded, so held shares must follow a split and dividends must reach cash.
+logs both; Guard measures the next day's loss from that value. At each
+session open, before the strategy hears of the session, it applies that day's
+splits and dividends (data/corporate.py): prices are as traded, so held
+shares must follow a split and dividends must reach cash.
 """
 
 import hashlib
@@ -135,6 +136,10 @@ class _Engine:
         self.portfolio = Portfolio(cash)
         self.last_prices: dict[str, float] = {}
         self.prices = MappingProxyType(self.last_prices)
+        self.price_times: dict[str, datetime] = {}  # when each last price was seen
+        self.times = MappingProxyType(self.price_times)
+        # The account's value at the last close; the starting cash before the first.
+        self.last_close_value = float(cash)
         self.open: dict[str, _OpenOrder] = {}  # by client_order_id, oldest first
         self.log: list[Record] = []
         self.closes: list[SessionClose] = []
@@ -150,6 +155,8 @@ class _Engine:
             positions=self.portfolio.positions,
             last_prices=self.prices,
             open_orders=tuple(entry.order for entry in self.open.values()),
+            price_times=self.times,
+            last_close_value=self.last_close_value,
         )
 
     def handle(self, bars: dict[str, Bar]) -> None:
@@ -168,6 +175,7 @@ class _Engine:
         now = first.end  # the moment the slice is complete
         for ticker, bar in bars.items():
             self.last_prices[ticker] = bar.close
+            self.price_times[ticker] = bar.end
         for bar in bars.values():
             for fill in self.broker.on_bar(bar):
                 self.book(fill, bar)
@@ -296,6 +304,7 @@ class _Engine:
         )
         self.log.append(record)
         self.closes.append(record)
+        self.last_close_value = record.value
         self.strategy.on_session_end(self.view(close))
 
     def finish(self) -> None:
