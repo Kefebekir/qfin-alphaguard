@@ -6,14 +6,14 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 8 is next:** equal-spaced child orders, three from 10:30;
-a day's trades wait until they are worth 20 USD (decision 0013). Step 7e is
-done: the backtest trades fractional shares at Alpaca's costs (decisions
-0008 and 0012, #24 and #25). Efe chose Alpaca to start real money with
-about 500 USD, and no leverage for the nightly plan for now (decision 0009).
-A second strategy, intraday momentum on the Nasdaq-100 (decision 0011), has
-its own steps in Phase 1b; the first is done: QQQ's 1-minute bars are in the
-store (#22).
+**Phase 1, step 9 is next:** Guard's rules in the backtest. Step 8 is done:
+the band's trades go out in equal-spaced child orders, three from 10:30 to
+15:30, once a day's trades are worth 20 USD together (decision 0013, #26 and
+#27). The backtest trades fractional shares at Alpaca's costs (decisions 0008
+and 0012). Efe chose Alpaca to start real money with about 500 USD, and no
+leverage for the nightly plan for now (decision 0009). A second strategy,
+intraday momentum on the Nasdaq-100 (decision 0011), has its own steps in
+Phase 1b; the first is done: QQQ's 1-minute bars are in the store (#22).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ store (#22).
 | 7d. The band trades a gap only as far as its edge (decision 0007) | Efe | done, #20 |
 | 7e. Fractional shares and the broker's costs: event types, simulated broker, band (decisions 0008 and 0012) | Claude designs; Efe's rules | done, #24 and #25 |
 | 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | done, #23 |
-| 8. Timing without ML: equal-spaced child orders (decision 0013) | Efe | to do |
+| 8. Timing without ML: equal-spaced child orders (decision 0013) | Efe | done, #27 |
 | 9. Guard rules in the backtest | Efe | to do |
 | 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
 
@@ -108,15 +108,14 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
 - [x] Selling a stock that leaves the trading universe at the new year: its
       January minutes are downloaded too, 6–10 stocks a year (step 7c).
-- [ ] Stock-days without minutes: 1.7% of the 136,301 a backtest of
-      2016–2026 needs. 2,010 belong to old or renamed codes no minutes were
-      found for: BKNG 2016–17 is under PCLN and AABA under YHOO, which the
-      renamed-ticker map above would find; CHK_old, DWDP and VIAC are still to
-      look up. 286 are holes in stored years: EODHD has no 1-minute bars for
-      TSLA from 19 July 2023 to 14 May 2024, nor for NVDA from its split on 10
-      June 2024 to 24 July, and BKNG's before 27 February 2018 are under PCLN.
-      The backtest must not trade a stock on a day without minutes, and the
-      report says how often the plan wanted to (step 10).
+- [ ] Stock-days without minutes. Step 7f filled EODHD's holes from Alpaca's
+      SIP history (#23); neither provider has VIAC's minutes after 16
+      February 2022, when it became PARA, nor DWDP's after 31 May 2019, when
+      it became DD (next item). The backtest must not trade a stock on a day
+      without minutes, and the report says how often the plan wanted to (step
+      10). Step 8's timing waits for the price of every stock in the plan or
+      held: one never priced holds up the day's trades to the deadline, and
+      one priced before is ordered at a stale price and never fills.
 - [ ] A held stock whose bars stop during its year: renamed (DWDP → DD in
       2019, FB → META and VIAC → PARA in 2022) or bought for cash (TWTR, 54.20
       USD on 27 October 2022). The backtest must carry the shares over to the
@@ -133,9 +132,9 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       stock while it ranks within the top 12) halved the trades over
       2017–2026 without raising the Sharpe ratio (decision 0007); measure it
       again in the step 10 backtest.
-- [ ] Timing without ML: equal-spaced child orders, three from 10:30 to
+- [x] Timing without ML: equal-spaced child orders, three from 10:30 to
       15:30; a day's trades wait until they are worth 20 USD together
-      (decision 0013).
+      (decision 0013, step 8).
 - [ ] Confirm decision 0013's schedule in the step 10 backtest, net of
       costs, with walk-forward tests. Its measurements: the number of
       orders hardly matters, the half spread at 09:35 is twice that of

@@ -63,6 +63,8 @@ Both ruff commands must pass before a commit.
   next day and each stock's volatility
 - `src/qfin_alphaguard/rebalance.py`: the band; which stocks to trade at the
   open, and how many shares
+- `src/qfin_alphaguard/execution.py`: when the day's trades go out; the
+  equal-spaced child orders that Phase 2's timing model has to beat
 - `src/qfin_alphaguard/backtest/`: the event loop and the simulated broker's
   interface
 - `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that
