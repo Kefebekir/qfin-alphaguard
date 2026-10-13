@@ -52,6 +52,10 @@ class Portfolio:
         else:
             del self._positions[ticker]
 
+    def pay_out(self, ticker: str, price: float) -> None:
+        """Every share of `ticker` turned into cash at `price`, as in a takeover."""
+        self._cash += self._positions.pop(ticker, 0) * price
+
     def dividend(self, ticker: str, amount: float) -> None:
         """Cash for each share held; a short position pays it instead."""
         self._cash += self._positions.get(ticker, 0) * amount

@@ -112,6 +112,21 @@ def test_fractional_fills_add_up_and_a_position_sold_to_nothing_disappears():
     assert portfolio.cash == pytest.approx(100.0)
 
 
+def test_a_payout_turns_every_share_into_cash_at_the_price():
+    portfolio = Portfolio(100.0)
+    portfolio.apply(fill(Side.BUY, 2.5, 20.0))
+    portfolio.apply(fill(Side.BUY, 1, 10.0, ticker="B"))
+    portfolio.pay_out("A", 54.2)
+    assert portfolio.positions == {"B": 1}
+    assert portfolio.cash == pytest.approx(100.0 - 50.0 - 10.0 + 135.5)
+
+
+def test_a_payout_of_a_stock_not_held_changes_nothing():
+    portfolio = Portfolio(100.0)
+    portfolio.pay_out("A", 54.2)
+    assert (portfolio.positions, portfolio.cash) == ({}, 100.0)
+
+
 def test_a_dividend_is_paid_per_share_held_and_charged_to_a_short():
     portfolio = Portfolio(0.0)
     portfolio.apply(fill(Side.BUY, 10, 100.0))

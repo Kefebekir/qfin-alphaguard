@@ -10,6 +10,7 @@ from qfin_alphaguard.events import (
     Bar,
     Cancellation,
     DailyPlan,
+    Delisting,
     Dividend,
     ExecutionSettings,
     Fill,
@@ -239,6 +240,12 @@ def test_a_split_ratio_must_be_positive_and_not_one(ratio):
 def test_a_dividend_must_be_positive(amount):
     with pytest.raises(ValueError):
         Dividend("AAPL", date(2025, 2, 10), amount)
+
+
+def test_a_delisting_needs_a_ticker():
+    assert Delisting("TWTR", date(2022, 10, 28)).ticker == "TWTR"
+    with pytest.raises(ValueError, match="ticker"):
+        Delisting("", date(2022, 10, 28))
 
 
 def test_a_plans_volatility_must_be_positive():
