@@ -11,7 +11,9 @@ on decision 0013's schedule:
 2. A trade is split into N child orders, at most max_children, each worth at
    least min_trade_usd and min_gap_min minutes apart. They go at equal
    intervals from then to deadline_before_close_min before the close: 10:30,
-   13:00 and 15:30.
+   13:00 and 15:30. On a day with sales, each buy goes a minute after them,
+   at 10:31, 13:01 and 15:31, so the sales' cash is there when Guard checks
+   the buy (decision 0014).
 3. Each child is what is left of the trade over the children left. A child
    still open when the next is due is cancelled, and its rest goes with the
    next one; the last child takes all that is left.
@@ -20,6 +22,10 @@ on decision 0013's schedule:
    fills at once on an ordinary minute and never breaks the collar. A buy
    child worth less than min_trade_usd, Alpaca's smallest buy, waits for the
    next child; a sale of any size goes.
+5. Guard's limits are kept, so it has nothing to drop on an ordinary day
+   (decision 0014). A child goes only on a bar of its own stock, so its price
+   is never stale; and at most max_orders_per_min children go in a minute,
+   the earliest due first, the rest on the next bar.
 
 This is the baseline that Phase 2's timing model has to beat (Gate M2).
 """
@@ -44,9 +50,15 @@ from qfin_alphaguard.strategy import Decision, Strategy, View
 class EqualSpaced(Strategy):
     """Each day's trades from the band, in equal-spaced child orders."""
 
-    def __init__(self, plans: Mapping[date, DailyPlan], collar_bps: float) -> None:
+    def __init__(
+        self,
+        plans: Mapping[date, DailyPlan],
+        collar_bps: float,
+        max_orders_per_min: int,
+    ) -> None:
         self.plans = plans  # the plan for each trading day
         self.collar = collar_bps / 10_000  # Guard's price_collar_bps, as a fraction
+        self.max_orders = max_orders_per_min  # Guard's, so it never drops one for it
         self.plan: DailyPlan | None = None  # today's
         self.decided = False  # whether the band has decided today's trades
         self.left: dict[str, float] = {}  # shares still to trade; negative to sell
@@ -68,11 +80,21 @@ class EqualSpaced(Strategy):
         )
         if not self.decided and start <= view.now <= deadline:
             self.decide(view, deadline)
+        # A child goes on a bar of its own stock, the earliest due first.
+        ready = sorted(
+            (due[0], ticker)
+            for ticker, due in self.due.items()
+            if due and due[0] <= view.now and ticker in bars
+        )
         decisions: list[Decision] = []
-        for ticker, due in self.due.items():
-            if due and due[0] <= view.now:
-                due.pop(0)
-                decisions += self.send(ticker, view)
+        orders = 0
+        for _, ticker in ready:
+            if orders == self.max_orders:
+                break  # the rest go on the next bar
+            self.due[ticker].pop(0)
+            sent = self.send(ticker, view)
+            orders += sum(isinstance(decision, OrderIntent) for decision in sent)
+            decisions += sent
         return decisions
 
     def on_fill(self, fill: Fill, view: View) -> None:
@@ -93,6 +115,7 @@ class EqualSpaced(Strategy):
         self.decided = True
         settings = self.plan.execution
         gap = timedelta(minutes=settings.min_gap_min)
+        sales = any(change < 0 for change in trades.values())
         for ticker, change in trades.items():
             worth = abs(change) * view.last_prices[ticker]
             n = math.floor(worth / settings.min_trade_usd)
@@ -101,8 +124,10 @@ class EqualSpaced(Strategy):
                 n = min(n, 1 + math.floor((deadline - view.now) / gap))
             n = max(n, 1)
             step = (deadline - view.now) / (n - 1) if n > 1 else timedelta(0)
+            # A buy waits a minute for the day's sales to fill, and their cash.
+            delay = timedelta(minutes=1) if sales and change > 0 else timedelta(0)
             self.left[ticker] = change
-            self.due[ticker] = [view.now + k * step for k in range(n)]
+            self.due[ticker] = [view.now + delay + k * step for k in range(n)]
             self.children[ticker] = n
 
     def send(self, ticker: str, view: View) -> list[Decision]:
