@@ -8,9 +8,9 @@ the target (decision 0007), in fractional shares (decision 0012). The
 strategy then splits the day's trades into orders and times them (Phase 1,
 step 8).
 
-trades_at_open checks its inputs and values the account. The two rules it
-applies are Efe's (Phase 1, step 7b): _change for each stock and
-_pay_for_buys for the cash.
+trades_at_open checks its inputs and values the account. The three rules it
+applies are Efe's: _change for each stock and _pay_for_buys for the cash
+(Phase 1, step 7b), and _worth_a_day for the fees (decision 0013).
 """
 
 import math
@@ -29,7 +29,9 @@ def trades_at_open(
 
     `shares` are the shares held now, `prices` the latest price of every stock
     in the plan or held, and `cash` the cash in the account. Equity, what the
-    account is worth, is the cash plus the value of the shares.
+    account is worth, is the cash plus the value of the shares. The day's
+    trades are made only when together they are worth
+    plan.execution.min_day_usd; until then they wait.
     """
     held = {ticker: n for ticker, n in shares.items() if n > 0}
     tickers = sorted(set(plan.target_weights) | set(held))
@@ -54,7 +56,8 @@ def trades_at_open(
         )
         if change != 0:
             trades[ticker] = change
-    return _pay_for_buys(trades, prices, cash, plan.execution.min_trade_usd)
+    paid = _pay_for_buys(trades, prices, cash, plan.execution.min_trade_usd)
+    return _worth_a_day(paid, prices, plan.execution.min_day_usd)
 
 
 def _change(
@@ -122,3 +125,18 @@ def _pay_for_buys(
                 continue
         paid[ticker] = n
     return paid
+
+
+def _worth_a_day(
+    trades: dict[str, float], prices: Mapping[str, float], min_day_usd: float
+) -> dict[str, float]:
+    """The day's trades, or none while together they are worth less than min_day_usd.
+
+    Alpaca rounds each day's fees up to the cent, so a day with trades costs
+    at least 2 cents (decision 0013). Small trades wait, and grow, until the
+    day's trades, sales included, are worth min_day_usd together.
+    """
+    worth = sum(abs(n) * prices[ticker] for ticker, n in trades.items())
+    if worth < min_day_usd:
+        return {}
+    return trades

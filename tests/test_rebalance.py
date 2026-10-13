@@ -95,8 +95,9 @@ def test_a_fractional_holding_is_traded_to_the_edge_in_fractions():
 
 
 def test_the_default_minimum_is_alpacas_1_usd():
-    # No band: 10% of 10,000 USD wanted at 100 USD a share, so 10 shares.
-    wants = plan({"A": 0.10}, band_k=0.0)
+    # No band: 10% of 10,000 USD wanted at 100 USD a share, so 10 shares. No
+    # day minimum, so the trades are judged one by one.
+    wants = plan({"A": 0.10}, band_k=0.0, min_day_usd=0.0)
     assert wants.execution.min_trade_usd == 1.0
     # 9.995 shares held: 0.005 more would cost 0.50 USD, so it waits.
     assert trades_at_open(wants, {"A": 9.995}, at_100("A"), 9_000.5) == {}
@@ -129,6 +130,48 @@ def test_a_stock_the_plan_dropped_is_sold_completely_even_below_the_minimum():
         49_475.0,
     )
     assert trades == {"OLD": -5.25}
+
+
+# --- Days worth trading (decision 0013) --------------------------------------
+
+
+def test_a_days_trades_wait_together_until_they_are_worth_20_usd():
+    # No band, 10% of 10,000 USD wanted in each: A is 0.1 share short and B
+    # 0.05, so the day's trades are worth 15 USD, and wait.
+    wants = plan({"A": 0.10, "B": 0.10}, band_k=0.0)
+    assert wants.execution.min_day_usd == 20.0
+    assert trades_at_open(wants, {"A": 9.9, "B": 9.95}, at_100("A", "B"), 8_015.0) == {}
+    # Twice as far from the plan, they are worth 30 USD and are made.
+    trades = trades_at_open(wants, {"A": 9.8, "B": 9.9}, at_100("A", "B"), 8_030.0)
+    assert trades == {"A": 0.2, "B": 0.1}
+
+
+def test_sales_count_towards_the_days_worth():
+    # B's buy is worth 5 USD; with A's sale of 20 USD the day is worth 25 USD.
+    wants = plan({"A": 0.10, "B": 0.10}, band_k=0.0)
+    trades = trades_at_open(wants, {"A": 10.2, "B": 9.95}, at_100("A", "B"), 7_985.0)
+    assert trades == {"A": -0.2, "B": 0.05}
+
+
+def test_a_stock_the_plan_dropped_waits_for_a_day_worth_trading_too():
+    # OLD is worth 5 USD and A is at its target: the day is worth 5 USD.
+    trades = trades_at_open(
+        plan({"A": 0.5}), {"A": 50, "OLD": 0.05}, at_100("A", "OLD"), 4_995.0
+    )
+    assert trades == {}
+
+
+def test_a_day_the_cash_cut_takes_below_20_usd_waits():
+    # A is over its target but within its wide band. B is 10 points short and
+    # wants 5.1 shares, 510 USD, but the cash is 10 USD: the cut leaves a buy
+    # of 0.1 share, 10 USD, and the day waits.
+    trades = trades_at_open(
+        plan({"A": 0.5, "B": 0.5}, {"A": 0.03}),
+        {"A": 60, "B": 39.9},
+        at_100("A", "B"),
+        10.0,
+    )
+    assert trades == {}
 
 
 # --- Paying for the buys ------------------------------------------------------
@@ -220,9 +263,16 @@ def test_no_short_no_borrowing_no_small_trades_and_every_trade_towards_the_plan(
         cash = float(rng.uniform(0, 50_000))
         band_k = float(rng.choice([0.0, 5.0, 10.0]))
         minimum = float(rng.choice([1.0, 100.0, 1_000.0]))
+        day_minimum = float(rng.choice([0.0, 20.0, 5_000.0]))
 
         trades = trades_at_open(
-            plan(weights, volatility, band_k=band_k, min_trade_usd=minimum),
+            plan(
+                weights,
+                volatility,
+                band_k=band_k,
+                min_trade_usd=minimum,
+                min_day_usd=day_minimum,
+            ),
             shares,
             prices,
             cash,
@@ -232,8 +282,10 @@ def test_no_short_no_borrowing_no_small_trades_and_every_trade_towards_the_plan(
         sold = sum(-n * prices[ticker] for ticker, n in trades.items() if n < 0)
         bought = sum(n * prices[ticker] for ticker, n in trades.items() if n > 0)
         assert bought <= cash + sold + 1e-6  # no borrowing
+        if trades:
+            assert sold + bought >= day_minimum  # a day worth trading
         for ticker, held in shares.items():
-            if held and ticker not in weights:
+            if trades and held and ticker not in weights:
                 assert trades.get(ticker) == -held  # a dropped stock is sold
         for ticker, n in trades.items():
             assert n != 0 and round_shares(n) == n  # an order can take it
