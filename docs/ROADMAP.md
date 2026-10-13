@@ -14,9 +14,9 @@ week alongside university.
   fundamentals.
 - **The pilot.** On price and volume alone, monthly gradient-boosted trees
   picking 10 of the year's 50 most liquid stocks beat holding all 50 by
-  9.3% a year after costs, in 8 of 9 years (2018–2026). That is not yet
-  proof: the deflated Sharpe ratio is 0.70 of the 0.95 needed
-  (`docs/research/machine-learning-for-the-plan.md`).
+  about 8% a year after costs, from 3% to 15% depending on the start day
+  (2018–2026). That is not yet proof: the deflated Sharpe ratio is 0.70 of
+  the 0.95 needed (`docs/research/machine-learning-for-the-plan.md`).
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:

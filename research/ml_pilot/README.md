@@ -30,3 +30,4 @@ Use 1, 5 or 21 sessions as the horizon.
 | `walkforward.py` | Ridge and gradient-boosted trees, trained on the years before each test year and purged of the last 1 + h sessions; their average; three single signals. |
 | `evaluate.py` | Rank IC, long-only portfolios in both universes before and after 2, 5 and 10 bps, and the deflated Sharpe ratio of the best of the twelve variants. |
 | `yearly.py` | The top 10 of the 50 against the 50, year by year. |
+| `startdays.py` | The same over every day a rebalance every h sessions can start on, net of costs. |

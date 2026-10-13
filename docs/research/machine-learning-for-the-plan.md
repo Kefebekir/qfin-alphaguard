@@ -32,8 +32,9 @@ and can be rerun.
 - **Our own pilot finds a signal that is consistent but not yet proven.**
   - Setting: 2018–2026, 20 price and volume features.
   - Monthly gradient boosting picked 10 of the year's 50 most liquid stocks.
-    It beat holding all 50 at equal weight by 9.3% a year after 10 bps of
-    costs, in 8 of 9 years.
+    It beat holding all 50 at equal weight by about 8% a year after 10 bps of
+    costs: the average over the 21 days a monthly rebalance can start on,
+    with 3% to 15% depending on the day.
   - Corrected for the twelve variants tried, its deflated Sharpe ratio is
     0.70 against the 0.95 needed. It could still be luck.
 - **Proof comes forward.** Each night's predictions are committed publicly
@@ -176,13 +177,28 @@ t-statistic uses non-overlapping periods):
 | 12-1 momentum, monthly | +4.6% | +4.5% | +3.9% | 7× | 0.30 |
 | Low volatility, monthly | −7.0% | −7.1% | −7.5% | 6× | −0.51 |
 
-**Monthly gradient-boosted trees, year by year:**
+**Monthly gradient-boosted trees, year by year** (the first start day):
 
 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | +4.3% | +0.5% | +16.2% | +20.1% | +7.8% | −1.0% | +10.5% | +22.1% | +10.9% |
 
 It beat the 50 in 58% of months.
+
+**The start day matters.** A monthly rebalance can start on any of 21
+sessions. Over all 21, after 10 bps:
+
+| | Mean | Lowest | Highest | Information ratio |
+| --- | --- | --- | --- | --- |
+| Gradient-boosted trees | +8.1% | +3.3% | +15.1% | 0.64 (0.26 to 1.21) |
+| Average of both models | +6.1% | +0.4% | +10.8% | 0.52 (0.04 to 1.00) |
+| Ridge | +4.2% | +0.4% | +8.6% | 0.38 (0.04 to 0.68) |
+| 12-1 momentum | +5.4% | +3.1% | +7.3% | 0.33 (0.19 to 0.43) |
+
+The +9.3% of the first start day is a lucky one. Rebalancing a slice of the
+portfolio each day, as overlapping monthly portfolios (Jegadeesh and Titman,
+1993), earns the average with less luck. Our band and EqualSpaced already
+trade a little each day.
 
 **What it means:**
 - **The signal is small,** as in the literature: rank ICs of 0.01–0.02.
@@ -193,7 +209,8 @@ It beat the 50 in 58% of months.
   0.95, before counting the three horizons as trials too.
 - **The fundamental law agrees.** With an IC near 0.016 over 50 stocks and
   12 rebalances a year, it implies an information ratio near 0.4
-  (0.016 × √600). So the pilot's 0.84 probably includes luck.
+  (0.016 × √600). The 0.64 average over start days probably still includes
+  luck.
 - **2018–2026 was led by a few large growth stocks.** That flatters any
   model that leans towards them; low volatility lost about 7% a year.
 
@@ -277,7 +294,7 @@ long it takes to show an active return is above zero:
 | Information ratio | Months | Years |
 | --- | --- | --- |
 | 0.5 | 132 | 11.0 |
-| 0.84 (the pilot's best) | 48 | 4.0 |
+| 0.84 (the pilot's first start day) | 48 | 4.0 |
 | 1.0 | 35 | 2.9 |
 
 So the forward test's first job is to prove the system trades as the
@@ -322,6 +339,9 @@ edge.
   *Review of Financial Studies*. SSRN 4187217.
 - Jiang, J., Kelly, B., and Xiu, D. (2023). (Re-)Imag(in)ing Price Trends.
   *Journal of Finance* 78(6), 3193–3249.
+- Jegadeesh, N., and Titman, S. (1993). Returns to Buying Winners and Selling
+  Losers: Implications for Stock Market Efficiency. *Journal of Finance*
+  48(1), 65–91.
 - Krauss, C., Do, X. A., and Huck, N. (2017). Deep Neural Networks,
   Gradient-Boosted Trees, Random Forests: Statistical Arbitrage on the
   S&P 500. *European Journal of Operational Research* 259(2), 689–702.

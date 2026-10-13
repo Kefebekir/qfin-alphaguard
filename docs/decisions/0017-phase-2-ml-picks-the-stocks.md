@@ -27,8 +27,9 @@
     - Setting: 20 price and volume features, every S&P 500 member,
       walk-forward 2018–2026.
     - Monthly gradient-boosted trees picking 10 of the year's 50 most liquid
-      stocks beat holding all 50 by 9.3% a year after 10 bps, in 8 of 9
-      years.
+      stocks beat holding all 50 by about 8% a year after 10 bps. That is
+      the average over the 21 days a monthly rebalance can start on, with 3%
+      to 15% depending on the day.
     - Its deflated Sharpe ratio is 0.70 of the 0.95 needed.
 
 ## Decision
@@ -94,7 +95,7 @@ matter:
 - Phase 3 paper trades the model and compares it every day with its
   backtest.
 - The minimum track record length is stated next to every forward result:
-  about 4 years at the pilot's information ratio of 0.84, and 11 at 0.5.
+  about 4 years at an information ratio of 0.84, and 11 at 0.5.
 
 **8. What does not change**, whatever else does:
 - no look-ahead;

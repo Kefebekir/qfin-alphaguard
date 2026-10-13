@@ -62,7 +62,8 @@ The first pilot of those forecasts gives a promising result that is not yet
 proven ([decision 0017](docs/decisions/0017-phase-2-ml-picks-the-stocks.md)):
 - the setup: monthly gradient-boosted trees on price and volume features;
 - the result: picking 10 of the year's 50 most liquid stocks beat holding all
-  50 by 9.3% a year after costs, in 8 of 9 years (2018–2026);
+  50 by about 8% a year after costs, from 3% to 15% depending on the day the
+  monthly rebalance starts (2018–2026);
 - the catch: corrected for the twelve variants tried, that could still be
   luck.
 
