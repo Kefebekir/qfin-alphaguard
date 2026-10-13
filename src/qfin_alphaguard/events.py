@@ -237,6 +237,24 @@ class Dividend:
 
 
 @dataclass(frozen=True)
+class Delisting:
+    """From the open of `day`, `ticker` has no more bars in the backtest.
+
+    It was bought for cash, as TWTR was in October 2022, or its code changed,
+    as VIAC's did to PARA, or its stored minutes end. Each share still held is
+    paid out in cash at its last price; otherwise the position would stay in
+    the books for ever, neither sold nor valued (decision 0013).
+    """
+
+    ticker: str
+    day: date
+
+    def __post_init__(self) -> None:
+        if not self.ticker:
+            raise ValueError("a delisting needs a ticker")
+
+
+@dataclass(frozen=True)
 class ExecutionSettings:
     """How the engine turns a day's target change into orders."""
 

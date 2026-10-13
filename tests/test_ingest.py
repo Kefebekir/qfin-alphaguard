@@ -6,6 +6,8 @@ import polars as pl
 from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.eodhd import BARS_SCHEMA
 from qfin_alphaguard.data.ingest import (
+    BENCHMARKS,
+    download_benchmarks,
     download_sp500,
     load_prices,
     snap_rounding,
@@ -174,6 +176,26 @@ def test_bars_on_days_the_exchange_was_closed_are_dropped():
     assert date(2025, 1, 1) not in dates
     assert date(2025, 1, 9) not in dates
     assert len(dates) == len(days) - 2
+
+
+def test_the_benchmark_etf_is_stored_like_a_stock_but_never_as_a_member():
+    days = weekdays(date(2020, 1, 6), date(2020, 1, 10))
+    client = FakeClient({"SPY": days})
+
+    prices = download_benchmarks(client, BENCHMARKS, days[0], days[-1])
+
+    assert BENCHMARKS == ("SPY",)
+    assert dict(prices.schema) == EXPECTED_SCHEMA
+    assert prices["ticker"].unique().to_list() == ["SPY"]
+    assert prices["date"].to_list() == days
+    assert not prices["sp500"].any()
+    assert validate_prices(prices).ok
+
+
+def test_no_benchmark_gives_an_empty_frame_in_the_members_columns():
+    prices = download_benchmarks(FakeClient({}), (), date(2020, 1, 6), date(2020, 1, 6))
+    assert prices.is_empty()
+    assert dict(prices.schema) == EXPECTED_SCHEMA
 
 
 def test_a_member_without_data_lowers_the_coverage():

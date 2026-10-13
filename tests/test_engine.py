@@ -12,6 +12,7 @@ from qfin_alphaguard.backtest.engine import (
 from qfin_alphaguard.events import (
     Bar,
     Cancellation,
+    Delisting,
     Dividend,
     Fill,
     Order,
@@ -627,6 +628,31 @@ def test_a_split_divides_the_last_price_the_strategy_sees_even_when_not_held():
 
     assert seen[NEXT_OPEN] == {"A": pytest.approx(110.0)}
     assert records(result, Split) == []  # nothing held, so nothing booked
+
+
+def test_a_held_stock_whose_bars_end_is_paid_out_at_its_last_price():
+    # A is bought at 100 and last trades at 105; the next day only B trades.
+    strategy = Script({at(1): lambda view: [buy(view, quantity=10)]})
+    feed = [
+        bar("A", 0),
+        bar("A", 1, close=105.0),
+        bar("B", 0, day_open=NEXT_OPEN),
+    ]
+    delisting = Delisting("A", NEXT_OPEN.date())
+
+    result = run(feed, strategy, NextOpenBroker(commission=0.0), actions=[delisting])
+
+    assert result.positions == {}
+    assert result.cash == pytest.approx(10_000.0 - 1_000.0 + 1_050.0)
+    assert result.closes[1].value == pytest.approx(10_050.0)
+    assert delisting in result.log
+
+
+def test_a_delisting_of_a_stock_not_held_changes_nothing_and_is_not_logged():
+    feed = [bar("A", 0), bar("B", 0, day_open=NEXT_OPEN)]
+    result = run(feed, Script(), actions=[Delisting("A", NEXT_OPEN.date())])
+    assert result.cash == 10_000.0
+    assert records(result, Delisting) == []
 
 
 def test_a_dividend_on_a_held_stock_reaches_cash_at_the_open():

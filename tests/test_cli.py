@@ -33,10 +33,33 @@ def test_a_command_is_required(argv):
     assert stopped.value.code == 2  # argparse's exit code for a usage error
 
 
-@pytest.mark.parametrize("command", ["backtest"])
-def test_commands_not_built_yet_fail_and_say_so(command, capsys):
-    assert main([command]) == 1
-    assert "not built yet" in capsys.readouterr().err
+def test_backtest_needs_the_daily_prices_first(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["backtest"]) == 1
+    assert "run `qfin ingest` first" in capsys.readouterr().err
+
+
+def test_backtest_reports_the_runs_and_writes_the_same_json_every_time(
+    store, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    guard = str(Path(__file__).resolve().parents[1] / "guard.yaml")
+    argv = ["backtest", "--capital", "1000", "2000", "--guard", guard]
+
+    assert main(argv) == 0
+    first = (
+        tmp_path / "data/backtests/backtest_2016-01-05_2016-01-07.json"
+    ).read_text()
+    output = capsys.readouterr().out
+    assert main([*argv, "--out", "again.json"]) == 0
+    again = (tmp_path / "again.json").read_text()
+
+    assert first == again
+    report = json.loads(first)
+    assert set(report["plan"]) == {"1000", "2000"}
+    assert set(report["baselines"]) == {"equal weight", "SPY"}
+    for line in ("Plan, 1,000 USD", "Plan, 2,000 USD", "Same stocks, equal weight"):
+        assert line in output
 
 
 def test_aws_task_definition_runs_a_valid_command():

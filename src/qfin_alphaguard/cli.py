@@ -4,18 +4,23 @@
     qfin intraday     download 1-minute bars for each year's trading universe
     qfin etf-minutes  download ETFs' 1-minute bars from Alpaca, such as QQQ's
     qfin plan         build a day's plan: the portfolio to hold, from the bars before it
-    qfin backtest     run the event-driven backtester (Phase 1, not built yet)
+    qfin backtest     replay the nightly plan on the stored minutes, against SPY and
+                      the same stocks at equal weight
 
 The nightly AWS job runs the command in infra/aws/task-definition.template.json;
 a test checks that this CLI still accepts it.
 """
 
 import argparse
+import json
 import sys
+import time
 from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from qfin_alphaguard.backtest.report import render, summary
+from qfin_alphaguard.backtest.run import Backtest
 from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.alpaca import AlpacaClient, api_keys
 from qfin_alphaguard.data.eodhd import EodhdClient, api_key
@@ -117,9 +122,33 @@ def build_parser() -> argparse.ArgumentParser:
     plan.set_defaults(run=_plan)
 
     backtest = commands.add_parser(
-        "backtest", help="run the event-driven backtester (not built yet)"
+        "backtest",
+        help="replay the nightly plan on the stored minutes, against SPY and the "
+        "same stocks at equal weight",
     )
-    backtest.set_defaults(run=_not_built_yet)
+    backtest.add_argument(
+        "--from",
+        dest="first",
+        type=date.fromisoformat,
+        help="first day (YYYY-MM-DD); defaults to the first with a year of daily "
+        "returns before it",
+    )
+    backtest.add_argument(
+        "--to",
+        dest="last",
+        type=date.fromisoformat,
+        help="last day; defaults to the last with daily bars and minutes",
+    )
+    backtest.add_argument(
+        "--capital",
+        type=float,
+        nargs="+",
+        default=[500.0, 5_000.0, 30_000.0],
+        help="starting cash in USD; one run each",
+    )
+    backtest.add_argument("--guard", default="guard.yaml", help="the risk limits file")
+    backtest.add_argument("--out", help="where to write the report's JSON")
+    backtest.set_defaults(run=_backtest)
 
     return parser
 
@@ -296,11 +325,32 @@ def _plan(args: argparse.Namespace) -> int:
     return 0
 
 
-def _not_built_yet(args: argparse.Namespace) -> int:
-    print(
-        f"qfin {args.command} is not built yet; it arrives in Phase 1", file=sys.stderr
-    )
-    return 1
+def _backtest(args: argparse.Namespace) -> int:
+    config = Config()
+    daily_path = prices_path(config)
+    if not daily_path.exists():
+        print(f"{daily_path} not found; run `qfin ingest` first", file=sys.stderr)
+        return 1
+    daily = read_prices(daily_path)
+    limits = load_guard_config(args.guard)
+    started = time.monotonic()
+    test = Backtest(daily, config.raw_dir, limits, args.first, args.last)
+    days = test.inputs.days
+    print(f"backtest from {days[0]} to {days[-1]}: {len(days):,} sessions", flush=True)
+    runs = {}
+    for capital in args.capital:
+        runs[capital] = test.run(capital)
+        elapsed = time.monotonic() - started
+        print(f"ran {capital:,.0f} USD; {elapsed:.0f}s so far", flush=True)
+    plans = test.plans(args.capital[0])
+    report = summary(daily, test.inputs, plans, runs, test.costs)
+    print(render(report))
+    name = f"backtest_{days[0]}_{days[-1]}.json"
+    out = Path(args.out) if args.out else Path("data/backtests") / name
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
 
 
 if __name__ == "__main__":

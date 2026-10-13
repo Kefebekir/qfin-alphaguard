@@ -17,6 +17,11 @@ from qfin_alphaguard.sessions import session_days
 # validation.
 ROUNDING_TOLERANCE = 1e-9
 
+# The S&P 500 ETF the backtest report measures the plan against (step 10). A
+# UK investor would hold a UCITS ETF of the same index; SPY's history is the
+# longest.
+BENCHMARKS = ("SPY",)
+
 # A split shows up as a jump in `adjustment` (10x for a 10-for-1 split). Split
 # histories are fetched only for codes whose adjustment jumps by more than
 # this from one day to the next; a 5-for-4 split is a 1.25 jump, while
@@ -30,13 +35,17 @@ def load_prices(config: Config) -> pl.DataFrame:
     Columns: date, ticker, open, high, low, close, volume, adjustment,
     split_factor, sp500. The price as traded that day is the adjusted price
     divided by `adjustment`; the shares traded are `volume / split_factor`.
-    `sp500` says whether the stock was in the S&P 500 that day.
+    `sp500` says whether the stock was in the S&P 500 that day; the benchmark
+    ETFs in BENCHMARKS never are. The synthetic data has no benchmark.
     """
     if config.synthetic:
         return generate_prices(config)
     first = date.fromisoformat(config.start_date)
     last = date.fromisoformat(config.end_date)
-    return download_sp500(EodhdClient(api_key()), sp500(), first, last)
+    client = EodhdClient(api_key())
+    members = download_sp500(client, sp500(), first, last)
+    etfs = download_benchmarks(client, BENCHMARKS, first, last)
+    return pl.concat([members, etfs]).sort(["ticker", "date"])
 
 
 def download_sp500(
@@ -78,6 +87,22 @@ def download_sp500(
         )
     prices = keep_sessions(pl.concat(frames))
     return snap_rounding(prices.sort(["ticker", "date"]))
+
+
+def download_benchmarks(
+    client: EodhdClient, codes: tuple[str, ...], first: date, last: date
+) -> pl.DataFrame:
+    """Daily bars for ETFs such as SPY, in the members' columns, never `sp500`."""
+    frames = [
+        _with_split_factor(client, code, client.daily_bars(code, first, last))
+        for code in codes
+    ]
+    if not frames:
+        return pl.DataFrame(
+            schema={**BARS_SCHEMA, "split_factor": pl.Float64, "sp500": pl.Boolean}
+        )
+    prices = pl.concat(frames).with_columns(pl.lit(False).alias("sp500"))
+    return snap_rounding(keep_sessions(prices).sort(["ticker", "date"]))
 
 
 def keep_sessions(prices: pl.DataFrame) -> pl.DataFrame:

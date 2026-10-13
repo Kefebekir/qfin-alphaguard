@@ -6,17 +6,23 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1, step 10 is next:** `qfin backtest`, the report against
-buy-and-hold and equal weight. Step 9 is done: Guard checks every order
-against `guard.yaml`, and the strategy keeps within its limits (decision
-0014, #28). The band's trades go out in equal-spaced child orders, three from
-10:30 to 15:30, once a day's trades are worth 20 USD together (decision 0013,
-#26 and #27). The backtest trades fractional shares at Alpaca's costs
-(decisions 0008 and 0012). Efe chose Alpaca to start real money with about
-500 USD, and no leverage for the nightly plan for now (decision 0009). A
-second strategy, intraday momentum on the Nasdaq-100 (decision 0011), has its
-own steps in Phase 1b; the first is done: QQQ's 1-minute bars are in the
-store (#22).
+**Phase 1's ten steps are done.** `qfin backtest` replays the nightly plan on
+the stored minutes since 2016 and reports it against SPY and the same stocks
+at equal weight (decision 0015, #29).
+- **The plan loses to both baselines**, at the same risk too. It earns 10.6
+  to 10.8% a year with 12.8% volatility; SPY earned 15.2% with 17.7%, and
+  equal weight 17.5% with 19.3%. The Sharpe ratios are 0.86 against 0.89
+  and 0.93.
+- **Gate M1:** its two conditions hold. Efe decides whether it is passed,
+  given the items still open below.
+- **What the backtest runs:** Guard checks every order (decision 0014,
+  #28). The band's trades go out in equal-spaced child orders (decision
+  0013), in fractional shares at Alpaca's costs (decisions 0008 and 0012).
+
+Efe chose Alpaca to start real money with about 500 USD, and no leverage for
+the nightly plan for now (decision 0009). A second strategy, intraday
+momentum on the Nasdaq-100 (decision 0011), has its own steps in Phase 1b;
+the first is done: QQQ's 1-minute bars are in the store (#22).
 
 | Phase 1 step | Core logic by | State |
 | --- | --- | --- |
@@ -38,7 +44,7 @@ store (#22).
 | 7f. Fill each source's minute holes from the other: the stocks' EODHD minutes from Alpaca's SIP history (decision 0008), QQQ's Alpaca minutes from EODHD's | Claude | done, #23 |
 | 8. Timing without ML: equal-spaced child orders (decision 0013) | Efe | done, #27 |
 | 9. Guard rules in the backtest (decision 0014) | Claude; Efe's limits in `guard.yaml` | done, #28 |
-| 10. Report against buy-and-hold and equal weight: `qfin backtest` | Claude | to do |
+| 10. Report against buy-and-hold and equal weight: `qfin backtest` (decision 0015) | Claude | done, #29 |
 
 Phase 0 is done and Gate M0 is met (#1–#6): cleanup, README, event types,
 `CLAUDE.md`, `guard.yaml` and its loader, docs, CLI subcommands.
@@ -90,9 +96,11 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Data: EODHD daily bars for every S&P 500 member since 2015, and 1-minute
       bars since 2016 for each year's trading universe (decision 0005).
 - [x] Store OHLCV, not only closes: fills at the next bar's open need it.
-- [ ] Universe rule written down, and its survivorship bias stated in the report.
+- [x] Universe rule written down (decision 0005), and its survivorship bias
+      stated in the report (step 10).
 - [x] Exchange calendar with holidays and half days; all timestamps UTC.
-- [ ] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1.
+- [x] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1
+      (step 5: the engine stops a run that breaks it).
 - [x] Split- and dividend-adjusted prices.
 - [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
       WYND → TNL, CDAY → DAY, ARNC → HWM) so their earlier index years have
@@ -106,24 +114,22 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       the cloud. Until then `qfin intraday` refreshes them locally in about 3
       minutes; on S3 they should be one file per day, because versioning would
       otherwise keep a copy of every stock's whole-year file each night.
-- [ ] Backtests read the stored Parquet file, never a fresh download: two
-      yfinance downloads of the same history can differ in the fifth decimal.
+- [x] Backtests read the stored Parquet file, never a fresh download: two
+      yfinance downloads of the same history can differ in the fifth decimal
+      (`qfin backtest`, step 10).
 - [x] Event loop: the same `Strategy` class runs on history and, in Phase 3, live.
 - [x] Selling a stock that leaves the trading universe at the new year: its
       January minutes are downloaded too, 6–10 stocks a year (step 7c).
-- [ ] Stock-days without minutes. Step 7f filled EODHD's holes from Alpaca's
+- [x] Stock-days without minutes. Step 7f filled EODHD's holes from Alpaca's
       SIP history (#23); neither provider has VIAC's minutes after 16
       February 2022, when it became PARA, nor DWDP's after 31 May 2019, when
-      it became DD (next item). The backtest must not trade a stock on a day
-      without minutes, and the report says how often the plan wanted to (step
-      10). Step 8's timing waits for the price of every stock in the plan or
-      held: one never priced holds up the day's trades to the deadline, and
-      one priced before is ordered at a stale price and never fills.
-- [ ] A held stock whose bars stop during its year: renamed (DWDP → DD in
-      2019, FB → META and VIAC → PARA in 2022) or bought for cash (TWTR, 54.20
-      USD on 27 October 2022). The backtest must carry the shares over to the
-      new code or pay the cash out, or it keeps a position it can neither sell
-      nor value.
+      it became DD. The backtest trades a stock only on its own bars (decision
+      0014), and the report counts the stock-days the plan held a stock
+      without minutes: 72 of 54,912 over 2016–2026 (decision 0015).
+- [x] A held stock whose bars stop: renamed (DWDP → DD in 2019, VIAC → PARA
+      in 2022) or bought for cash (TWTR, 54.20 USD on 27 October 2022). On
+      the first session without its minutes, a Delisting pays it out at its
+      last price (decisions 0013 and 0015); over 2016–2026, 2 held stocks were.
 - [x] Daily plan from the CVXPY optimiser with Ledoit-Wolf covariance, holding
       as many stocks as the capital can hold.
 - [x] The band: trade a stock only when its gap is larger than its own
@@ -139,7 +145,7 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       15:30; a day's trades wait until they are worth 20 USD together
       (decision 0013, step 8).
 - [ ] Confirm decision 0013's schedule in the step 10 backtest, net of
-      costs, with walk-forward tests. Its measurements: the number of
+      costs, with walk-forward tests, on the backtest of step 10. Its measurements: the number of
       orders hardly matters, the half spread at 09:35 is twice that of
       10:30, and at 500 USD days of at least 20 USD cut Alpaca's fees from
       0.80% to 0.29% a year. Guard's limits stay hand-set safety limits,
@@ -156,17 +162,20 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [ ] The simulated broker fills a fractional buy under 1 USD, which Alpaca
       refuses. Only a buy Guard cuts can be that small: 4 in 2025, at 30,000
       and 5,000 USD (decision 0014).
-- [ ] A held stock whose prices end, as TWTR's did when it was taken private
-      for cash and VIAC's after it became PARA, is turned into cash at its
-      last price; otherwise it stays in the books for ever (decision 0013).
-- [ ] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
-      buy-and-hold and equal-weight baselines, and the days: daily profit and
-      loss, the share of winning days, the worst day. Capital levels: 500,
-      5,000 and 30,000 USD. Variants: volatility targeting and leverage, net of
-      borrowing costs (decision 0009).
+- [x] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
+      buy-and-hold (SPY) and equal-weight baselines, and the days: the share
+      of winning days, the worst day. Capital levels: 500, 5,000 and 30,000
+      USD (`qfin backtest`, decision 0015).
+- [ ] Report variants: volatility targeting and leverage, net of borrowing
+      costs (decision 0009).
+- [ ] One broken bar stops the nightly ingest. On 13 October 2026 EODHD's bar
+      of LUMN for the 12th opened at 5.25, above its high of 5.05; validation
+      failed, so neither the AWS job nor a local `qfin ingest` wrote anything.
+      Decide whether such a bar is dropped with a warning instead.
 
 **Gate M1:** one command produces the same report from the same inputs every
-time; results after costs compared with the baselines.
+time; results after costs compared with the baselines. Both hold with
+`qfin backtest` (decision 0015).
 
 ### Phase 1b: Intraday momentum on the Nasdaq-100 (decision 0011)
 

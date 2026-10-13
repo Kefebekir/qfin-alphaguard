@@ -20,7 +20,8 @@ At each session close it cancels the open orders, values the portfolio and
 logs both; Guard measures the next day's loss from that value. At each
 session open, before the strategy hears of the session, it applies that day's
 splits and dividends (data/corporate.py): prices are as traded, so held
-shares must follow a split and dividends must reach cash.
+shares must follow a split and dividends must reach cash. A held stock whose
+bars have ended (Delisting) is paid out in cash at its last price.
 """
 
 import hashlib
@@ -34,6 +35,7 @@ from qfin_alphaguard.backtest.broker import SimulatedBroker
 from qfin_alphaguard.events import (
     Bar,
     Cancellation,
+    Delisting,
     Dividend,
     Fill,
     Order,
@@ -77,6 +79,7 @@ Record = (
     | SessionClose
     | Split
     | Dividend
+    | Delisting
 )
 
 
@@ -99,11 +102,11 @@ def run_backtest(
     broker: SimulatedBroker,
     guard: RiskCheck,
     cash: float,
-    actions: Iterable[Split | Dividend] = (),
+    actions: Iterable[Split | Dividend | Delisting] = (),
 ) -> BacktestResult:
     """Replay `feed`, bars in time order, through `strategy`, Guard and `broker`.
 
-    `actions` are the splits and dividends of the stocks in `feed`.
+    `actions` are the splits, dividends and delistings of the stocks in `feed`.
     """
     engine = _Engine(strategy, broker, guard, cash, actions)
     for bars in _slices(feed):
@@ -125,9 +128,9 @@ class _Engine:
         broker: SimulatedBroker,
         guard: RiskCheck,
         cash: float,
-        actions: Iterable[Split | Dividend],
+        actions: Iterable[Split | Dividend | Delisting],
     ) -> None:
-        self.actions: dict[date, list[Split | Dividend]] = defaultdict(list)
+        self.actions: dict[date, list[Split | Dividend | Delisting]] = defaultdict(list)
         for action in actions:
             self.actions[action.day].append(action)
         self.strategy = strategy
@@ -184,7 +187,7 @@ class _Engine:
             self.decide(decision, now)
 
     def apply_actions(self, day: date) -> None:
-        """The day's splits and dividends, before anyone sees the session."""
+        """The day's splits, dividends and delistings, before anyone sees it."""
         for action in self.actions.pop(day, ()):
             held = action.ticker in self.portfolio.positions
             if isinstance(action, Split):
@@ -194,6 +197,10 @@ class _Engine:
                     self.last_prices[action.ticker] /= action.ratio
                 if held:
                     self.portfolio.split(action.ticker, action.ratio)
+            elif isinstance(action, Delisting):
+                if held:
+                    price = self.last_prices[action.ticker]
+                    self.portfolio.pay_out(action.ticker, price)
             elif held:
                 self.portfolio.dividend(action.ticker, action.amount)
             if held:
