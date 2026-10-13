@@ -24,7 +24,11 @@ from qfin_alphaguard.backtest.run import Backtest
 from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.alpaca import AlpacaClient, api_keys
 from qfin_alphaguard.data.eodhd import EodhdClient, api_key
-from qfin_alphaguard.data.ingest import load_prices, sp500_coverage
+from qfin_alphaguard.data.ingest import (
+    load_prices,
+    repair_broken_bars,
+    sp500_coverage,
+)
 from qfin_alphaguard.data.intraday import YearOfMinutes, backfill_minutes
 from qfin_alphaguard.data.store import (
     prices_path,
@@ -168,8 +172,16 @@ def _ingest(args: argparse.Namespace) -> int:
 
     config = Config(synthetic=args.synthetic, end_date=end_date)
 
-    df = load_prices(config)
+    df, broken = repair_broken_bars(load_prices(config))
     print(f"Loaded {len(df)} rows for {df['ticker'].n_unique()} tickers")
+    if not broken.is_empty():
+        cases = ", ".join(
+            f"{ticker} {day}" for ticker, day in broken.select("ticker", "date").rows()
+        )
+        print(
+            f"[warning] repaired_bars: {broken.height} bars had an open or close "
+            f"outside low..high; high and low were widened to them: {cases}"
+        )
     if not args.synthetic:
         print(f"S&P 500 member-days with prices: {sp500_coverage(df, sp500()):.1%}")
 

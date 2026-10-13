@@ -10,6 +10,7 @@ from qfin_alphaguard.data.ingest import (
     download_benchmarks,
     download_sp500,
     load_prices,
+    repair_broken_bars,
     snap_rounding,
     sp500_coverage,
 )
@@ -241,6 +242,35 @@ def test_open_a_rounding_step_below_the_low_is_snapped():
 
     assert snapped["low"][0] == 98.0
     assert validate_prices(snapped).ok
+
+
+def test_a_bar_with_a_wrong_high_and_low_is_widened_to_its_open_and_close():
+    # LUMN, 12 October 2026, as EODHD sent it.
+    bars = pl.concat(
+        [
+            one_bar(open=5.25, high=5.05, low=5.05, close=5.05),
+            one_bar(open=5.56, high=5.58, low=5.13, close=5.28).with_columns(
+                pl.lit(date(2024, 1, 3)).alias("date")
+            ),
+        ]
+    )
+
+    repaired, broken = repair_broken_bars(bars)
+
+    assert broken.equals(bars.head(1))
+    assert repaired.select("open", "high", "low", "close").rows() == [
+        (5.25, 5.25, 5.05, 5.05),
+        (5.56, 5.58, 5.13, 5.28),  # a sound bar is left as it was
+    ]
+    assert validate_prices(repaired).ok
+
+
+def test_a_close_below_the_low_moves_the_low_down():
+    repaired, broken = repair_broken_bars(
+        one_bar(open=4.96, high=4.985, low=4.985, close=4.99)
+    )
+    assert repaired.select("high", "low").row(0) == (4.99, 4.96)
+    assert broken.height == 1
 
 
 def test_a_real_inconsistency_is_left_for_validation():

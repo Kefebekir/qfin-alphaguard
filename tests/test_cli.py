@@ -25,6 +25,31 @@ def test_ingest_synthetic_writes_parquet(tmp_path, monkeypatch):
     assert (tmp_path / "data" / "raw" / "prices_synthetic.parquet").exists()
 
 
+def test_ingest_repairs_a_broken_bar_writes_and_says_so(tmp_path, monkeypatch, capsys):
+    # One bar with a wrong high and low, as EODHD sent LUMN's of 12 October
+    # 2026, no longer stops the nightly job (decision 0016).
+    monkeypatch.chdir(tmp_path)
+    load = cli.load_prices
+
+    def with_a_broken_bar(config):
+        prices = load(config)
+        first = (pl.col("ticker") == prices["ticker"][0]) & (
+            pl.col("date") == prices["date"][0]
+        )
+        return prices.with_columns(
+            pl.when(first)
+            .then(pl.col("low") * 0.5)
+            .otherwise(pl.col("high"))
+            .alias("high")
+        )
+
+    monkeypatch.setattr(cli, "load_prices", with_a_broken_bar)
+
+    assert main(["ingest", "--synthetic"]) == 0
+    assert "[warning] repaired_bars: 1 bars" in capsys.readouterr().out
+    assert (tmp_path / "data" / "raw" / "prices_synthetic.parquet").exists()
+
+
 @pytest.mark.parametrize("argv", [[], ["--synthetic"]])
 def test_a_command_is_required(argv):
     # ["--synthetic"] is the old form of `qfin ingest --synthetic`.

@@ -147,6 +147,28 @@ def snap_rounding(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def repair_broken_bars(prices: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Bars whose open or close lies outside low..high, widened to cover them.
+
+    EODHD sometimes sends a bar whose high and low are wrong while its open and
+    close are right: LUMN's of 12 October 2026 came as open 5.25, high and low
+    5.05, close 5.05, where the SIP minutes say 5.25, 5.28, 4.99 and 5.055
+    (decision 0016). The open and close carry the returns and are kept; the
+    high and low are moved out to them. Dropping the bar instead would leave
+    the stock a day short and out of the plans for a year.
+
+    Returns the bars, repaired, and the broken ones as they came.
+    """
+    broken = (pl.col("low") > pl.min_horizontal("open", "close")) | (
+        pl.col("high") < pl.max_horizontal("open", "close")
+    )
+    repaired = prices.with_columns(
+        pl.max_horizontal("open", "high", "low", "close").alias("high"),
+        pl.min_horizontal("open", "high", "low", "close").alias("low"),
+    )
+    return repaired, prices.filter(broken)
+
+
 def _with_split_factor(
     client: EodhdClient, code: str, bars: pl.DataFrame
 ) -> pl.DataFrame:
