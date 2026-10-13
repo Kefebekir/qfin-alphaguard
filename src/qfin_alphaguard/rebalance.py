@@ -4,8 +4,9 @@ At the open the engine compares the day's plan with the shares it holds. A
 stock is traded only when its gap is larger than its own band (decision
 0006): band_k days of its daily volatility, times the larger of its target
 and current weight. It is then traded only as far as the band's edge, not to
-the target (decision 0007). The strategy then splits the day's trades into
-orders and times them (Phase 1, step 8).
+the target (decision 0007), in fractional shares (decision 0012). The
+strategy then splits the day's trades into orders and times them (Phase 1,
+step 8).
 
 trades_at_open checks its inputs and values the account. The two rules it
 applies are Efe's (Phase 1, step 7b): _change for each stock and
@@ -15,15 +16,15 @@ _pay_for_buys for the cash.
 import math
 from collections.abc import Mapping
 
-from qfin_alphaguard.events import DailyPlan, ExecutionSettings
+from qfin_alphaguard.events import DailyPlan, ExecutionSettings, round_shares
 
 
 def trades_at_open(
     plan: DailyPlan,
-    shares: Mapping[str, int],
+    shares: Mapping[str, float],
     prices: Mapping[str, float],
     cash: float,
-) -> dict[str, int]:
+) -> dict[str, float]:
     """Shares to buy (positive) or sell (negative) today, by ticker; only trades.
 
     `shares` are the shares held now, `prices` the latest price of every stock
@@ -58,12 +59,12 @@ def trades_at_open(
 
 def _change(
     target: float,
-    held: int,
+    held: float,
     price: float,
     volatility: float,
     equity: float,
     settings: ExecutionSettings,
-) -> int:
+) -> float:
     """Shares to trade in one stock today: positive to buy, negative to sell.
 
     `target` is the plan's weight for the stock, 0 if the plan dropped it, and
@@ -74,8 +75,8 @@ def _change(
     2. If |target - current| <= settings.band_k * volatility *
        max(target, current), return 0: the gap is within the stock's own
        noise.
-    3. Otherwise trade only as far as the band's edge, to the nearest whole
-       number of shares at it, unless the trade is worth less than
+    3. Otherwise trade only as far as the band's edge, in shares to 9
+       decimals (round_shares), unless the trade is worth less than
        settings.min_trade_usd; then return 0. The edge is the target minus
        the band for a stock below its target, plus the band for one above.
     """
@@ -86,24 +87,24 @@ def _change(
     if abs(target - current) <= band:
         return 0
     edge = target - math.copysign(band, target - current)
-    change = round(edge * equity / price) - held
+    change = round_shares(edge * equity / price - held)
     if abs(change) * price < settings.min_trade_usd:
         return 0
     return change
 
 
 def _pay_for_buys(
-    trades: dict[str, int],
+    trades: dict[str, float],
     prices: Mapping[str, float],
     cash: float,
     min_trade_usd: float,
-) -> dict[str, int]:
+) -> dict[str, float]:
     """The day's trades, with the buys cut to what the account can pay.
 
     Sales pay first: the money available is the cash plus the value of every
     sale. If the buys cost more than that, every buy is multiplied by the same
-    factor, available / cost of the buys (never below 0), and rounded down to
-    whole shares. A buy worth less than min_trade_usd after the cut waits for
+    factor, available / cost of the buys (never below 0), in shares to 9
+    decimals. A buy worth less than min_trade_usd after the cut waits for
     another day. Sales are never changed. With nothing to buy there is
     nothing to cut, even when costs have taken the cash below zero.
     """
@@ -116,7 +117,7 @@ def _pay_for_buys(
     paid = {}
     for ticker, n in trades.items():
         if n > 0:
-            n = math.floor(n * factor)
+            n = round_shares(n * factor)
             if n * prices[ticker] < min_trade_usd:
                 continue
         paid[ticker] = n

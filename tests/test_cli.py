@@ -234,13 +234,13 @@ def run_plan(*options):
 
 
 def test_plan_writes_the_next_sessions_plan_from_synthetic_bars(synthetic_bars, capsys):
-    assert run_plan("--capital", "30000") == 0
+    assert run_plan("--capital", "30") == 0
 
     # The synthetic bars end on 31 December 2024; the next session is 2 January.
     written = synthetic_bars / "data" / "plans" / "daily_plan_2025-01-02.json"
     plan = plan_from_json(written.read_text(encoding="utf-8"))
     assert plan.trading_date.isoformat() == "2025-01-02"
-    assert len(plan.target_weights) == 10  # 30,000 USD holds ten 3,000 USD positions
+    assert len(plan.target_weights) == 10  # 30 USD holds ten positions of 3 USD
     assert "plan for 2025-01-02" in capsys.readouterr().out
 
 

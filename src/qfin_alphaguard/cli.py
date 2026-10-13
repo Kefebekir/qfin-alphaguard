@@ -107,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--capital",
         type=float,
         default=30_000.0,
-        help="account value in USD; it sets how many stocks are held",
+        help="account value in USD; only a tiny one limits the stocks held",
     )
     plan.add_argument(
         "--synthetic", action="store_true", help="plan from the synthetic bars"
