@@ -6,18 +6,26 @@ week alongside university.
 
 ## Where we are
 
-**Phase 1's ten steps are done.** `qfin backtest` replays the nightly plan on
-the stored minutes since 2016 and reports it against SPY and the same stocks
-at equal weight (decision 0015, #29).
-- **The plan loses to both baselines**, at the same risk too. It earns 10.6
-  to 10.8% a year with 12.8% volatility; SPY earned 15.2% with 17.7%, and
-  equal weight 17.5% with 19.3%. The Sharpe ratios are 0.86 against 0.89
-  and 0.93.
-- **Gate M1:** its two conditions hold. Efe decides whether it is passed,
-  given the items still open below.
-- **What the backtest runs:** Guard checks every order (decision 0014,
-  #28). The band's trades go out in equal-spaced child orders (decision
-  0013), in fractional shares at Alpaca's costs (decisions 0008 and 0012).
+**Phase 1 is done and Gate M1 is passed; Phase 2 starts (decision 0017).**
+- **In Phase 2 the ML picks the nightly plan's stocks.** It ranks every
+  S&P 500 member by its expected return over the coming month, from price,
+  volume and fundamental features, point in time.
+- **Step 1 is next:** the data, meaning renamed tickers and SEC EDGAR
+  fundamentals.
+- **The pilot.** On price and volume alone, monthly gradient-boosted trees
+  picking 10 of the year's 50 most liquid stocks beat holding all 50 by
+  about 8% a year after costs, from 3% to 15% depending on the start day
+  (2018–2026). That is not yet proof: the deflated Sharpe ratio is 0.70 of
+  the 0.95 needed (`docs/research/machine-learning-for-the-plan.md`).
+- **Phase 1's result.** `qfin backtest` replays the nightly plan on the
+  stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
+  loses to both baselines, at the same risk too:
+  - the plan, 10.6–10.8% a year with 12.8% volatility;
+  - SPY, 15.2% with 17.7%;
+  - equal weight, 17.5% with 19.3%.
+
+  Guard checks every order (decision 0014), and the trades go out in
+  equal-spaced child orders (decision 0013).
 
 Efe chose Alpaca to start real money with about 500 USD, and no leverage for
 the nightly plan for now (decision 0009). A second strategy, intraday
@@ -102,15 +110,15 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Look-ahead rule: decide after bar t closes, fill no earlier than bar t+1
       (step 5: the engine stops a run that breaks it).
 - [x] Split- and dividend-adjusted prices.
-- [ ] Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
+- [ ] → Phase 2, step 1 (decision 0017). Map renamed tickers (RE → EG, PEAK → DOC, IR → TT, BHGE → BKR,
       WYND → TNL, CDAY → DAY, ARNC → HWM) so their earlier index years have
       prices; with a few acquired companies EODHD lacks, about 0.67% of
       member-days have no prices today. The same map finds 1-minute bars for
       stocks whose earlier ticker the membership file does not show (BKNG was
       PCLN until 2018, AABA was YHOO until 2017).
-- [ ] Speed up the nightly download, 17 minutes for 767 codes: parallel
+- [ ] → Phase 3 (decision 0017). Speed up the nightly download, 17 minutes for 767 codes: parallel
       requests or EODHD's bulk end-of-day endpoint.
-- [ ] Add each day's 1-minute bars in the nightly job once a backtest runs in
+- [ ] → Phase 3 (decision 0017). Add each day's 1-minute bars in the nightly job once a backtest runs in
       the cloud. Until then `qfin intraday` refreshes them locally in about 3
       minutes; on S3 they should be one file per day, because versioning would
       otherwise keep a copy of every stock's whole-year file each night.
@@ -135,7 +143,7 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] The band: trade a stock only when its gap is larger than its own
       volatility allows (decision 0006, step 7b), and then only as far as the
       band's edge (decision 0007, step 7d).
-- [ ] Fewer swaps at small capital: at 30,000 USD the plan holds its top 10,
+- [ ] → Phase 2, step 5 (decision 0017). Fewer swaps at small capital: at 30,000 USD the plan holds its top 10,
       and stocks entering and leaving it, 42 times in 2025, cost 16 of the 19
       bps a year whatever the band (decision 0006). A buffer (keep a held
       stock while it ranks within the top 12) halved the trades over
@@ -144,7 +152,7 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 - [x] Timing without ML: equal-spaced child orders, three from 10:30 to
       15:30; a day's trades wait until they are worth 20 USD together
       (decision 0013, step 8).
-- [ ] Confirm decision 0013's schedule in the step 10 backtest, net of
+- [ ] → Phase 2, step 5 (decision 0017). Confirm decision 0013's schedule in the step 10 backtest, net of
       costs, with walk-forward tests, on the backtest of step 10. Its measurements: the number of
       orders hardly matters, the half spread at 09:35 is twice that of
       10:30, and at 500 USD days of at least 20 USD cut Alpaca's fees from
@@ -159,14 +167,14 @@ Run the nightly plan and intraday timing end to end on history, without ML.
       limits and an open sale frees no cash, so the account never borrows;
       without Guard it closed a day of 2025 with −1.15 USD of cash at 30,000
       USD.
-- [ ] The simulated broker fills a fractional buy under 1 USD, which Alpaca
+- [ ] → Phase 2, step 5 (decision 0017). The simulated broker fills a fractional buy under 1 USD, which Alpaca
       refuses. Only a buy Guard cuts can be that small: 4 in 2025, at 30,000
       and 5,000 USD (decision 0014).
 - [x] Report: return, Sharpe, maximum drawdown, turnover, cost share, against
       buy-and-hold (SPY) and equal-weight baselines, and the days: the share
       of winning days, the worst day. Capital levels: 500, 5,000 and 30,000
       USD (`qfin backtest`, decision 0015).
-- [ ] Report variants: volatility targeting and leverage, net of borrowing
+- [ ] → Phase 2, step 6 (decision 0017). Report variants: volatility targeting and leverage, net of borrowing
       costs (decision 0009).
 - [x] One broken bar stopped the nightly ingest. On 13 October 2026 EODHD's
       bar of LUMN for the 12th opened at 5.25, above its high of 5.05, and
@@ -175,7 +183,8 @@ Run the nightly plan and intraday timing end to end on history, without ML.
 
 **Gate M1:** one command produces the same report from the same inputs every
 time; results after costs compared with the baselines. Both hold with
-`qfin backtest` (decision 0015).
+`qfin backtest` (decision 0015). **Passed on 13 October 2026**; the items
+still open above move to Phase 2 and 3 (decision 0017).
 
 ### Phase 1b: Intraday momentum on the Nasdaq-100 (decision 0011)
 
@@ -202,34 +211,66 @@ Nasdaq-100 and is flat at every close.
 **Gate M1b:** the engine's backtest matches the research, and the paper
 results stay inside the backtest's range.
 
-### Phase 2: Alpha AI v1 (7 December 2026 – 31 January 2027)
+### Phase 2: Alpha AI v1 (13 October 2026 – 31 January 2027)
 
-Prove whether ML adds anything after costs. Slower during January exams.
+The ML picks the stocks the nightly plan holds, and must prove it adds
+something after costs (decision 0017; the research is in
+[docs/research](research/machine-learning-for-the-plan.md)). Slower during
+January exams.
 
-- [ ] Two targets: next-day return and volatility (for the optimiser); the
-      direction of the next 30 minutes, only to time the plan's trades: it
-      never trades its own signal (decision 0010).
-- [ ] Purged walk-forward: drop training samples whose target horizon overlaps
-      the test period, with an embargo before it.
-- [ ] Ridge and logistic regression first, then LightGBM; deep models only if
-      they beat both.
-- [ ] Feature parity test: batch and incremental calculations agree.
-- [ ] Model registry (version, training date, data range) and a
-      champion/challenger rule.
-- [ ] Prequential evaluation: every model predicts first and learns after, on
-      all stocks together; retrained weekly, later daily, and promoted only by
-      the champion/challenger rule. No model updates itself after each signal
-      or for each stock (decision 0010).
-- [ ] Health check: if the score distribution drifts, fall back to timing without ML.
-- [ ] Revisit Guard's limit of 3 orders a stock a day. Efe expects to raise
-      it once a timing model shows a measured gain from more orders; with
-      decision 0010's signal, 31 orders beat 3 by 1.26 bps a trade
-      (decision 0013). The change is Efe's, by hand in `guard.yaml`, with
-      a decision record.
+1. [ ] **Data, point in time.**
+   - Map renamed tickers (from Phase 1).
+   - Fundamentals from SEC EDGAR's XBRL company facts, each figure from its
+     `filed` date; Efe chooses the contact e-mail SEC asks for.
+   - Industries from SIC codes, and earnings dates.
+2. [ ] **A feature store** of price, volume and fundamental features for
+   every member:
+   - the same batch and incremental values (feature parity);
+   - a test that no feature uses data from after its date.
+3. [ ] **The test harness.**
+   - Labels: the rank of the coming 21- and 5-session returns, from the
+     close after the decision.
+   - Purged walk-forward with an embargo, and purged cross-validation for
+     choices.
+   - A registry of every variant tried; the deflated Sharpe ratio and the
+     probability of backtest overfitting.
+4. [ ] **Models.**
+   - Ridge and LightGBM (needs `libgomp1`), averaged by rank; a small
+     neural-network ensemble as challenger.
+   - A model registry (version, training dates, data range) and a
+     champion/challenger rule.
+   - Monthly retraining.
+5. [ ] **The portfolio from the forecasts.** Compare, in `qfin backtest`, at
+   500, 5,000 and 30,000 USD and net of costs:
+   - the top stocks at equal weight;
+   - a tilt on the minimum-variance plan;
+   - mean-variance with a trading-cost penalty.
 
-**Gate M2:** two reports. Nightly model: Sharpe after costs against the plan
-without ML. Intraday model: execution cost against equal-spaced timing. "ML
-adds nothing" is a valid result; that part then runs without ML.
+   Also here: the buffer (decision 0007), decision 0013's schedule, and
+   Alpaca's 1 USD minimum in the simulated broker (from Phase 1).
+6. [ ] **Risk.**
+   - HAR volatility forecasts from the 1-minute realised variance.
+   - Volatility targeting and leverage as variants, net of borrowing costs
+     (decision 0009).
+7. [ ] **A health check:** if the forecasts' distribution drifts, the plan
+   falls back to the Phase 1 plan.
+8. [ ] **Forward record.** From the first frozen model on, each night's
+   predictions are committed to the public repository before the open.
+9. [ ] **Optional, last:** an intraday timing model (decisions 0001 and 0010).
+   - Revisit Guard's limit of 3 orders a stock a day. Efe expects to raise
+     it once a timing model shows a measured gain from more orders; with
+     decision 0010's signal, 31 orders beat 3 by 1.26 bps a trade
+     (decision 0013).
+   - The change is Efe's, by hand in `guard.yaml`, with a decision record.
+
+**Gate M2:** the ML plan's active return over the same stocks at equal
+weight must pass three tests:
+- a deflated Sharpe ratio of at least 0.95, counting every variant tried;
+- positive after 10 bps of costs in most years;
+- and the plan beats SPY at similar risk.
+
+"ML adds nothing" is a valid result; Phase 3 then paper trades the Phase 1
+plan.
 
 ### Phase 3: Paper trading (February – May 2027)
 

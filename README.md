@@ -17,16 +17,19 @@ exactly what works today and what does not.
 | Docker image and scheduled AWS run | done |
 | Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
 | Phase 0: event types, risk configuration, repository skeleton | done |
-| Phase 1: event-driven backtester with costs and Guard rules | ten steps done; first report below |
-| Phase 2: ML forecasts and intraday execution timing | planned |
+| Phase 1: event-driven backtester with costs and Guard rules | done; Gate M1 passed on 13 October 2026 |
+| Phase 2: ML that picks the plan's stocks, tested against luck | in progress |
 | Phase 3: paper trading on Alpaca | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
-Phase 1's ten steps are done, and `qfin backtest` gives the first full report
-(below). [docs/ROADMAP.md](docs/ROADMAP.md) says what remains before its gate.
-Nothing from Phase 2 onwards exists yet.
+Phase 1 is done: `qfin backtest` gives the first full report (below). Phase 2
+has started. Its ML will rank every S&P 500 member by its expected return
+over the coming month, and the nightly plan will hold the best. Its research
+and a first pilot on our data are in
+[docs/research](docs/research/machine-learning-for-the-plan.md), and its
+steps in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## First results
 
@@ -54,6 +57,15 @@ year's 50 most liquid S&P 500 stocks.
 The goal is still to beat both baselines after costs; Phase 2's forecasts
 are the next attempt
 ([decision 0015](docs/decisions/0015-the-backtest-and-its-first-report.md)).
+
+The first pilot of those forecasts gives a promising result that is not yet
+proven ([decision 0017](docs/decisions/0017-phase-2-ml-picks-the-stocks.md)):
+- the setup: monthly gradient-boosted trees on price and volume features;
+- the result: picking 10 of the year's 50 most liquid stocks beat holding all
+  50 by about 8% a year after costs, from 3% to 15% depending on the day the
+  monthly rebalance starts (2018–2026);
+- the catch: corrected for the twelve variants tried, that could still be
+  luck.
 
 ## How it works
 
