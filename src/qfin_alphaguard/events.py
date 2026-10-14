@@ -209,6 +209,40 @@ class Cancellation:
 
 
 @dataclass(frozen=True)
+class DecisionNote:
+    """What a strategy decided at `time`, what it saw, and why: the decision log.
+
+    It is not an order: Guard never sees it and nothing trades from it. The
+    engine writes it into the log beside the orders it explains, so a day can
+    be read back decision by decision, in a backtest, in paper trading and
+    live.
+    """
+
+    ticker: str
+    time: datetime
+    choice: str  # what was decided, e.g. "long", "short" or "flat"
+    reason: str  # why, in words, e.g. "above the band: buy"
+    # The numbers the decision used, e.g. price, band, VWAP and shares. A
+    # value may be NaN when the strategy had none (a band without history).
+    seen: Mapping[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        _require_utc("time", self.time)
+        for name in ("ticker", "choice", "reason"):
+            if not getattr(self, name):
+                raise ValueError(f"{name} cannot be empty")
+        seen = dict(self.seen)  # a copy: the caller's dict cannot change the note
+        for name, value in seen.items():
+            if not name:
+                raise ValueError("a seen value needs a name")
+            if isinstance(value, bool) or not isinstance(value, Real):
+                raise TypeError(f"seen[{name!r}] must be a number, got {value!r}")
+            if math.isinf(value):
+                raise ValueError(f"seen[{name!r}] cannot be infinite, got {value!r}")
+        object.__setattr__(self, "seen", MappingProxyType(seen))
+
+
+@dataclass(frozen=True)
 class Split:
     """From the open of `day`, each share of `ticker` became `ratio` shares."""
 
