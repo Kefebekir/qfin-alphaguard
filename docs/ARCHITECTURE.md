@@ -28,7 +28,7 @@ The engine starts in Python (Phase 3) and moves to C++ (Phase 4).
 | Alpha AI | trained weekly; predicts nightly and every bar | features → μ, σ, short-term score | scikit-learn, LightGBM, ONNX |
 | Optimiser | nightly | μ, Σ, constraints → target weights | CVXPY, Ledoit-Wolf covariance |
 | Strategy | every bar | plan + score + position → order intent | inside the engine |
-| Guard | every order + continuous monitoring | intent → approve, reduce or reject; halt | rules from `guard.yaml` |
+| Guard | every order + continuous monitoring | intent → approve, reduce or reject; halt | each account's limits: `guard.yaml`, `guard_qqq.yaml` |
 | Engine (OMS) | continuously, event-driven | approved order → broker; fill → position, PnL | Python (Alpaca API), then C++ |
 | Log store | event-driven + nightly | every decision → JSONL, compacted to Parquet | DuckDB |
 | FPGA | lab benchmark; optional live risk gate | market message or order → decision or approval | SystemVerilog, Vivado, Artix-7 |
@@ -47,7 +47,7 @@ retail-broker strategy more profitable.
 | 3 | Features → Alpha AI | feature matrix + target | train weekly, predict nightly | Parquet |
 | 4 | Alpha AI → optimiser | μ and σ forecasts, model version | nightly | Parquet |
 | 5 | Optimiser → engine | `daily_plan.json`: target weights, each stock's volatility, execution settings | once, before the open | JSON, versioned |
-| 6 | `guard.yaml` → Guard | risk limits | only by hand, through a commit | YAML |
+| 6 | `guard.yaml`, `guard_qqq.yaml` → Guard | each account's risk limits | only by hand, through a commit | YAML |
 | 7 | Data feed → engine | live trades, built into 1-minute bars | continuous | EODHD WebSocket (Cboe EDGX) or Alpaca (IEX) |
 | 8 | Inside the engine | 1-minute bar → features → score → intent | every bar | in memory |
 | 9 | Strategy → Guard → Alpaca | order intent → approved order | per order | in memory, Alpaca REST API |
@@ -193,11 +193,13 @@ replays the nightly plan on the stored data only, never on a fresh download:
 
 ## Risk file
 
-Only Efe changes this file, by hand and through a commit. The Python Guard,
-the C++ Guard and the FPGA gate all read the same file: `guard.yaml` at the
-repository root, loaded by `src/qfin_alphaguard/guard/config.py`. Every
-setting is required, an unknown or repeated setting is an error, and every
-value is checked for type and range before the engine may trade.
+Each account has its own limits file at the repository root: `guard.yaml`
+for the nightly plan, `guard_qqq.yaml` for the QQQ strategy (decision 0019).
+Only Efe changes them, by hand and through a commit. The Python Guard, the
+C++ Guard and the FPGA gate all read the same files, loaded by
+`src/qfin_alphaguard/guard/config.py`. Every setting is required, an unknown
+or repeated setting is an error, and every value is checked for type and
+range before the engine may trade. `guard.yaml`:
 
 ```yaml
 allow_short: false             # no short selling
@@ -213,20 +215,28 @@ stale_data_sec: 15             # no trading on data older than 15 seconds
 live_trading: false            # set to true by hand for a live account
 ```
 
-Guard (`guard/rules.py`) judges each order on the View and on the orders it
-let through itself that day (decision 0014):
+`guard_qqq.yaml` allows shorts and 2.1× in its one ETF, 70,000 USD an
+order, 12 orders a day and reversals, and has no daily loss limit
+(`daily_loss_limit_pct: false`).
 
+Guard (`guard/rules.py`) judges each order on the View and on the orders it
+let through itself that day (decisions 0014 and 0019):
+
+- **An order that only reduces a position**, towards zero but not past it
+  once the open orders on its side fill, faces only `price_collar_bps` and
+  `max_orders_per_min`. No limit can keep a position from being closed.
 - **Dropped** (in this order): after a loss of `daily_loss_limit_pct` since
   the last close, for the rest of the day; on a price older than
   `stale_data_sec`; on a limit price outside `price_collar_bps`; after
   `max_orders_per_min` orders in the last 60 seconds,
   `max_trades_per_symbol_day` orders in the stock today, or an order in the
-  stock the other way today.
-- **Cut** to the smallest quantity these allow: `max_order_usd`; no sale of
-  more than is held and not already in open sales; `max_weight` for the
-  stock; `max_gross_exposure` for the account. Buys count at their limit
-  prices, and an open sale frees no cash until it fills, so the account never
-  borrows.
+  stock the other way today; and, where shorts are allowed, an order that
+  would take a position through zero: it is closed first.
+- **Cut** to the smallest quantity these allow: `max_order_usd`; without
+  shorts, no sale of more than is held and not already in open sales;
+  `max_weight` for the stock; `max_gross_exposure` for the account. A short
+  counts as exposure like a long. Buys count at their limit prices, and an
+  open sale frees no cash until it fills, so the account never borrows.
 - **`live_trading`** is checked by the live engine before it connects
   (Phase 3).
 
