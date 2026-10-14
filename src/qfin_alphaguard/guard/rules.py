@@ -4,26 +4,36 @@ Guard stands between the strategy and the broker. It judges an intent on two
 things only: what the View shows at that moment, and the orders it has let
 through itself that day. It does not rely on the strategy to count them.
 
+0. An intent that only reduces a position, taking it towards zero but not
+   past it once the open orders on its side fill, faces only the checks on
+   the order itself: price_collar_bps and max_orders_per_min. No limit on
+   risk may keep risk from being reduced, or a losing position could be
+   locked in (decision 0019); its quantity is bounded by the position.
 1. Six rules drop an intent (REJECT), checked in this order:
    - daily_loss_limit_pct: the account has fallen this far below its value
-     at the last close. Nothing more goes out that day, even after a
+     at the last close. No new risk goes out that day, even after a
      recovery; it is not a halt, which would stop a backtest for good.
+     false in the file means no such limit (decision 0019).
    - stale_data_sec: the stock's last price is older than this, or missing.
    - price_collar_bps: the limit price lies further than this from the last
      price, on either side.
    - max_orders_per_min: this many orders went out in the last 60 seconds.
    - max_trades_per_symbol_day: this many orders in the stock went out today.
    - no_same_day_reversal: an order in the stock went the other way today.
+   And an intent that would take a position through zero is dropped too:
+   it has to be closed first, as Alpaca requires.
 2. Four rules cut its quantity (REDUCE), together:
    - max_order_usd: the order's value at its limit price.
    - allow_short: a sale is at most the shares held and not already in open
      sales.
-   - max_weight: the stock at its last price, with its open buys and this
-     one at their limits, as a share of the account's value.
-   - max_gross_exposure: every position at its last price and every open
-     buy at its limit, as a multiple of the account's value. An open sale
-     counts only once it fills: if the buy filled and the sale did not, the
-     account would borrow.
+   - max_weight: the stock's exposure, long or short, as a share of the
+     account's value: its position at its last price, with its open orders
+     and this one counted where they add to it (a buy at its limit, a sale
+     beyond the shares held at the last price).
+   - max_gross_exposure: every stock's exposure so counted, as a multiple of
+     the account's value. An open sale of shares held counts only once it
+     fills: if the buy filled and the sale did not, the account would
+     borrow.
    The intent goes out with the smallest quantity they allow, and the event
    names the rule that set it. If that is no shares, the intent is dropped.
 
@@ -66,6 +76,14 @@ class Guard:
         """Let `intent` through, cut its quantity or drop it."""
         if view.session.day != self.day:
             self.day, self.sent, self.stopped = view.session.day, [], False
+        if _reduces(intent, view):
+            dropped = self._malformed(intent, view)
+            if dropped is not None:
+                rule, detail = dropped
+                event = _event(intent, RiskAction.REJECT, rule, detail)
+                return GuardDecision(None, event)
+            self.sent.append(intent)
+            return GuardDecision(intent)
         dropped = self._dropped(intent, view)
         if dropped is not None:
             rule, detail = dropped
@@ -86,19 +104,22 @@ class Guard:
         """The first rule that drops `intent`, and why; None if none does."""
         limits = self.limits
         ticker = intent.ticker
-        start = view.last_close_value
-        if start is None or not start > 0:
-            raise ValueError(
-                f"the daily loss limit needs the value at the last close, got {start!r}"
-            )
-        value = _value(view)
-        if 100 * (1 - value / start) >= limits.daily_loss_limit_pct:
-            self.stopped = True
-        if self.stopped:
-            return "daily_loss_limit_pct", (
-                f"the account fell {limits.daily_loss_limit_pct:g}% below its "
-                f"{start:,.2f} USD at the last close today; it is {value:,.2f} USD"
-            )
+        loss_limit = limits.daily_loss_limit_pct
+        if loss_limit is not False:
+            start = view.last_close_value
+            if start is None or not start > 0:
+                raise ValueError(
+                    "the daily loss limit needs the value at the last close, "
+                    f"got {start!r}"
+                )
+            value = _value(view)
+            if 100 * (1 - value / start) >= loss_limit:
+                self.stopped = True
+            if self.stopped:
+                return "daily_loss_limit_pct", (
+                    f"the account fell {loss_limit:g}% below its {start:,.2f} USD "
+                    f"at the last close today; it is {value:,.2f} USD"
+                )
 
         seen = view.price_times.get(ticker)
         if seen is None or ticker not in view.last_prices:
@@ -110,20 +131,9 @@ class Guard:
                 f"at most {limits.stale_data_sec:g}"
             )
 
-        last = view.last_prices[ticker]
-        gap = abs(intent.limit_price - last) / last * 10_000
-        if gap > limits.price_collar_bps + COLLAR_TOLERANCE_BPS:
-            return "price_collar_bps", (
-                f"the limit {intent.limit_price} is {gap:.1f} bps from the last "
-                f"price {last}; at most {limits.price_collar_bps:g}"
-            )
-
-        recent = [order for order in self.sent if order.time > intent.time - MINUTE]
-        if len(recent) >= limits.max_orders_per_min:
-            return "max_orders_per_min", (
-                f"{len(recent)} orders went out in the last minute; "
-                f"at most {limits.max_orders_per_min}"
-            )
+        malformed = self._malformed(intent, view)
+        if malformed is not None:
+            return malformed
 
         same = [order for order in self.sent if order.ticker == ticker]
         if len(same) >= limits.max_trades_per_symbol_day:
@@ -136,6 +146,31 @@ class Guard:
         ):
             other = "sale" if intent.side is Side.BUY else "buy"
             return "no_same_day_reversal", f"a {other} of {ticker} went out today"
+        if limits.allow_short and _crosses(intent, view):
+            return "crosses_zero", (
+                f"it would take the position in {ticker} through zero; close it first"
+            )
+        return None
+
+    def _malformed(self, intent: OrderIntent, view: View) -> tuple[str, str] | None:
+        """The checks on the order itself, which every order faces."""
+        limits = self.limits
+        ticker = intent.ticker
+        last = view.last_prices.get(ticker)
+        if last is None:
+            return "stale_data_sec", f"no price for {ticker}"
+        gap = abs(intent.limit_price - last) / last * 10_000
+        if gap > limits.price_collar_bps + COLLAR_TOLERANCE_BPS:
+            return "price_collar_bps", (
+                f"the limit {intent.limit_price} is {gap:.1f} bps from the last "
+                f"price {last}; at most {limits.price_collar_bps:g}"
+            )
+        recent = [order for order in self.sent if order.time > intent.time - MINUTE]
+        if len(recent) >= limits.max_orders_per_min:
+            return "max_orders_per_min", (
+                f"{len(recent)} orders went out in the last minute; "
+                f"at most {limits.max_orders_per_min}"
+            )
         return None
 
     def _allowed(self, intent: OrderIntent, view: View) -> tuple[float, str, str]:
@@ -152,14 +187,10 @@ class Guard:
                 (_shares(limits.max_order_usd / limit), "max_order_usd", detail)
             )
         held = view.positions.get(ticker, 0.0)
-        if intent.side is Side.SELL:
-            selling = sum(
-                order.intent.quantity
-                for order in view.open_orders
-                if order.intent.ticker == ticker and order.intent.side is Side.SELL
-            )
+        if intent.side is Side.SELL and not limits.allow_short:
+            selling = _open(view, ticker, Side.SELL)
             free = max(round_shares(held - selling), 0.0)
-            if not limits.allow_short and intent.quantity > free:
+            if intent.quantity > free:
                 detail = (
                     f"{held} shares of {ticker} held and {selling} in open sales: "
                     f"selling {intent.quantity} would sell short"
@@ -167,33 +198,85 @@ class Guard:
                 caps.append((free, "allow_short", detail))
             return _smallest(intent, caps)
 
+        # From here the intent adds to the stock's exposure: a buy of a long,
+        # or, with shorts allowed, a sale of a short. A sale is valued at the
+        # last price, which is above its limit: the higher of the two.
         value = _value(view)
-        buys = [
-            order.intent for order in view.open_orders if order.intent.side is Side.BUY
-        ]
-        stock = held * view.last_prices[ticker] + sum(
-            buy.notional for buy in buys if buy.ticker == ticker
-        )
+        price = limit if intent.side is Side.BUY else view.last_prices[ticker]
+        added = intent.quantity * price
+        stocks = _exposures(view)
+        stock = stocks.get(ticker, 0.0)
         room = limits.max_weight * value - stock
-        if notional > room:
+        if added > room:
             detail = (
-                f"{ticker} would be worth {stock + notional:,.2f} USD, over "
-                f"{limits.max_weight:g} of the account's {value:,.2f} USD"
+                f"{ticker} would be worth {stock + added:,.2f} USD long or short, "
+                f"over {limits.max_weight:g} times the account's {value:,.2f} USD"
             )
-            caps.append((_shares(room / limit), "max_weight", detail))
-        gross = sum(
-            abs(shares) * view.last_prices[name]
-            for name, shares in view.positions.items()
-        ) + sum(buy.notional for buy in buys)
+            caps.append((_shares(room / price), "max_weight", detail))
+        gross = sum(stocks.values())
         room = limits.max_gross_exposure * value - gross
-        if notional > room:
+        if added > room:
             detail = (
-                f"positions and buys would be worth {gross + notional:,.2f} USD, "
-                f"over {limits.max_gross_exposure:g} times the account's "
+                f"positions and open orders would be worth {gross + added:,.2f} "
+                f"USD, over {limits.max_gross_exposure:g} times the account's "
                 f"{value:,.2f} USD"
             )
-            caps.append((_shares(room / limit), "max_gross_exposure", detail))
+            caps.append((_shares(room / price), "max_gross_exposure", detail))
         return _smallest(intent, caps)
+
+
+def _open(view: View, ticker: str, side: Side) -> float:
+    """The shares of `ticker` in open orders on `side`."""
+    return sum(
+        order.intent.quantity
+        for order in view.open_orders
+        if order.intent.ticker == ticker and order.intent.side is side
+    )
+
+
+def _reduces(intent: OrderIntent, view: View) -> bool:
+    """Whether `intent` only takes its stock's position towards zero.
+
+    The open orders on the same side count as filled, so two orders that each
+    reduce a position cannot together take it past zero.
+    """
+    held = view.positions.get(intent.ticker, 0.0)
+    after = round_shares(intent.quantity + _open(view, intent.ticker, intent.side))
+    if intent.side is Side.SELL:
+        return held > 0 and after <= held
+    return held < 0 and after <= -held
+
+
+def _crosses(intent: OrderIntent, view: View) -> bool:
+    """Whether `intent` would take a position from one side of zero to the other."""
+    held = view.positions.get(intent.ticker, 0.0)
+    after = round_shares(intent.quantity + _open(view, intent.ticker, intent.side))
+    if intent.side is Side.SELL:
+        return held > 0 and after > held
+    return held < 0 and after > -held
+
+
+def _exposures(view: View) -> dict[str, float]:
+    """Each stock's exposure in USD, long or short, with its open orders.
+
+    A position counts at its last price. An open order counts where it adds:
+    a buy at its limit price, and the part of a sale beyond the shares held
+    at the last price. An open order that reduces a position does not count.
+    """
+    stocks = {
+        ticker: abs(shares) * view.last_prices[ticker]
+        for ticker, shares in view.positions.items()
+    }
+    for order in view.open_orders:
+        intent = order.intent
+        held = view.positions.get(intent.ticker, 0.0)
+        if intent.side is Side.BUY:
+            added = intent.notional if held >= 0 else 0.0
+        else:
+            beyond = max(round_shares(intent.quantity - max(held, 0.0)), 0.0)
+            added = beyond * view.last_prices[intent.ticker]
+        stocks[intent.ticker] = stocks.get(intent.ticker, 0.0) + added
+    return stocks
 
 
 def _smallest(

@@ -112,34 +112,59 @@ def test_the_view_must_say_what_the_account_was_worth_at_the_last_close():
 # --- The daily loss limit ------------------------------------------------------------
 
 
-def test_a_two_percent_loss_since_the_last_close_stops_new_orders():
-    # 100 shares of A were worth 10,000 USD at the last close.
+def test_a_two_percent_loss_since_the_last_close_stops_new_risk():
+    # 20 shares of A at 100 and 8,000 USD of cash: 10,000 USD at the last close.
     guard = Guard(LIMITS)
-    held = {"A": 100}
-    intent = sell(limit=97.6)
-    assert guard.check(intent, view({"A": 98.01}, held, 0, last_close=10_000)).intent
-    decision = guard.check(intent, view({"A": 97.99}, held, 0, last_close=10_000))
+    held = {"A": 20}
+    intent = buy(1, ticker="B", limit=50.2)
+    up = view({"A": 90.05, "B": 50.0}, held, 8_000, last_close=10_000)
+    assert guard.check(intent, up).intent
+    down = view({"A": 89.95, "B": 50.0}, held, 8_000, last_close=10_000)
+    decision = guard.check(intent, down)
     assert dropped(decision, "daily_loss_limit_pct")
     assert "it is 9,799.00 USD" in decision.event.detail
 
 
-def test_a_loss_of_exactly_the_limit_stops_new_orders_too():
+def test_after_the_loss_limit_a_position_can_still_be_closed():
+    # Decision 0019: no limit on risk may keep risk from being reduced.
+    guard = Guard(LIMITS)
+    held = {"A": 50}
+    down = view({"A": 95.0}, held, 5_000, last_close=10_000)
+    assert dropped(guard.check(buy(1, limit=95.4), down), "daily_loss_limit_pct")
+    sale = sell(50, limit=94.6)
+    decision = guard.check(sale, down)
+    assert decision.intent == sale and decision.event is None
+
+
+def test_with_no_daily_loss_limit_new_risk_goes_after_any_loss():
+    # 10 shares of A were 1,000 USD at the last close and are 500 USD now:
+    # the account is 5% down.
+    guard = Guard(replace(LIMITS, daily_loss_limit_pct=False))
+    account = view({"A": 50.0}, {"A": 10}, cash=9_000.0, last_close=10_000.0)
+    intent = buy(1, limit=50.2)
+    assert guard.check(intent, account).intent == intent
+    # Nor does it need the account's value at the last close.
+    unknown = replace(account, last_close_value=None)
+    assert guard.check(intent, unknown).intent == intent
+
+
+def test_a_loss_of_exactly_the_limit_stops_new_risk_too():
     # A 25% limit and a fall from 10,000 to 7,500 USD: exact in floating point.
     guard = Guard(replace(LIMITS, daily_loss_limit_pct=25.0))
     down = view({"A": 75.0}, {"A": 100}, 0, last_close=10_000)
-    assert dropped(guard.check(sell(limit=74.7), down), "daily_loss_limit_pct")
+    assert dropped(guard.check(buy(1, limit=75.3), down), "daily_loss_limit_pct")
 
 
 def test_the_loss_limit_holds_for_the_rest_of_the_day_after_a_recovery():
     guard = Guard(LIMITS)
     held = {"A": 100}
     down = view({"A": 97.0}, held, 0, last_close=10_000)
-    assert dropped(guard.check(sell(limit=96.6), down), "daily_loss_limit_pct")
-    # Back to a 1% loss two hours later: still nothing goes out today.
+    assert dropped(guard.check(buy(1, limit=97.4), down), "daily_loss_limit_pct")
+    # Back to a 1% loss two hours later: still no new risk goes out today.
     moment = NOW + timedelta(hours=2)
     later = view({"A": 99.0}, held, 0, now=moment, last_close=10_000)
     assert dropped(
-        guard.check(sell(limit=98.6, now=moment), later), "daily_loss_limit_pct"
+        guard.check(buy(1, limit=99.4, now=moment), later), "daily_loss_limit_pct"
     )
     tomorrow = NEXT_SESSION.open + timedelta(hours=1)
     next_day = view(
@@ -222,17 +247,26 @@ def test_at_most_3_orders_in_a_stock_a_day():
     assert guard.check(buy(1, now=tomorrow), next_day).intent
 
 
-def test_no_order_against_the_day_s_direction_in_a_stock():
+def test_no_new_risk_against_the_day_s_direction_in_a_stock():
+    # A sale in the morning; buying the stock back later the same day is dropped.
+    guard = Guard(LIMITS)
+    held = {"A": 10}
+    assert guard.check(sell(1), view(positions=held)).intent
+    later = NOW + timedelta(minutes=5)
+    decision = guard.check(buy(1, now=later), view(positions=held, now=later))
+    assert dropped(decision, "no_same_day_reversal")
+    assert "a sale of A went out today" in decision.event.detail
+    allowed = Guard(replace(LIMITS, no_same_day_reversal=False))
+    allowed.check(sell(1), view(positions=held))
+    assert allowed.check(buy(1, now=later), view(positions=held, now=later)).intent
+
+
+def test_a_sale_of_shares_bought_today_still_goes_it_only_reduces():
     guard = Guard(LIMITS)
     held = {"A": 10}
     assert guard.check(buy(1), view(positions=held)).intent
     later = NOW + timedelta(minutes=5)
-    decision = guard.check(sell(1, now=later), view(positions=held, now=later))
-    assert dropped(decision, "no_same_day_reversal")
-    assert "a buy of A went out today" in decision.event.detail
-    allowed = Guard(replace(LIMITS, no_same_day_reversal=False))
-    allowed.check(buy(1), view(positions=held))
-    assert allowed.check(sell(1, now=later), view(positions=held, now=later)).intent
+    assert guard.check(sell(11, now=later), view(positions={"A": 11}, now=later)).intent
 
 
 def test_an_order_guard_drops_is_not_counted():
@@ -405,3 +439,144 @@ def test_in_the_engine_guard_lets_10_orders_through_a_minute_and_logs_the_rest()
 
 def test_times_are_utc():
     assert NOW == datetime(2026, 10, 6, 14, 30, tzinfo=UTC)
+
+
+# --- Orders that only reduce a position (decision 0019) --------------------------
+
+
+def test_a_closing_sale_goes_on_a_stale_price_and_after_the_days_orders():
+    guard = Guard(LIMITS)
+    held = {"A": 10}
+    for minute in range(3):  # the day's three orders in A
+        moment = NOW + timedelta(minutes=minute)
+        assert guard.check(buy(1, now=moment), view(positions=held, now=moment)).intent
+    later = NOW + timedelta(minutes=10)
+    stale = view(
+        positions={"A": 13}, now=later, seen={"A": later - timedelta(minutes=1)}
+    )
+    sale = sell(13, now=later)
+    assert guard.check(sale, stale).intent == sale
+
+
+def test_a_closing_order_is_never_cut_it_is_bounded_by_the_position():
+    # 50 shares at 100 are 5,000 USD, above the 2,000 USD order limit.
+    sale = sell(50)
+    decision = Guard(LIMITS).check(sale, view(positions={"A": 50}, cash=5_000))
+    assert decision.intent == sale and decision.event is None
+
+
+def test_a_closing_order_still_needs_a_sane_limit_price():
+    far = sell(10, limit=95.0)  # 500 bps below the last price
+    decision = Guard(LIMITS).check(far, view(positions={"A": 10}))
+    assert dropped(decision, "price_collar_bps")
+
+
+def test_a_closing_order_still_counts_in_the_orders_a_minute():
+    guard = Guard(replace(LIMITS, max_orders_per_min=1))
+    held = {"A": 10, "B": 10}
+    prices = {"A": 100.0, "B": 100.0}
+    assert guard.check(sell(10), view(prices, held)).intent
+    assert dropped(
+        guard.check(sell(10, ticker="B"), view(prices, held)), "max_orders_per_min"
+    )
+
+
+def test_two_closing_orders_cannot_together_go_past_zero():
+    # 10 held and 6 already in an open sale: another 6 would sell 2 short.
+    held = {"A": 10}
+    waiting = (open_order(sell(6)),)
+    decision = Guard(LIMITS).check(sell(6), view(positions=held, open_orders=waiting))
+    assert decision.event.rule == "allow_short"
+    assert decision.intent.quantity == 4
+
+
+# --- Short positions, where allowed ----------------------------------------------
+
+SHORTS = replace(
+    LIMITS,
+    allow_short=True,
+    max_weight=2.0,
+    max_gross_exposure=2.0,
+    max_order_usd=1e6,
+    max_trades_per_symbol_day=100,
+    no_same_day_reversal=False,
+)
+
+
+def test_a_short_counts_in_the_stocks_weight():
+    # 10,000 USD of cash: a short in A may be worth at most 20,000 USD.
+    decision = Guard(SHORTS).check(sell(250), view())
+    assert decision.event.rule == "max_weight"
+    assert decision.intent.quantity == 200
+
+
+def test_a_short_counts_in_the_gross_exposure():
+    # 15,000 USD of B held: 5,000 USD of room left at 2x a 10,000 USD account.
+    prices = {"A": 100.0, "B": 100.0}
+    account = view(prices, {"B": 150}, cash=-5_000)
+    decision = Guard(SHORTS).check(sell(100), account)
+    assert decision.event.rule == "max_gross_exposure"
+    assert decision.intent.quantity == 50
+
+
+def test_a_short_held_leaves_less_room_to_sell_more_short():
+    # Short 10,000 USD of A in a 10,000 USD account: 10,000 USD of room at 2x.
+    account = view(positions={"A": -100}, cash=20_000.0)
+    decision = Guard(SHORTS).check(sell(150), account)
+    assert decision.event.rule == "max_weight"
+    assert decision.intent.quantity == 100
+
+
+def test_open_short_sales_count_before_they_fill():
+    waiting = (open_order(sell(150)),)
+    decision = Guard(SHORTS).check(sell(100), view(open_orders=waiting))
+    assert decision.event.rule == "max_weight"
+    assert decision.intent.quantity == 50
+
+
+def test_buying_back_a_short_only_reduces_it():
+    # Short 200 at 120 against a 6,000 USD account: 4x, over the 2x limit.
+    account = view({"A": 120.0}, {"A": -200}, cash=30_000)
+    cover = buy(200, limit=120.5)
+    assert Guard(SHORTS).check(cover, account).intent == cover
+
+
+@pytest.mark.parametrize(
+    ("held", "intent"),
+    [({"A": 10}, sell(15)), ({"A": -10}, buy(15))],
+)
+def test_an_order_through_zero_is_dropped_close_first(held, intent):
+    decision = Guard(SHORTS).check(intent, view(positions=held, cash=20_000))
+    assert dropped(decision, "crosses_zero")
+    assert "close it first" in decision.event.detail
+
+
+def test_an_order_that_crosses_zero_once_open_orders_fill_is_dropped():
+    # 10 held and 6 in an open sale: selling 6 more would end 2 short.
+    waiting = (open_order(sell(6)),)
+    account = view(positions={"A": 10}, open_orders=waiting)
+    assert dropped(Guard(SHORTS).check(sell(6), account), "crosses_zero")
+
+
+def test_a_long_only_account_still_cuts_a_sale_to_the_shares_held():
+    decision = Guard(LIMITS).check(sell(15), view(positions={"A": 10}))
+    assert decision.event.rule == "allow_short"
+    assert decision.intent.quantity == 10
+
+
+def test_an_open_sale_of_shares_held_adds_no_exposure():
+    # 10,000 USD of B held, half of it in an open sale: 10,000 USD of room.
+    prices = {"A": 100.0, "B": 100.0}
+    selling = open_order(sell(50, "B"))
+    account = view(prices, {"B": 100}, cash=0.0, open_orders=(selling,))
+    intent = buy(60)  # 6,030 USD at its limit
+    assert Guard(SHORTS).check(intent, account).intent == intent
+
+
+def test_an_open_buy_back_of_a_short_adds_no_exposure():
+    # Short 10,000 USD of B, all of it in an open buy back: 10,000 USD of room.
+    prices = {"A": 100.0, "B": 100.0}
+    covering = open_order(buy(100, "B"))
+    account = view(prices, {"B": -100}, cash=20_000.0, open_orders=(covering,))
+    intent = buy(99)  # 9,949.50 USD at its limit
+    assert Guard(SHORTS).check(intent, account).intent == intent

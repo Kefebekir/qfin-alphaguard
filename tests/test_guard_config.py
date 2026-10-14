@@ -113,7 +113,7 @@ def test_config_cannot_be_changed_after_creation():
 @pytest.mark.parametrize(
     ("name", "value"),
     [
-        ("max_weight", 1.0),  # the upper bound is allowed
+        ("max_weight", 1.0),  # as much as max_gross_exposure is allowed
         ("max_gross_exposure", 1),  # whole numbers are fine where a float is expected
         ("stale_data_sec", 0.5),  # so are fractions of a second
         ("price_collar_bps", 9_999),
@@ -121,6 +121,7 @@ def test_config_cannot_be_changed_after_creation():
         # the repository test at the bottom pins the scope.
         ("allow_short", True),
         ("live_trading", True),
+        ("daily_loss_limit_pct", False),  # no daily loss limit (decision 0019)
     ],
 )
 def test_values_inside_the_rules_are_accepted(name, value):
@@ -147,7 +148,6 @@ def test_values_inside_the_rules_are_accepted(name, value):
         ("max_order_usd", 0),
         ("max_order_usd", -500),
         ("max_weight", 0),
-        ("max_weight", 1.01),
         ("max_gross_exposure", 0),
         ("price_collar_bps", 0),
         ("price_collar_bps", 10_000),  # a sell limit would be at or below zero
@@ -156,6 +156,10 @@ def test_values_inside_the_rules_are_accepted(name, value):
         ("max_trades_per_symbol_day", 0),
         ("daily_loss_limit_pct", 0),
         ("daily_loss_limit_pct", 100),
+        # Only false switches the daily loss limit off; an empty value is null.
+        ("daily_loss_limit_pct", True),
+        ("daily_loss_limit_pct", None),
+        ("daily_loss_limit_pct", "false"),
         ("stale_data_sec", 0),
     ],
 )
@@ -167,6 +171,26 @@ def test_invalid_value_is_rejected_by_name(name, value):
 def test_one_stock_cannot_exceed_the_whole_exposure():
     with pytest.raises(GuardConfigError, match="max_weight"):
         make_config(max_weight=0.5, max_gross_exposure=0.4)
+
+
+@pytest.mark.parametrize(("written", "loaded"), [("false", False), ("2.5", 2.5)])
+def test_the_daily_loss_limit_is_a_number_or_false(tmp_path, written, loaded):
+    text = yaml.safe_dump({**VALID, "daily_loss_limit_pct": 0}, sort_keys=False)
+    text = text.replace("daily_loss_limit_pct: 0", f"daily_loss_limit_pct: {written}")
+    assert load_guard_config(write_text(tmp_path, text)).daily_loss_limit_pct == loaded
+
+
+def test_a_daily_loss_limit_left_empty_fails_to_load(tmp_path):
+    text = yaml.safe_dump({**VALID, "daily_loss_limit_pct": 0}, sort_keys=False)
+    text = text.replace("daily_loss_limit_pct: 0", "daily_loss_limit_pct:")
+    with pytest.raises(GuardConfigError, match="daily_loss_limit_pct"):
+        load_guard_config(write_text(tmp_path, text))
+
+
+def test_one_instrument_may_be_held_at_leverage():
+    # The QQQ strategy holds one ETF at up to 2x (decision 0019).
+    config = make_config(max_weight=2.1, max_gross_exposure=2.1)
+    assert config.max_weight == 2.1
 
 
 def test_repository_guard_yaml_is_valid():

@@ -52,7 +52,7 @@ class GuardConfig:
     max_orders_per_min: int
     max_trades_per_symbol_day: int
     no_same_day_reversal: bool
-    daily_loss_limit_pct: float
+    daily_loss_limit_pct: float | bool  # false: no daily loss limit
     stale_data_sec: float
     live_trading: bool
 
@@ -66,15 +66,12 @@ class GuardConfig:
             "max_gross_exposure",
             "max_order_usd",
             "price_collar_bps",
-            "daily_loss_limit_pct",
             "stale_data_sec",
         ):
             _require_number(name, getattr(self, name))
 
-        if not (0 < self.max_weight <= 1):
-            raise GuardConfigError(
-                f"max_weight must be above 0 and at most 1, got {self.max_weight}"
-            )
+        if not self.max_weight > 0:
+            raise GuardConfigError(f"max_weight must be above 0, got {self.max_weight}")
         for name in ("max_gross_exposure", "max_order_usd", "stale_data_sec"):
             if getattr(self, name) <= 0:
                 raise GuardConfigError(
@@ -85,11 +82,18 @@ class GuardConfig:
                 "price_collar_bps must be above 0 and under 10000, "
                 f"got {self.price_collar_bps}"
             )
-        if not (0 < self.daily_loss_limit_pct < 100):
-            raise GuardConfigError(
-                "daily_loss_limit_pct must be above 0 and below 100, "
-                f"got {self.daily_loss_limit_pct}"
-            )
+        # false, written out, is the only way to have no daily loss limit: a
+        # value left empty is null, and fails like any other non-number.
+        loss = self.daily_loss_limit_pct
+        if loss is not False:
+            if isinstance(loss, bool) or not isinstance(loss, (int, float)):
+                raise GuardConfigError(
+                    f"daily_loss_limit_pct must be a number or false, got {loss!r}"
+                )
+            if not (0 < loss < 100):
+                raise GuardConfigError(
+                    f"daily_loss_limit_pct must be above 0 and below 100, got {loss}"
+                )
         if self.max_weight > self.max_gross_exposure:
             raise GuardConfigError(
                 f"max_weight ({self.max_weight}) cannot exceed "
