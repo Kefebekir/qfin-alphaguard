@@ -51,6 +51,7 @@ uv run python research/intraday_pilot/morning_picks.py $P/morning_scores.parquet
 uv run --env-file .env python research/intraday_pilot/gap_quotes.py data/raw/prices.parquet $P/morning_quotes --picks $P/morning_picks.parquet
 uv run python research/intraday_pilot/gap_costs.py data/raw/prices.parquet $P/morning_quotes --scores $P/morning_scores.parquet --signal gbt
 uv run python research/intraday_pilot/daily_choices.py data/raw 2024-05-01 data/reports/qqq_day_book.html $P/qqq_days.parquet
+uv run python research/intraday_pilot/engine_check.py data/raw $P/qqq_days.parquet
 ```
 
 Set `OMP_NUM_THREADS=8` (and the same for OpenBLAS and MKL) when two
@@ -76,6 +77,7 @@ many times over.
 | `qqq_halfhour.py` | ML makes QQQ's half-hourly decisions, alone or as a meta-label on the rule. |
 | `market_leadlag.py` | Predict QQQ's next 15 minutes from the last 15 minutes of 36 assets: seven models and their ensemble (Aleti, Bollerslev and Siggaard, 2025). |
 | `daily_choices.py` | The day book: every QQQ decision, day by day, as a page to open in a browser. |
+| `engine_check.py` | Phase 2, step 2: the engine's strategy (`momentum.py`) against `qqq_momentum.py`, day by day, at no cost and at QQQ's measured spread. |
 
 - **Time:** each script takes seconds to a minute on 20 cores, except
   `open_to_close.py` (about 12 minutes) and the two downloads.

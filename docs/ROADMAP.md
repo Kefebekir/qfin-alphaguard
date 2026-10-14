@@ -12,13 +12,14 @@ week alongside university.
   work within the day, and its choices are shown day by day.
 - **The research is done** (`docs/research/intraday-machine-learning.md`,
   `research/intraday_pilot/`). One intraday edge holds up: QQQ intraday
-  momentum (decision 0011), 21.2% a year at a 2× cap with a Sharpe ratio of
-  1.62 in 2018–2026, and 1.26 after its paper's data ended. Machine
+  momentum (decision 0011), 21.1% a year at a 2× cap with a Sharpe ratio of
+  1.61 in 2018–2026, and 1.26 after its paper's data ended. Machine
   learning beat it in none of our walk-forward tests with costs, on QQQ or
   on single stocks; models will run beside it in shadow until one does.
 - **The day book shows every decision:** `daily_choices.py` writes a page
   with each day's chart, decisions and reasons, from May 2024.
-- **Step 2 is next:** the QQQ strategy in our engine. Efe writes its rules.
+- **Step 2 is done:** the QQQ strategy runs in our engine and trades on the
+  same days as the research (#33). **Step 3 is next:** the decision log.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -208,19 +209,24 @@ January exams.
 | Phase 2 step | Core logic by | State |
 | --- | --- | --- |
 | 1. Research: what ML can do within the day, and the day book | Claude | done, #32 |
-| 2. The QQQ strategy as its own `Strategy` in our engine | Efe | next |
-| 3. The decision log, and the day book reading it | Claude designs; Efe's strategy writes it | planned |
+| 2. The QQQ strategy as its own `Strategy` in our engine | Efe's rules; Claude's skeleton | done, #33 |
+| 3. The decision log, and the day book reading it | Claude designs; Efe's strategy writes it | next |
 | 4. Guard's limits for an intraday strategy | Efe, in `guard.yaml` | planned |
 | 5. The shadow record for ML challengers | Claude | planned |
 
-2. [ ] **The QQQ strategy in our engine:** the noise band, VWAP, decisions
-   at 10:00 and every half hour to 15:30, a size of min(2, 2% / 14-day
-   volatility), flat at the close. Efe writes the trading rules; Claude
-   prepares the skeleton, the spec and the tests.
-   - It must reproduce `research/intraday_pilot/qqq_momentum.py` for every
-     day: 2016–2026 at the 2× cap, 17.9% a year and a Sharpe ratio of 1.44.
-     (Decision 0011's research code, not in the repository, gave 18.3% and
-     1.47; the pilot's code is the reference now.)
+2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
+   band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
+   min(2, 2% / 14-day volatility), flat a minute before the close. Efe
+   wrote the four rules; Claude the skeleton, the spec and the tests.
+   - Longs may be fractional (a 500 USD account); shorts are whole shares,
+     and a turn from long to short closes first, as Alpaca requires.
+   - It reproduces `research/intraday_pilot/qqq_momentum.py`: the same 1,580
+     trading days in 2016–2026, and at no cost 19.5% a year with a Sharpe
+     ratio of 1.57 against 19.6% and 1.56 (`engine_check.py`).
+   - At QQQ's measured half spread, 0.3 bps, and Alpaca's fees: 16.2% and
+     1.33. The simulated broker's default half spread, 1 bp, is the
+     stocks'; it needs one per instrument, a change to the broker (Efe's,
+     step 6 of Phase 1) before Phase 3.
 3. [ ] **The decision log:** every decision with its time, what the strategy
    saw (price, band, VWAP, size), the choice, its reason and the order; the
    same in a backtest, in paper trading and live. The day book reads it

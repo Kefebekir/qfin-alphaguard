@@ -72,7 +72,7 @@ for i, d in enumerate(days):
     n = int(d["k"].max()) + 1
     price = np.full(n, np.nan)
     price[d["k"]] = d["close"]
-    price = pl.Series(price).fill_null(strategy="forward").to_numpy()
+    price = pl.Series(price).fill_nan(None).fill_null(strategy="forward").to_numpy()
     nxt_open = np.full(n + 1, np.nan)
     nxt_open[d["k"]] = d["open"]
     move = np.abs(price / d["open"][0] - 1)
@@ -90,7 +90,7 @@ for i, d in enumerate(days):
     vwap_k[d["k"]] = np.cumsum(typical * d["volume"]) / np.maximum(
         np.cumsum(d["volume"]), 1
     )
-    vwap = pl.Series(vwap_k).fill_null(strategy="forward").to_numpy()
+    vwap = pl.Series(vwap_k).fill_nan(None).fill_null(strategy="forward").to_numpy()
     daily_returns = np.diff(np.log(closes[i - LOOKBACK - 1 : i]))
     vol = daily_returns.std(ddof=1)
     # Positions in units of "1x the account", decided at HH:00 and HH:30.

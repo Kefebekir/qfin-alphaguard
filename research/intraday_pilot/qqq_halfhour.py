@@ -75,7 +75,7 @@ for i, d in enumerate(days):
     n = int(d["k"].max()) + 1
     price = np.full(n, np.nan)
     price[d["k"]] = d["close"]
-    price = pl.Series(price).fill_null(strategy="forward").to_numpy()
+    price = pl.Series(price).fill_nan(None).fill_null(strategy="forward").to_numpy()
     nxt_open = np.full(n + 1, np.nan)
     nxt_open[d["k"]] = d["open"]
     vol_by_minute = np.zeros(n)
@@ -99,7 +99,7 @@ for i, d in enumerate(days):
     vwap_k[d["k"]] = np.cumsum(typical * d["volume"]) / np.maximum(
         np.cumsum(d["volume"]), 1
     )
-    vwap = pl.Series(vwap_k).fill_null(strategy="forward").to_numpy()
+    vwap = pl.Series(vwap_k).fill_nan(None).fill_null(strategy="forward").to_numpy()
     daily = np.diff(np.log(closes[i - LOOKBACK - 1 : i]))
     vol14 = daily.std(ddof=1)
     minute_returns = np.diff(np.log(price))

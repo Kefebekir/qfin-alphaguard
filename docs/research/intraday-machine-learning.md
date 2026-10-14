@@ -19,8 +19,8 @@ out of sample, unless stated.
 ## 1. The short answer
 
 - **One intraday edge holds up for us: the market's own trend within the
-  day, on QQQ** (decision 0011). Its rules earned 21.2% a year at a 2× cap
-  with a Sharpe ratio of 1.62 out of sample in 2018–2026, and a Sharpe ratio
+  day, on QQQ** (decision 0011). Its rules earned 21.1% a year at a 2× cap
+  with a Sharpe ratio of 1.61 out of sample in 2018–2026, and a Sharpe ratio
   of 1.26 after its paper's data ended (May 2024 – October 2026). It has a
   known cause (dealers hedging options in the direction of the day's move)
   and a published record.
@@ -126,10 +126,10 @@ morning tests pick, all from Alpaca's SIP history. Costs are stated per test.
 
 | Test | Result |
 | --- | --- |
-| **The noise-area rule** (decision 0011), re-implemented, cap 2× | 2016–2026: 17.9% a year, Sharpe ratio 1.44 (decision 0011's research code, not in the repository: 18.3%, 1.47). 2018–2026: 21.2% a year, Sharpe 1.62, worst drawdown −12.8%. After the paper's data end (May 2024 – October 2026): +44.5% in all, Sharpe 1.26, worst drawdown −12.8%; it traded on 56% of days and won on 26%. |
-| **ML at 10:00 skips or resizes the day.** Boosted trees and ridge on 15 features known at 10:00 (the gap, the first half hour's move, range and volume, the band, recent volatility, the strategy's own last days) | Skipping the days the model ranks in its bottom third: −4.3% and −4.8% a year against the rule (t −1.85 and −2.13). Half or 1.5× the size instead: +0.5% (t 0.35) and −0.4% (t −0.31). No gain. |
-| **HAR volatility for the size** | HAR forecasts the day's volatility better than the rule's 14-day measure (correlation with the realised value 0.72 against 0.61), but the strategy earns 20.7% a year and Sharpe 1.58 with it, against 21.2% and 1.62. No gain. |
-| **ML makes the half-hourly decisions.** Boosted trees and ridge on 13 features at each HH:00 and HH:30: the price against the band's edges and VWAP, the move since the open and in the last half hour, the gap, the time, the volume and volatility so far, the rule's position | Alone: 0.0% and 7.9% a year (Sharpe 0.09 and 0.55), right on 50.4% and 51.6% of the half hours it held a position; the rule is right on 53.6%. As a meta-label that keeps the rule's position only when the model agrees: Sharpe 1.29 and 1.48 against 1.62 (−7.4% and −2.8% a year, t −3.01 and −1.95). Worse. |
+| **The noise-area rule** (decision 0011), re-implemented, cap 2× | 2016–2026: 17.9% a year, Sharpe ratio 1.43 (decision 0011's research code, not in the repository: 18.3%, 1.47). 2018–2026: 21.1% a year, Sharpe 1.61, worst drawdown −12.8%. After the paper's data end (May 2024 – October 2026): +44.5% in all, Sharpe 1.26, worst drawdown −12.8%; it traded on 56% of days and won on 26%. |
+| **ML at 10:00 skips or resizes the day.** Boosted trees and ridge on 15 features known at 10:00 (the gap, the first half hour's move, range and volume, the band, recent volatility, the strategy's own last days) | Skipping the days the model ranks in its bottom third: −2.6% and −4.9% a year against the rule (t −1.12 and −2.13). Half or 1.5× the size instead: +1.3% (t 0.92) and −0.5% (t −0.33). No significant gain in any of the four; the best one's t moved from 0.35 to 0.92 when three days of input changed (the missing-minute fix of step 2), which is what noise looks like. |
+| **HAR volatility for the size** | HAR forecasts the day's volatility better than the rule's 14-day measure (correlation with the realised value 0.72 against 0.61), but the strategy earns 20.6% a year and Sharpe 1.57 with it, against 21.1% and 1.61. No gain. |
+| **ML makes the half-hourly decisions.** Boosted trees and ridge on 13 features at each HH:00 and HH:30: the price against the band's edges and VWAP, the move since the open and in the last half hour, the gap, the time, the volume and volatility so far, the rule's position | Alone: −0.2% and 7.2% a year (Sharpe 0.07 and 0.51), right on 50.4% and 51.5% of the half hours it held a position; the rule is right on 53.5%. As a meta-label that keeps the rule's position only when the model agrees: Sharpe 1.27 and 1.48 against 1.61 (−7.6% and −2.7% a year, t −3.11 and −1.92). Worse. |
 | **The factor-zoo method** (Aleti, Bollerslev and Siggaard) on what we store: the last 15 minutes, the last hour, the day so far and the opening gap of 36 assets (QQQ; SPY, IWM, DIA, TLT, GLD, HYG and the nine sector SPDRs; the 20 stocks in every year's trading universe), predicting QQQ's next 15 minutes. Ridge, lasso, elastic net, PCR, PLS, boosted trees, a neural network and their ensemble, tuned and refitted each year | No forecasting power. The out-of-sample R² is below zero for every model but the trees (+0.005%), and −0.007% for the ensemble; the sign is right on 50.4–50.9% of the 15-minute slots. The ensemble's R² was positive in 2020, 2021 and 2024 (+0.07%, +0.12%, +0.04%) and negative in the six other years; the paper, too, found its gains in times of crisis. Traded the paper's way, changing side only when the forecast beats one side's cost: 2–10% a year, Sharpe 0.13–0.65 across the models, the ensemble 0.45 and 0.55, against 0.37 for simply holding QQQ over the same hours before costs. Far below the rule. |
 
 ### 3.2 Single stocks within the day
@@ -160,6 +160,34 @@ morning tests pick, all from Alpaca's SIP history. Costs are stated per test.
   after decimalisation, after publication, and in large, liquid stocks; the
   papers that find tradeable intraday ML (Aleti, Bollerslev and Siggaard;
   Huddleston, Liu and Stentoft) end in 2020 and 2016 and earn most in crises.
+
+### 3.4 The rules in the engine (Phase 2, step 2)
+
+`research/intraday_pilot/engine_check.py` runs the strategy of
+`src/qfin_alphaguard/momentum.py` through the backtest engine on the stored
+QQQ minutes, 2016–2026, from 30,000 USD, with a stand-in that lets every
+order through (Guard's limits for it are step 4):
+
+- **The same decisions.** It trades on exactly the same 1,580 days as
+  `qqq_momentum.py`. At no cost it earns 19.5% a year with a Sharpe ratio of
+  1.57, against 19.6% and 1.56, and the daily results correlate at 0.996.
+  What differs is by design: the engine leaves on the last minute's open,
+  not at the close (on the few days QQQ moved 36–47 bps in the last minute,
+  that is up to 95 bps at 2×), and it turns from long to short a minute
+  later, because Alpaca takes no order that crosses zero.
+- **A bug found in the research.** The scripts left a missing minute empty
+  instead of carrying the last price, because polars' `fill_null` does not
+  fill NaN. QQQ lacks minutes on four days, the trading halts of March 2020;
+  for 14 sessions after each, no decision was taken at those minutes. Fixed;
+  three days' results changed, and the numbers above are after the fix.
+- **QQQ's spread, measured.** Alpaca's NBBO quotes on 101 days of 2016–2026
+  show a spread of a cent: a half spread of 0.36 bps at 10:00 and 0.23 bps at
+  15:59, about 0.3 on average. With it and Alpaca's fees, the engine earns
+  16.2% a year with a Sharpe ratio of 1.33; the research's cost model had
+  assumed less spread (17.9% and 1.43). The simulated broker's default half
+  spread of 1 bp, measured for the trading universe's stocks (decision
+  0012), is three times QQQ's and would give 11.1% and 0.95: the broker
+  needs a spread for each instrument.
 
 ## 4. What to build
 

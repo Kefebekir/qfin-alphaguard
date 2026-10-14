@@ -67,8 +67,8 @@ The intraday research
 the literature offers on our own minutes and quotes, walk-forward from 2018
 to October 2026, after costs:
 - **One edge holds up: the Nasdaq-100's trend within the day** (decision
-  0011). Its rules earned 21.2% a year at a 2× cap with a Sharpe ratio of
-  1.62, and a Sharpe ratio of 1.26 after its paper's data ended in April
+  0011). Its rules earned 21.1% a year at a 2× cap with a Sharpe ratio of
+  1.61, and a Sharpe ratio of 1.26 after its paper's data ended in April
   2024.
 - **Machine learning did not beat it.** Models that chose or sized the day,
   made the half-hourly decisions, or forecast the next 15 minutes from 36
