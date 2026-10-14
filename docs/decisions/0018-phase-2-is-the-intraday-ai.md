@@ -108,3 +108,22 @@ in the repository; results reported as they are.
 - **New research data,** all in the git-ignored `data/`: 15 more ETFs'
   minutes (`qfin etf-minutes`), every S&P 500 member's first 16 minutes
   since 2016, and quotes for the stocks the morning tests pick.
+
+## Update: missing minutes, found in step 2
+
+Comparing the engine's strategy with the research (Phase 2, step 2) found a
+bug in the research scripts: they left a missing minute empty instead of
+carrying the last price forward, because polars' `fill_null` does not fill
+NaN. QQQ lacks minutes on four days, the market-wide trading halts of 9, 12,
+16 and 18 March 2020; for the 14 sessions after each, the noise band was
+empty at those minutes, so no decision was taken then. With the fix, three
+days' results change:
+
+| QQQ rules, cap 2× | Before | After |
+| --- | --- | --- |
+| 2016–2026 | 17.9% a year, Sharpe 1.44 | 17.9%, 1.43 |
+| 2018–2026 | 21.2% a year, Sharpe 1.62 | 21.1%, 1.61 |
+| May 2024 – October 2026 | Sharpe 1.26 | 1.26 |
+
+No conclusion of the research changes (its section 3 has the corrected
+numbers). The decision stands.

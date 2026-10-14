@@ -12,8 +12,8 @@ week alongside university.
   work within the day, and its choices are shown day by day.
 - **The research is done** (`docs/research/intraday-machine-learning.md`,
   `research/intraday_pilot/`). One intraday edge holds up: QQQ intraday
-  momentum (decision 0011), 21.2% a year at a 2× cap with a Sharpe ratio of
-  1.62 in 2018–2026, and 1.26 after its paper's data ended. Machine
+  momentum (decision 0011), 21.1% a year at a 2× cap with a Sharpe ratio of
+  1.61 in 2018–2026, and 1.26 after its paper's data ended. Machine
   learning beat it in none of our walk-forward tests with costs, on QQQ or
   on single stocks; models will run beside it in shadow until one does.
 - **The day book shows every decision:** `daily_choices.py` writes a page
@@ -218,7 +218,7 @@ January exams.
    volatility), flat at the close. Efe writes the trading rules; Claude
    prepares the skeleton, the spec and the tests.
    - It must reproduce `research/intraday_pilot/qqq_momentum.py` for every
-     day: 2016–2026 at the 2× cap, 17.9% a year and a Sharpe ratio of 1.44.
+     day: 2016–2026 at the 2× cap, 17.9% a year and a Sharpe ratio of 1.43.
      (Decision 0011's research code, not in the repository, gave 18.3% and
      1.47; the pilot's code is the reference now.)
 3. [ ] **The decision log:** every decision with its time, what the strategy
