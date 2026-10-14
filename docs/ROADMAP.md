@@ -207,7 +207,7 @@ January exams.
 
 | Phase 2 step | Core logic by | State |
 | --- | --- | --- |
-| 1. Research: what ML can do within the day, and the day book | Claude | this PR |
+| 1. Research: what ML can do within the day, and the day book | Claude | done, #32 |
 | 2. The QQQ strategy as its own `Strategy` in our engine | Efe | next |
 | 3. The decision log, and the day book reading it | Claude designs; Efe's strategy writes it | planned |
 | 4. Guard's limits for an intraday strategy | Efe, in `guard.yaml` | planned |
