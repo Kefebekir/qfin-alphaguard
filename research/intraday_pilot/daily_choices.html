@@ -59,7 +59,7 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 <body>
 <header>
   <h1>QQQ intraday momentum: the day book</h1>
-  <div class="sub">Every decision of the rules of decision 0011 (cap 2×), replayed on stored 1-minute bars. Each day starts and ends flat.</div>
+  <div class="sub">Every decision of the QQQ strategy in our engine (momentum.py, cap 2×), from its decision log, on stored 1-minute bars, after Alpaca's fees and QQQ's measured spread. Each day starts and ends flat. Guard's limits for it are Phase 2's step 4: this replay sends every order.</div>
   <div class="stats" id="stats"></div>
 </header>
 <main>
@@ -69,6 +69,7 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 <script>
 const DAYS = /*DATA*/null;
 const fmtPct = (x, d = 2) => (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%";
+const num = v => v === null ? "" : v.toFixed(2);
 const cls = x => x > 1e-9 ? "pos" : x < -1e-9 ? "neg" : "zero";
 const side = p => p === 1 ? "long" : p === -1 ? "short" : "flat";
 
@@ -117,13 +118,15 @@ function list() {
 
 function chart(d) {
   const W = 900, H = 360, L = 52, R = 12, T = 12, B = 28;
-  const n = d.minutes[d.minutes.length - 1] || 1;
-  const all = [...d.price, ...d.upper, ...d.lower, ...d.vwap, d.prev_close].filter(Number.isFinite);
+  // the axis reaches the last fill and decision, a minute before the close
+  const n = Math.max(d.minutes[d.minutes.length - 1], ...d.fills.map(f => f.t), ...d.decisions.map(s => s.t)) || 1;
+  const all = [...d.price, ...d.upper, ...d.lower, ...d.vwap, d.prev_close].filter(v => v !== null && Number.isFinite(v));
   let lo = Math.min(...all), hi = Math.max(...all);
   const pad = (hi - lo) * 0.05 || 1; lo -= pad; hi += pad;
   const x = m => L + (W - L - R) * m / n;
   const y = v => T + (H - T - B) * (hi - v) / (hi - lo);
-  const path = arr => arr.map((v, i) => (i ? "L" : "M") + x(d.minutes[i]).toFixed(1) + "," + y(v).toFixed(1)).join("");
+  // a missing value (no band yet) breaks the line instead of dropping it to zero
+  const path = arr => arr.map((v, i) => v === null ? "" : ((i && arr[i - 1] !== null ? "L" : "M") + x(d.minutes[i]).toFixed(1) + "," + y(v).toFixed(1))).join("");
   let shade = "";
   const ds = d.decisions;
   for (let i = 0; i < ds.length; i++) {
@@ -140,10 +143,9 @@ function chart(d) {
     ticks += `<text x="${x(m)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${clock(d.open_et, m)}</text>`;
   }
   let marks = "";
-  for (const s of ds) {
-    if (s.fill === null) continue;
-    const color = s.position > 0 ? "var(--up)" : s.position < 0 ? "var(--down)" : "var(--flat)";
-    marks += `<circle cx="${x(s.t)}" cy="${y(s.fill)}" r="5" fill="${color}" stroke="var(--panel)" stroke-width="1.5"><title>${clock(d.open_et, s.t)} ${side(s.position)} at ${s.fill.toFixed(2)}</title></circle>`;
+  for (const f of d.fills) {
+    const color = f.after > 0 ? "var(--up)" : f.after < 0 ? "var(--down)" : "var(--flat)";
+    marks += `<circle cx="${x(f.t)}" cy="${y(f.price)}" r="5" fill="${color}" stroke="var(--panel)" stroke-width="1.5"><title>${clock(d.open_et, f.t)} filled at ${f.price.toFixed(2)}, now ${side(f.after)}</title></circle>`;
   }
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="QQQ on ${d.day}">${shade}${ticks}
     <path d="${path(d.upper)}" fill="none" stroke="var(--band)" stroke-dasharray="4 3"/>
@@ -155,17 +157,17 @@ function chart(d) {
 function show(day) {
   const d = DAYS.find(x => x.day === day);
   document.querySelectorAll("#days button").forEach(b => b.setAttribute("aria-current", b.dataset.day === day));
-  const rows = d.decisions.map(s => `<tr><td>${clock(d.open_et, s.t)}</td><td>${s.price.toFixed(2)}</td>
-    <td>${s.lower.toFixed(2)} – ${s.upper.toFixed(2)}</td><td>${s.vwap.toFixed(2)}</td>
-    <td class="${cls(s.position)}">${side(s.position)}</td><td>${s.fill === null ? "" : s.fill.toFixed(2)}</td><td class="why">${s.why}</td></tr>`).join("");
+  const rows = d.decisions.map(s => `<tr><td>${clock(d.open_et, s.t)}</td><td>${num(s.price)}</td>
+    <td>${s.lower === null || s.upper === null ? "" : num(s.lower) + " – " + num(s.upper)}</td><td>${num(s.vwap)}</td>
+    <td class="${cls(s.position)}">${side(s.position)}</td><td>${num(s.fill)}</td><td class="why">${s.why}</td></tr>`).join("");
   document.getElementById("detail").innerHTML = `
     <h2>${d.day} <span class="${cls(d.net)}">${d.trades ? fmtPct(d.net) : "no trade"}</span></h2>
-    <div class="sub">Size ${d.size}× the account · ${d.trades} unit${d.trades === 1 ? "" : "s"} traded · before costs ${fmtPct(d.gross)} · previous close ${d.prev_close.toFixed(2)}</div>
+    <div class="sub">Size ${d.size}× the account · ${d.trades} fill${d.trades === 1 ? "" : "s"} · fees ${d.fees.toFixed(2)} USD · previous close ${num(d.prev_close)}</div>
     ${chart(d)}
     <div class="legend"><span><i style="background:var(--price)"></i>QQQ</span><span><i style="background:var(--band)"></i>noise band</span>
-    <span><i style="background:var(--vwap)"></i>VWAP</span><span>dots: fills (green buy into long, red short, grey flat)</span></div>
+    <span><i style="background:var(--vwap)"></i>VWAP</span><span>dots: fills (green: now long, red: now short, grey: now flat)</span></div>
     <div class="scroll"><table><thead><tr><th>Time (New York)</th><th>Price</th><th>Band</th><th>VWAP</th><th>Position</th><th>Fill</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="note">A decision at a time uses the minute that ended then, and fills at the next minute's open. Everything is closed at the close.</div>`;
+    <div class="note">A decision at a time uses the minute that ended then; its order fills on the next minute. A turn from long to short closes first and opens a minute later. The last minute closes what is held.</div>`;
 }
 
 stats();
