@@ -5,6 +5,8 @@
 - **Changes:** the Phase 2 plan of the roadmap. It reorders decisions 0001
   and 0010: their intraday timing model becomes Phase 2's last, optional
   step.
+- **Changed by:** decision 0018. Phase 2 is the intraday AI; the monthly
+  ranking below is set aside as research, and its Gate M2 replaced.
 
 ## Context
 

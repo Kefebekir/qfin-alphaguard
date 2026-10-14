@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQQ Day Book</title>
+<style>
+:root {
+  --bg: #fbfaf7; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e4e1da;
+  --up: #1f7a4d; --down: #b3261e; --flat: #8a8780; --band: #9a8f7a; --vwap: #3b6fb6; --price: #1d1d1b;
+  --long-bg: rgba(31,122,77,.09); --short-bg: rgba(179,38,30,.09);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --panel: #1f1f1c; --ink: #ecebe6; --muted: #a3a19a; --line: #34332f;
+    --up: #5cc28f; --down: #f08a80; --flat: #8f8d86; --band: #b9ad95; --vwap: #7fa7e3; --price: #ecebe6;
+    --long-bg: rgba(92,194,143,.12); --short-bg: rgba(240,138,128,.12);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --panel: #1f1f1c; --ink: #ecebe6; --muted: #a3a19a; --line: #34332f;
+  --up: #5cc28f; --down: #f08a80; --flat: #8f8d86; --band: #b9ad95; --vwap: #7fa7e3; --price: #ecebe6;
+  --long-bg: rgba(92,194,143,.12); --short-bg: rgba(240,138,128,.12);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 20px 16px 8px; max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: var(--muted); }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; }
+.stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 12px; }
+main { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 8px 16px 32px;
+  max-width: 1200px; margin: 0 auto; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+#days { max-height: 78vh; overflow-y: auto; }
+#days .month { position: sticky; top: 0; background: var(--panel); padding: 8px 12px 4px;
+  font-weight: 600; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+#days button { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; width: 100%; padding: 5px 12px;
+  cursor: pointer; font-variant-numeric: tabular-nums; }
+#days button:hover, #days button[aria-current="true"] { background: var(--bg); }
+#days button:focus-visible { outline: 2px solid var(--vwap); outline-offset: -2px; }
+.pos { color: var(--up); } .neg { color: var(--down); } .zero { color: var(--flat); }
+#detail { padding: 14px; min-width: 0; }
+#detail h2 { font-size: 17px; margin: 0 0 2px; }
+svg { width: 100%; height: auto; display: block; margin: 10px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; }
+.legend i { display: inline-block; width: 16px; height: 2px; vertical-align: middle; margin-right: 4px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td.why { white-space: normal; min-width: 220px; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } #days { max-height: 240px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>QQQ intraday momentum: the day book</h1>
+  <div class="sub">Every decision of the rules of decision 0011 (cap 2×), replayed on stored 1-minute bars. Each day starts and ends flat.</div>
+  <div class="stats" id="stats"></div>
+</header>
+<main>
+  <nav class="panel" id="days" aria-label="Days"></nav>
+  <section class="panel" id="detail"></section>
+</main>
+<script>
+const DAYS = /*DATA*/null;
+const fmtPct = (x, d = 2) => (x > 0 ? "+" : "") + (x * 100).toFixed(d) + "%";
+const cls = x => x > 1e-9 ? "pos" : x < -1e-9 ? "neg" : "zero";
+const side = p => p === 1 ? "long" : p === -1 ? "short" : "flat";
+
+function clock(open, minutes) {
+  const [h, m] = open.split(":").map(Number);
+  const t = h * 60 + m + minutes;
+  return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+}
+
+function stats() {
+  const r = DAYS.map(d => d.net);
+  const growth = r.reduce((a, x) => a * (1 + x), 1) - 1;
+  const mean = r.reduce((a, x) => a + x, 0) / r.length;
+  const sd = Math.sqrt(r.reduce((a, x) => a + (x - mean) ** 2, 0) / (r.length - 1));
+  let peak = 1, value = 1, worst = 0;
+  for (const x of r) { value *= 1 + x; peak = Math.max(peak, value); worst = Math.min(worst, value / peak - 1); }
+  const items = [
+    [fmtPct(growth, 1), `in all, ${DAYS[0].day} to ${DAYS[DAYS.length - 1].day}`],
+    [(mean / sd * Math.sqrt(252)).toFixed(2), "Sharpe ratio, a year"],
+    [fmtPct(worst, 1), "worst drawdown"],
+    [Math.round(100 * r.filter(x => x > 0).length / r.length) + "%", "days won"],
+    [Math.round(100 * DAYS.filter(d => d.trades > 0).length / r.length) + "%", "days with a trade"],
+  ];
+  document.getElementById("stats").innerHTML = items.map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
+}
+
+function list() {
+  const nav = document.getElementById("days");
+  const months = new Map();
+  for (const d of [...DAYS].reverse()) {
+    const m = d.day.slice(0, 7);
+    if (!months.has(m)) months.set(m, []);
+    months.get(m).push(d);
+  }
+  let html = "";
+  for (const [m, ds] of months) {
+    const g = ds.reduce((a, d) => a * (1 + d.net), 1) - 1;
+    html += `<div class="month"><span>${m}</span><span class="${cls(g)}">${fmtPct(g, 1)}</span></div>`;
+    for (const d of ds) {
+      html += `<button data-day="${d.day}"><span>${d.day}</span><span class="${cls(d.net)}">${d.trades ? fmtPct(d.net) : "no trade"}</span></button>`;
+    }
+  }
+  nav.innerHTML = html;
+  nav.addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.day); });
+}
+
+function chart(d) {
+  const W = 900, H = 360, L = 52, R = 12, T = 12, B = 28;
+  const n = d.minutes[d.minutes.length - 1] || 1;
+  const all = [...d.price, ...d.upper, ...d.lower, ...d.vwap, d.prev_close].filter(Number.isFinite);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = (hi - lo) * 0.05 || 1; lo -= pad; hi += pad;
+  const x = m => L + (W - L - R) * m / n;
+  const y = v => T + (H - T - B) * (hi - v) / (hi - lo);
+  const path = arr => arr.map((v, i) => (i ? "L" : "M") + x(d.minutes[i]).toFixed(1) + "," + y(v).toFixed(1)).join("");
+  let shade = "";
+  const ds = d.decisions;
+  for (let i = 0; i < ds.length; i++) {
+    if (!ds[i].position) continue;
+    const a = ds[i].t, b = i + 1 < ds.length ? ds[i + 1].t : n;
+    shade += `<rect x="${x(a)}" y="${T}" width="${x(b) - x(a)}" height="${H - T - B}" fill="var(--${ds[i].position > 0 ? "long" : "short"}-bg)"/>`;
+  }
+  let ticks = "";
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (hi - lo) * k / 4;
+    ticks += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v.toFixed(2)}</text>`;
+  }
+  for (let m = 0; m <= n; m += 60) {
+    ticks += `<text x="${x(m)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${clock(d.open_et, m)}</text>`;
+  }
+  let marks = "";
+  for (const s of ds) {
+    if (s.fill === null) continue;
+    const color = s.position > 0 ? "var(--up)" : s.position < 0 ? "var(--down)" : "var(--flat)";
+    marks += `<circle cx="${x(s.t)}" cy="${y(s.fill)}" r="5" fill="${color}" stroke="var(--panel)" stroke-width="1.5"><title>${clock(d.open_et, s.t)} ${side(s.position)} at ${s.fill.toFixed(2)}</title></circle>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="QQQ on ${d.day}">${shade}${ticks}
+    <path d="${path(d.upper)}" fill="none" stroke="var(--band)" stroke-dasharray="4 3"/>
+    <path d="${path(d.lower)}" fill="none" stroke="var(--band)" stroke-dasharray="4 3"/>
+    <path d="${path(d.vwap)}" fill="none" stroke="var(--vwap)" stroke-width="1.2"/>
+    <path d="${path(d.price)}" fill="none" stroke="var(--price)" stroke-width="1.4"/>${marks}</svg>`;
+}
+
+function show(day) {
+  const d = DAYS.find(x => x.day === day);
+  document.querySelectorAll("#days button").forEach(b => b.setAttribute("aria-current", b.dataset.day === day));
+  const rows = d.decisions.map(s => `<tr><td>${clock(d.open_et, s.t)}</td><td>${s.price.toFixed(2)}</td>
+    <td>${s.lower.toFixed(2)} – ${s.upper.toFixed(2)}</td><td>${s.vwap.toFixed(2)}</td>
+    <td class="${cls(s.position)}">${side(s.position)}</td><td>${s.fill === null ? "" : s.fill.toFixed(2)}</td><td class="why">${s.why}</td></tr>`).join("");
+  document.getElementById("detail").innerHTML = `
+    <h2>${d.day} <span class="${cls(d.net)}">${d.trades ? fmtPct(d.net) : "no trade"}</span></h2>
+    <div class="sub">Size ${d.size}× the account · ${d.trades} unit${d.trades === 1 ? "" : "s"} traded · before costs ${fmtPct(d.gross)} · previous close ${d.prev_close.toFixed(2)}</div>
+    ${chart(d)}
+    <div class="legend"><span><i style="background:var(--price)"></i>QQQ</span><span><i style="background:var(--band)"></i>noise band</span>
+    <span><i style="background:var(--vwap)"></i>VWAP</span><span>dots: fills (green buy into long, red short, grey flat)</span></div>
+    <div class="scroll"><table><thead><tr><th>Time (New York)</th><th>Price</th><th>Band</th><th>VWAP</th><th>Position</th><th>Fill</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="note">A decision at a time uses the minute that ended then, and fills at the next minute's open. Everything is closed at the close.</div>`;
+}
+
+stats();
+list();
+show(DAYS[DAYS.length - 1].day);
+</script>
+</body>
+</html>

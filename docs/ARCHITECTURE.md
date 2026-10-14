@@ -63,8 +63,9 @@ of it. The engine builds each 1-minute bar from the feed's trades.
 Written by the nightly job, read by the engine at start-up. The types are in
 `src/qfin_alphaguard/events.py` (`DailyPlan`, `ExecutionSettings`).
 
-Until the forecasts of Phase 2 exist, `qfin plan` (`plan.py`) builds it from
-the daily bars before the day: the minimum-variance portfolio of the year's
+`qfin plan` (`plan.py`) builds it from the daily bars before the day (a
+forecasting model could replace this: decision 0017's monthly ranking, set
+aside by decision 0018): the minimum-variance portfolio of the year's
 trading universe, with Ledoit-Wolf covariance over the last 252 sessions and no
 stock above Guard's `max_weight`. It holds at most
 `floor(capital / (max_children · min_trade_usd))` stocks, so that each can be
