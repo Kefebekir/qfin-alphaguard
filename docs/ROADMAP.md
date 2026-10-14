@@ -16,10 +16,12 @@ week alongside university.
   1.61 in 2018–2026, and 1.26 after its paper's data ended. Machine
   learning beat it in none of our walk-forward tests with costs, on QQQ or
   on single stocks; models will run beside it in shadow until one does.
-- **The day book shows every decision:** `daily_choices.py` writes a page
-  with each day's chart, decisions and reasons, from May 2024.
-- **Step 2 is done:** the QQQ strategy runs in our engine and trades on the
-  same days as the research (#33). **Step 3 is next:** the decision log.
+- **The day book shows every decision:** `daily_choices.py` runs the
+  engine and writes a page with each day's chart, and every decision with
+  the reason the strategy logged for it, from May 2024.
+- **Steps 2 and 3 are done:** the QQQ strategy runs in our engine, trades on
+  the same days as the research (#33), and writes a decision log (#34).
+  **Step 4 is next:** Guard's limits for it, Efe's, by hand.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -210,8 +212,8 @@ January exams.
 | --- | --- | --- |
 | 1. Research: what ML can do within the day, and the day book | Claude | done, #32 |
 | 2. The QQQ strategy as its own `Strategy` in our engine | Efe's rules; Claude's skeleton | done, #33 |
-| 3. The decision log, and the day book reading it | Claude designs; Efe's strategy writes it | next |
-| 4. Guard's limits for an intraday strategy | Efe, in `guard.yaml` | planned |
+| 3. The decision log, and the day book reading it | Claude | done, #34 |
+| 4. Guard's limits for an intraday strategy | Efe, in `guard.yaml` | next |
 | 5. The shadow record for ML challengers | Claude | planned |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
@@ -227,10 +229,19 @@ January exams.
      1.33. The simulated broker's default half spread, 1 bp, is the
      stocks'; it needs one per instrument, a change to the broker (Efe's,
      step 6 of Phase 1) before Phase 3.
-3. [ ] **The decision log:** every decision with its time, what the strategy
-   saw (price, band, VWAP, size), the choice, its reason and the order; the
-   same in a backtest, in paper trading and live. The day book reads it
-   instead of replaying the research code.
+3. [x] **The decision log** (#34): a `DecisionNote` event for every
+   decision, with its time, what the strategy saw (price, band, VWAP,
+   shares, volatility, the account), the choice and its reason in words.
+   - The engine writes notes into the backtest's log before the orders they
+     explain; Guard never sees one, and a note dated before its data stops
+     the run, as an order would.
+   - The QQQ strategy notes every half hour, a kept position included, and
+     the close at the day's end; `decision_log.py` stores the notes and
+     fills as Parquet tables, the format the live engine is to write too.
+   - The day book now runs the engine and reads that log. Over 2016–2026,
+     32,189 of the research's 32,190 half-hourly decisions are the same;
+     the other fell in the market-wide halt of 18 March 2020, when the
+     engine decided on the first minute after trading resumed.
 4. [ ] **Guard's limits for an intraday strategy,** set by Efe: round trips
    and reversals allowed for it, the 2× cap, the daily loss limit
    (`no_same_day_reversal` and 3 orders a stock a day forbid it today).

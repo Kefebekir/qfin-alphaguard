@@ -66,6 +66,8 @@ Both ruff commands must pass before a commit.
   open, and how many shares
 - `src/qfin_alphaguard/momentum.py`: QQQ intraday momentum (decisions 0011
   and 0018): the noise-area rules and the strategy around them
+- `src/qfin_alphaguard/decision_log.py`: the decision log as tables: each
+  DecisionNote and fill, stored as Parquet
 - `src/qfin_alphaguard/execution.py`: when the day's trades go out; the
   equal-spaced child orders that Phase 2's timing model has to beat
 - `src/qfin_alphaguard/backtest/`: the event loop, the simulated broker, and

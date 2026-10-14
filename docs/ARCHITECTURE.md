@@ -52,7 +52,7 @@ retail-broker strategy more profitable.
 | 8 | Inside the engine | 1-minute bar → features → score → intent | every bar | in memory |
 | 9 | Strategy → Guard → Alpaca | order intent → approved order | per order | in memory, Alpaca REST API |
 | 10 | Alpaca → engine | order status, fills | per event | Alpaca WebSocket |
-| 11 | Engine → log store → nightly job | decisions, fills, slippage, PnL | per event; read nightly | JSONL → Parquet |
+| 11 | Engine → log store → nightly job | decisions (DecisionNote, with what was seen and why), fills, slippage, PnL | per event; read nightly | Parquet tables of notes and fills (`decision_log.py`) |
 
 The live feed is a single exchange (decision 0008): its prices follow the
 consolidated tape closely over 5 minutes or more, its volume is a few percent
