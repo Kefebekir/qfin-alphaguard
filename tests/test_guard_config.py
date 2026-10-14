@@ -12,6 +12,7 @@ from qfin_alphaguard.guard.config import (
 )
 
 REPO_GUARD_YAML = Path(__file__).resolve().parents[1] / "guard.yaml"
+REPO_GUARD_QQQ_YAML = Path(__file__).resolve().parents[1] / "guard_qqq.yaml"
 
 # A valid set of limits, kept separate from the repository's guard.yaml so a
 # limit can change there without touching these tests.
@@ -204,3 +205,11 @@ def test_repository_guard_yaml_is_paper_only_long_only_and_unlevered():
     assert config.live_trading is False
     assert config.allow_short is False
     assert config.max_gross_exposure <= 1
+
+
+def test_repository_guard_qqq_yaml_is_paper_only_and_at_most_2_1x():
+    # The QQQ strategy's account (decision 0019). Going live or raising its
+    # leverage means changing this test by hand, in the same commit.
+    config = load_guard_config(REPO_GUARD_QQQ_YAML)
+    assert config.live_trading is False
+    assert config.max_gross_exposure <= 2.1
