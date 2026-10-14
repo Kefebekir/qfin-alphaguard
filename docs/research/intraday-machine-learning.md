@@ -161,6 +161,34 @@ morning tests pick, all from Alpaca's SIP history. Costs are stated per test.
   papers that find tradeable intraday ML (Aleti, Bollerslev and Siggaard;
   Huddleston, Liu and Stentoft) end in 2020 and 2016 and earn most in crises.
 
+### 3.4 The rules in the engine (Phase 2, step 2)
+
+`research/intraday_pilot/engine_check.py` runs the strategy of
+`src/qfin_alphaguard/momentum.py` through the backtest engine on the stored
+QQQ minutes, 2016–2026, from 30,000 USD, with a stand-in that lets every
+order through (Guard's limits for it are step 4):
+
+- **The same decisions.** It trades on exactly the same 1,580 days as
+  `qqq_momentum.py`. At no cost it earns 19.5% a year with a Sharpe ratio of
+  1.57, against 19.6% and 1.56, and the daily results correlate at 0.996.
+  What differs is by design: the engine leaves on the last minute's open,
+  not at the close (on the few days QQQ moved 36–47 bps in the last minute,
+  that is up to 95 bps at 2×), and it turns from long to short a minute
+  later, because Alpaca takes no order that crosses zero.
+- **A bug found in the research.** The scripts left a missing minute empty
+  instead of carrying the last price, because polars' `fill_null` does not
+  fill NaN. QQQ lacks minutes on four days, the trading halts of March 2020;
+  for 14 sessions after each, no decision was taken at those minutes. Fixed;
+  three days' results changed, and the numbers above are after the fix.
+- **QQQ's spread, measured.** Alpaca's NBBO quotes on 101 days of 2016–2026
+  show a spread of a cent: a half spread of 0.36 bps at 10:00 and 0.23 bps at
+  15:59, about 0.3 on average. With it and Alpaca's fees, the engine earns
+  16.2% a year with a Sharpe ratio of 1.33; the research's cost model had
+  assumed less spread (17.9% and 1.43). The simulated broker's default half
+  spread of 1 bp, measured for the trading universe's stocks (decision
+  0012), is three times QQQ's and would give 11.1% and 0.95: the broker
+  needs a spread for each instrument.
+
 ## 4. What to build
 
 1. **The QQQ strategy in our engine,** as its own `Strategy`: the noise
