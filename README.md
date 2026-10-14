@@ -18,18 +18,20 @@ exactly what works today and what does not.
 | Covariance estimators (sample, Ledoit-Wolf, EWMA) and minimum-variance optimiser | done |
 | Phase 0: event types, risk configuration, repository skeleton | done |
 | Phase 1: event-driven backtester with costs and Guard rules | done; Gate M1 passed on 13 October 2026 |
-| Phase 2: ML that picks the plan's stocks, tested against luck | in progress |
+| Phase 2: the intraday AI: QQQ's decisions within the day, shown day by day, with ML measured against them | in progress |
 | Phase 3: paper trading on Alpaca | planned |
 | Phase 3b: small real-money trading with scaling and stop rules | planned |
 | Phase 4: C++ execution engine | planned |
 | Phase 5: FPGA market-data and pre-trade risk benchmarks | planned |
 
 Phase 1 is done: `qfin backtest` gives the first full report (below). Phase 2
-has started. Its ML will rank every S&P 500 member by its expected return
-over the coming month, and the nightly plan will hold the best. Its research
-and a first pilot on our data are in
-[docs/research](docs/research/machine-learning-for-the-plan.md), and its
-steps in [docs/ROADMAP.md](docs/ROADMAP.md).
+is the intraday AI
+([decision 0018](docs/decisions/0018-phase-2-is-the-intraday-ai.md)): a
+decision engine that trades the Nasdaq-100's trend within the day, shows
+every decision with its reason, and lets machine learning trade only after
+it beats the plain rules forward. Its research is in
+[docs/research](docs/research/intraday-machine-learning.md), and its steps
+in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## First results
 
@@ -58,14 +60,31 @@ The goal is still to beat both baselines after costs; Phase 2's forecasts
 are the next attempt
 ([decision 0015](docs/decisions/0015-the-backtest-and-its-first-report.md)).
 
-The first pilot of those forecasts gives a promising result that is not yet
-proven ([decision 0017](docs/decisions/0017-phase-2-ml-picks-the-stocks.md)):
-- the setup: monthly gradient-boosted trees on price and volume features;
-- the result: picking 10 of the year's 50 most liquid stocks beat holding all
-  50 by about 8% a year after costs, from 3% to 15% depending on the day the
-  monthly rebalance starts (2018–2026);
-- the catch: corrected for the twelve variants tried, that could still be
-  luck.
+### Within the day
+
+The intraday research
+([docs/research](docs/research/intraday-machine-learning.md)) tested what
+the literature offers on our own minutes and quotes, walk-forward from 2018
+to October 2026, after costs:
+- **One edge holds up: the Nasdaq-100's trend within the day** (decision
+  0011). Its rules earned 21.2% a year at a 2× cap with a Sharpe ratio of
+  1.62, and a Sharpe ratio of 1.26 after its paper's data ended in April
+  2024.
+- **Machine learning did not beat it.** Models that chose or sized the day,
+  made the half-hourly decisions, or forecast the next 15 minutes from 36
+  assets all did worse than the plain rules.
+- **Single stocks have real intraday signals, but not ones a small account
+  can take:** they are a few basis points, below the spread, or live in the
+  opening auction.
+
+So the rules make the decisions, every decision is shown day by day with
+its reason, and ML models run beside them in shadow until one proves
+better.
+
+An earlier pilot for the nightly plan, a monthly ranking of stocks, is set
+aside with its result: about 8% a year over equal weight after costs, but
+not yet distinguishable from luck
+([decision 0017](docs/decisions/0017-phase-2-ml-picks-the-stocks.md)).
 
 ## How it works
 
@@ -82,8 +101,10 @@ The system runs three loops at three speeds:
 
 Research and the models use the S&P 500 as it was on each day, including
 companies that later left the index; the system trades the most liquid of these
-stocks. UK retail accounts cannot buy US-domiciled ETFs, so single stocks are
-used instead.
+stocks. UK retail accounts cannot buy US-domiciled ETFs, so the nightly plan
+holds single stocks; the intraday strategy trades QQQ on the paper account,
+and real money from the UK will need a Nasdaq-100 CFD or another route
+(decision 0011).
 
 ### Design choices
 
