@@ -31,6 +31,9 @@ orders:
   side on the bar after the close has filled.
 - One minute before the close it closes whatever is held, and makes no
   decision after that.
+- Every decision, a kept position included, leaves a DecisionNote in the
+  log: what it chose, why in words (describe), and the numbers it saw. So
+  does the close at the day's end. A day without enough history leaves none.
 """
 
 import math
@@ -40,7 +43,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from itertools import pairwise
 
-from qfin_alphaguard.events import Bar, Cancellation, OrderIntent, Side, round_shares
+from qfin_alphaguard.events import (
+    Bar,
+    Cancellation,
+    DecisionNote,
+    OrderIntent,
+    Side,
+    round_shares,
+)
 from qfin_alphaguard.strategy import Decision, Strategy, View
 
 
@@ -172,6 +182,47 @@ def target_shares(
 
 # The strategy (Claude's skeleton around the rules).
 
+CHOICES = {1: "long", 0: "flat", -1: "short"}
+
+
+def describe(
+    before: int,
+    wanted: int,
+    after: int,
+    price: float,
+    lower: float,
+    upper: float,
+    vwap: float,
+) -> str:
+    """A decision in words, for the decision log.
+
+    `before` is the position the rules held, `wanted` what next_position
+    chose, and `after` what is held: `wanted`, unless long_only turned a
+    short into flat.
+    """
+    if math.isnan(lower) or math.isnan(upper):
+        return "no noise band at this minute (a past session lacks it): no change"
+    if wanted == -1 and after == 0:
+        return "below the band, but long only: stay flat"
+    if before == after:
+        if after == 0:
+            return "inside the noise band: stay flat"
+        stop = max(upper, vwap) if after == 1 else min(lower, vwap)
+        return f"the trend holds; its stop is at {stop:.2f}"
+    if after == 1:
+        return (
+            "above the band: buy"
+            if before == 0
+            else "short stopped above the band: buy"
+        )
+    if after == -1:
+        if before == 0:
+            return "below the band: sell short"
+        return "long stopped below the band: sell short"
+    if before == 1:
+        return "long stopped: price fell below the band's top or VWAP"
+    return "short stopped: price rose above the band's bottom or VWAP"
+
 
 class NoiseAreaMomentum(Strategy):
     """QQQ intraday momentum: the rules above, every `every_min` minutes."""
@@ -210,10 +261,13 @@ class NoiseAreaMomentum(Strategy):
             self.record(bar, view)
         if self.closed or self.day_open is None:
             return ()
+        notes: list[Decision] = []
         if view.now >= view.session.close - timedelta(minutes=1):
             self.closed = True
             self.held, self.target = 0, 0.0
-            return self.move(view)
+            if self.tradable():
+                notes.append(self.closing_note(view))
+            return notes + self.move(view)
         if self.next_due is not None and view.now >= self.next_due:
             every = timedelta(minutes=self.settings.every_min)
             while self.next_due <= view.now:
@@ -221,8 +275,8 @@ class NoiseAreaMomentum(Strategy):
             if self.next_due >= view.session.close:
                 self.next_due = None  # no decision at or after the close
             if self.tradable():
-                self.decide(view)
-        return self.move(view)
+                notes.append(self.decide(view))
+        return notes + self.move(view)
 
     def on_session_end(self, view: View) -> None:
         if self.day_open is None:
@@ -253,8 +307,8 @@ class NoiseAreaMomentum(Strategy):
             and self.account_value > 0
         )
 
-    def decide(self, view: View) -> None:
-        """The rules' position now, and the shares it is.
+    def decide(self, view: View) -> DecisionNote:
+        """The rules' position now, the shares it is, and the note saying why.
 
         A position the rules keep keeps its shares: as in the research, it is
         sized once, when it is taken, and not traded again until it changes.
@@ -265,20 +319,37 @@ class NoiseAreaMomentum(Strategy):
             list(self.moves), minute, self.day_open, self.closes[-1]
         )
         vwap = self.flow / self.volume if self.volume else price
-        held = next_position(self.held, price, lower, upper, vwap)
-        if self.settings.long_only:
-            held = max(held, 0)
-        if held == self.held:
-            return
-        self.held = held
-        self.target = target_shares(
-            held,
-            self.account_value,
-            price,
-            self.volatility,
-            self.settings.cap,
-            self.settings.target_vol,
-        )
+        before = self.held
+        wanted = next_position(before, price, lower, upper, vwap)
+        held = max(wanted, 0) if self.settings.long_only else wanted
+        if held != before:
+            self.held = held
+            self.target = target_shares(
+                held,
+                self.account_value,
+                price,
+                self.volatility,
+                self.settings.cap,
+                self.settings.target_vol,
+            )
+        reason = describe(before, wanted, held, price, lower, upper, vwap)
+        seen = {
+            "price": price,
+            "lower": lower,
+            "upper": upper,
+            "vwap": vwap,
+            "shares": self.target,
+            "volatility": self.volatility,
+            "account": self.account_value,
+        }
+        return DecisionNote(self.settings.ticker, view.now, CHOICES[held], reason, seen)
+
+    def closing_note(self, view: View) -> DecisionNote:
+        """The note for the close a minute before the session ends."""
+        held = view.positions.get(self.settings.ticker, 0.0)
+        reason = "the day's end: close the position" if held else "the day's end: flat"
+        seen = {"price": view.last_prices[self.settings.ticker], "shares": 0.0}
+        return DecisionNote(self.settings.ticker, view.now, "flat", reason, seen)
 
     def move(self, view: View) -> list[Decision]:
         """Orders that take the position towards the target, on every bar.
