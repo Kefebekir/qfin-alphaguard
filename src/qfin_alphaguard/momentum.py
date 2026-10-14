@@ -25,6 +25,11 @@ orders:
 - An order is a limit order at the last price plus Guard's price collar
   (minus it for a sale), as EqualSpaced sends them: it fills at once on an
   ordinary minute.
+- Orders go only when something calls for them: a decision, the second step
+  of a turn once its close has filled, the close at the day's end, and the
+  session's first bar if a position is left from an earlier day. An order
+  Guard drops, or one still open, is sent again at the next of these, not on
+  every bar: a refused order retried each minute would flood Guard.
 - A long may be fractional; a short is whole shares, because Alpaca sells
   short only whole shares. Alpaca takes no order that turns a long into a
   short or back: the strategy closes the position first and opens the other
@@ -240,6 +245,8 @@ class NoiseAreaMomentum(Strategy):
         self.target = 0.0  # the shares that position is
         self.next_due: datetime | None = None  # the next decision's time
         self.closed = False  # the day's last minute: everything closed
+        self.started = False  # whether today's first bar has been seen
+        self.turning = False  # a turn's close went out; the other side is next
         self.volatility: float | None = None  # today's, from past closes
         self.account_value = 0.0  # at today's open
 
@@ -247,6 +254,7 @@ class NoiseAreaMomentum(Strategy):
         self.prices, self.day_open = {}, None
         self.flow, self.volume = 0.0, 0
         self.held, self.target, self.closed = 0, 0.0, False
+        self.started, self.turning = False, False
         self.next_due = view.session.open + timedelta(minutes=self.settings.every_min)
         ready = len(self.closes) == self.closes.maxlen
         self.volatility = daily_volatility(list(self.closes)) if ready else None
@@ -261,6 +269,12 @@ class NoiseAreaMomentum(Strategy):
             self.record(bar, view)
         if self.closed or self.day_open is None:
             return ()
+        ticker = self.settings.ticker
+        held = view.positions.get(ticker, 0.0)
+        send = False
+        if not self.started:
+            self.started = True
+            send = held != 0  # a position left from an earlier day goes at once
         notes: list[Decision] = []
         if view.now >= view.session.close - timedelta(minutes=1):
             self.closed = True
@@ -276,7 +290,11 @@ class NoiseAreaMomentum(Strategy):
                 self.next_due = None  # no decision at or after the close
             if self.tradable():
                 notes.append(self.decide(view))
-        return notes + self.move(view)
+                send = True
+        open_orders = any(order.intent.ticker == ticker for order in view.open_orders)
+        if self.turning and held == 0 and not open_orders:
+            send = True  # the turn's close has filled: the other side goes now
+        return notes + self.move(view) if send else notes
 
     def on_session_end(self, view: View) -> None:
         if self.day_open is None:
@@ -352,7 +370,7 @@ class NoiseAreaMomentum(Strategy):
         return DecisionNote(self.settings.ticker, view.now, "flat", reason, seen)
 
     def move(self, view: View) -> list[Decision]:
-        """Orders that take the position towards the target, on every bar.
+        """Orders that take the position towards the target, when one is due.
 
         An order still open is cancelled and sent again for what is left at
         the new price: it was decided at an earlier price. On an ordinary
@@ -370,9 +388,11 @@ class NoiseAreaMomentum(Strategy):
         if ticker not in view.last_prices:
             return decisions
         held = view.positions.get(ticker, 0.0)
+        self.turning = False
         if held and self.target and (held > 0) != (self.target > 0):
             change = -held  # close first; the other side comes after the fill
             reason = "close before turning"
+            self.turning = True
         else:
             change = round_shares(self.target - held)
             reason = "decision" if not self.closed else "close at the day's end"
