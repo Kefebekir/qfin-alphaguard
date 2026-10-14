@@ -50,7 +50,7 @@ uv run python research/intraday_pilot/morning_ml.py data/raw/prices.parquet $P/o
 uv run python research/intraday_pilot/morning_picks.py $P/morning_scores.parquet $P/morning_picks.parquet
 uv run --env-file .env python research/intraday_pilot/gap_quotes.py data/raw/prices.parquet $P/morning_quotes --picks $P/morning_picks.parquet
 uv run python research/intraday_pilot/gap_costs.py data/raw/prices.parquet $P/morning_quotes --scores $P/morning_scores.parquet --signal gbt
-uv run python research/intraday_pilot/daily_choices.py data/raw 2024-05-01 data/reports/qqq_day_book.html $P/qqq_days.parquet
+uv run python research/intraday_pilot/daily_choices.py data/raw 2024-05-01 data/reports/qqq_day_book.html $P/decision_log
 uv run python research/intraday_pilot/engine_check.py data/raw $P/qqq_days.parquet
 ```
 
@@ -76,7 +76,7 @@ many times over.
 | `qqq_har.py` | Size QQQ momentum with a HAR volatility forecast. |
 | `qqq_halfhour.py` | ML makes QQQ's half-hourly decisions, alone or as a meta-label on the rule. |
 | `market_leadlag.py` | Predict QQQ's next 15 minutes from the last 15 minutes of 36 assets: seven models and their ensemble (Aleti, Bollerslev and Siggaard, 2025). |
-| `daily_choices.py` | The day book: every QQQ decision, day by day, as a page to open in a browser. |
+| `daily_choices.py` | The day book: runs the engine's QQQ strategy, stores its decision log, and shows every decision day by day as a page to open in a browser. |
 | `engine_check.py` | Phase 2, step 2: the engine's strategy (`momentum.py`) against `qqq_momentum.py`, day by day, at no cost and at QQQ's measured spread. |
 
 - **Time:** each script takes seconds to a minute on 20 cores, except
@@ -86,11 +86,13 @@ many times over.
 
 ## The day book
 
-`daily_choices.py` replays the QQQ rules on the stored minutes and writes
-`data/reports/qqq_day_book.html`: the days with their results, and for each
-day its chart (price, noise band, VWAP, fills) and every half-hourly decision
-with its reason. It checks itself against `qqq_momentum.py`: every day's
-result must match to 1e-12.
+`daily_choices.py` runs the engine's QQQ strategy (`momentum.py`) on the
+stored minutes, at Alpaca's fees and QQQ's measured half spread, stores its
+decision log (`decision_log.py`) and writes `data/reports/qqq_day_book.html`
+from it: the days with their results after costs, and for each day its chart
+(price, the strategy's noise band, VWAP, fills) and every decision with the
+reason the strategy logged. Guard's limits for the strategy are Phase 2's
+step 4; the replay uses a stand-in that sends every order.
 
 The page holds licensed prices, so it stays under the git-ignored `data/`
 and is for Efe's own use: do not commit or publish it.

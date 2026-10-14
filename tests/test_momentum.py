@@ -7,12 +7,20 @@ import pytest
 
 from qfin_alphaguard.backtest.broker import CostModel, NextBarBroker
 from qfin_alphaguard.backtest.engine import SessionClose, run_backtest
-from qfin_alphaguard.events import Bar, Cancellation, Fill, OrderIntent, Side
+from qfin_alphaguard.events import (
+    Bar,
+    Cancellation,
+    DecisionNote,
+    Fill,
+    OrderIntent,
+    Side,
+)
 from qfin_alphaguard.guard.check import GuardDecision
 from qfin_alphaguard.momentum import (
     MomentumSettings,
     NoiseAreaMomentum,
     daily_volatility,
+    describe,
     next_position,
     noise_band,
     target_shares,
@@ -368,3 +376,129 @@ def test_settings_are_checked():
         MomentumSettings(cap=0)
     with pytest.raises(ValueError, match="lookback"):
         MomentumSettings(lookback=1)
+
+
+# The decision log: a note for every decision, and for the day's close.
+
+
+def notes(result, day):
+    return [
+        record
+        for record in result.log
+        if isinstance(record, DecisionNote) and record.time.date() == day
+    ]
+
+
+def test_a_note_for_every_half_hour_and_the_close():
+    session = DAYS[WARM]
+    result, _ = run({WARM: trend(100.0, 0.0002)})
+    day = notes(result, session.day)
+    assert [ny_minutes(session, n.time) for n in day] == [*range(30, 361, 30), 389]
+    first, *kept, last = day
+    assert (first.choice, first.reason) == ("long", "above the band: buy")
+    assert all(
+        n.choice == "long" and n.reason.startswith("the trend holds") for n in kept
+    )
+    assert (last.choice, last.reason) == ("flat", "the day's end: close the position")
+
+
+def test_a_note_holds_what_the_decision_saw():
+    session = DAYS[WARM]
+    path = trend(100.0, 0.0002)
+    result, _ = run({WARM: path})
+    first = notes(result, session.day)[0]
+    buy = intents(result, session.day)[0]
+    assert first.seen["price"] == path(29)  # the bar that ended at 10:00
+    assert first.seen["shares"] == buy.quantity
+    assert first.seen["lower"] < first.seen["upper"] < first.seen["price"]
+    assert first.seen["account"] == CASH
+    assert first.seen["volatility"] > 0
+    # the kept long's stop is the higher of the band's top and VWAP
+    kept = notes(result, session.day)[1]
+    stop = max(kept.seen["upper"], kept.seen["vwap"])
+    assert kept.reason == f"the trend holds; its stop is at {stop:.2f}"
+
+
+def test_the_note_comes_before_the_order_it_explains():
+    session = DAYS[WARM]
+    result, _ = run({WARM: trend(100.0, 0.0002)})
+    day = [
+        r
+        for r in result.log
+        if isinstance(r, DecisionNote | OrderIntent) and r.time.date() == session.day
+    ]
+    assert isinstance(day[0], DecisionNote) and isinstance(day[1], OrderIntent)
+
+
+def test_no_note_before_there_is_history():
+    result, _ = run({14: trend(100.0, 0.0002)})
+    assert not any(isinstance(record, DecisionNote) for record in result.log)
+
+
+def test_a_quiet_day_notes_that_it_stays_flat():
+    session = DAYS[WARM + 1]
+    result, _ = run({WARM + 1: lambda minute: calm(0, minute)})
+    *half_hours, last = notes(result, session.day)
+    assert len(half_hours) == 12
+    assert {n.reason for n in half_hours} == {"inside the noise band: stay flat"}
+    assert (last.choice, last.reason) == ("flat", "the day's end: flat")
+
+
+def test_long_only_notes_why_it_does_not_short():
+    session = DAYS[WARM]
+    result, _ = run({WARM: trend(100.0, -0.0002)}, MomentumSettings(long_only=True))
+    reasons = {n.reason for n in notes(result, session.day)}
+    assert "below the band, but long only: stay flat" in reasons
+
+
+def test_a_turn_is_noted_once_the_rules_turn():
+    def path(minute):
+        if minute <= 60:
+            return 100.0 * (1 + 0.0003 * minute)
+        top = 100.0 * (1 + 0.0003 * 60)
+        return top * (1 - 0.001 * (minute - 60))
+
+    session = DAYS[WARM]
+    result, _ = run({WARM: path})
+    reasons = [(n.choice, n.reason) for n in notes(result, session.day)]
+    assert ("short", "long stopped below the band: sell short") in reasons
+
+
+@pytest.mark.parametrize(
+    ("before", "wanted", "after", "price", "vwap", "expected"),
+    [
+        (0, 1, 1, 103.0, 100.0, "above the band: buy"),
+        (0, -1, -1, 97.0, 100.0, "below the band: sell short"),
+        (0, 0, 0, 100.0, 100.0, "inside the noise band: stay flat"),
+        (1, 1, 1, 103.0, 100.0, "the trend holds; its stop is at 102.00"),
+        (1, 1, 1, 105.0, 104.0, "the trend holds; its stop is at 104.00"),
+        (-1, -1, -1, 97.0, 100.0, "the trend holds; its stop is at 98.00"),
+        (-1, -1, -1, 95.0, 96.0, "the trend holds; its stop is at 96.00"),
+        (
+            1,
+            0,
+            0,
+            101.0,
+            100.0,
+            "long stopped: price fell below the band's top or VWAP",
+        ),
+        (
+            -1,
+            0,
+            0,
+            99.0,
+            100.0,
+            "short stopped: price rose above the band's bottom or VWAP",
+        ),
+        (1, -1, -1, 97.0, 100.0, "long stopped below the band: sell short"),
+        (-1, 1, 1, 103.0, 100.0, "short stopped above the band: buy"),
+        (0, -1, 0, 97.0, 100.0, "below the band, but long only: stay flat"),
+    ],
+)
+def test_describe(before, wanted, after, price, vwap, expected):
+    assert describe(before, wanted, after, price, 98.0, 102.0, vwap) == expected
+
+
+def test_describe_a_missing_band():
+    reason = describe(1, 1, 1, 100.0, NAN, NAN, 99.0)
+    assert reason == "no noise band at this minute (a past session lacks it): no change"

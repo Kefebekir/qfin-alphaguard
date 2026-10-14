@@ -1,188 +1,203 @@
-"""The QQQ strategy's choices, day by day, as a page to open in a browser.
+"""The day book: the QQQ strategy's choices, day by day, from its decision log.
 
-For every session from FIRST on, the rules of qqq_momentum.py (decision
-0011, cap 2x) are replayed on the stored minutes, and every decision at
-HH:00 and HH:30 is kept with what it saw: the price, the noise band's edges,
-VWAP, the position chosen and why, and the price it filled at. The page lists
-the days with their results; a click shows the day's chart and decisions.
+The engine runs momentum.py's NoiseAreaMomentum on the stored QQQ minutes
+from 30,000 USD, at Alpaca's fees and QQQ's measured half spread (0.3 bps,
+engine_check.py), with a stand-in for Guard that sends every order: Guard's
+limits for this strategy are Phase 2's step 4, and nothing here trades. Its
+decision log is stored under LOG (decision_log.py) and read back into a page:
+the days with their results after costs, and for each day its chart (price,
+noise band, VWAP, fills) and every decision with the reason the strategy
+wrote for it.
+
+The band on the chart is the strategy's own noise_band at every minute, from
+the history the strategy keeps.
 
 The page holds prices from licensed data, so it is written under data/,
 which git ignores, and is for personal use only: do not publish it.
 
-Usage: daily_choices.py data/raw FIRST OUT.html [CHECK.parquet]
-CHECK is qqq_momentum.py's output; each day's result must match it.
+Usage: daily_choices.py ROOT FIRST OUT.html LOG
 """
 
 import json
+import math
 import sys
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
 
-from qfin_alphaguard.data.intraday import intraday_path
+from qfin_alphaguard.backtest.broker import CostModel, NextBarBroker
+from qfin_alphaguard.backtest.engine import SessionClose, run_backtest
+from qfin_alphaguard.data.intraday import intraday_path, minute_feed
+from qfin_alphaguard.decision_log import read_decision_log, write_decision_log
+from qfin_alphaguard.guard.check import GuardDecision
+from qfin_alphaguard.momentum import NoiseAreaMomentum, noise_band
 from qfin_alphaguard.sessions import sessions
 
 ROOT, FIRST, OUT = Path(sys.argv[1]), date.fromisoformat(sys.argv[2]), Path(sys.argv[3])
-CHECK = Path(sys.argv[4]) if len(sys.argv) > 4 else None
-LOOKBACK, TARGET_VOL, CAP = 14, 0.02, 2.0
-PER_SHARE, PER_VALUE = 0.001, 0.15e-4
+LOG = Path(sys.argv[4])
+CASH = 30_000.0
 NEW_YORK = ZoneInfo("America/New_York")
+POSITION = {"long": 1, "flat": 0, "short": -1}
 
-opens = {s.day: s.open for s in sessions(date(2016, 1, 1), date(2026, 12, 31))}
+
+class SendsEverything:
+    """Not Guard: lets every intent through, for this replay only."""
+
+    def check(self, intent, view):
+        return GuardDecision(intent)
+
+
 bars = (
     pl.concat(
         [
-            pl.read_parquet(intraday_path(ROOT, "QQQ", y)).select(
+            pl.read_parquet(intraday_path(ROOT, "QQQ", year)).select(
                 "start", "open", "high", "low", "close", "volume"
             )
-            for y in range(2016, 2027)
-            if intraday_path(ROOT, "QQQ", y).exists()
+            for year in range(2016, 2027)
+            if intraday_path(ROOT, "QQQ", year).exists()
         ]
     )
     .with_columns(pl.col("start").dt.date().alias("day"))
     .sort("start")
 )
+first, last = bars["day"].min(), bars["day"].max()
+result = run_backtest(
+    minute_feed(
+        ROOT, {year: ["QQQ"] for year in range(first.year, last.year + 1)}, first, last
+    ),
+    NoiseAreaMomentum(),
+    NextBarBroker(CostModel(half_spread_bps=0.3)),
+    SendsEverything(),
+    CASH,
+)
+write_decision_log(result.log, LOG)
+notes, fills = read_decision_log(LOG)  # the page reads the stored log
+closes = [record for record in result.log if isinstance(record, SessionClose)]
+value_before = dict(
+    zip([c.day for c in closes], [CASH] + [c.value for c in closes[:-1]], strict=True)
+)
+value_after = {c.day: c.value for c in closes}
+sessions_by_day = {s.day: s for s in sessions(first, last)}
+
+
+def minutes_since_open(times: pl.Series, open_at) -> list[int]:
+    return [int((t - open_at).total_seconds() // 60) for t in times]
+
+
+def number(value) -> float | None:
+    """A float for the page, or None where JSON has no NaN."""
+    if value is None or not math.isfinite(value):
+        return None
+    return round(float(value), 3)
+
+
+notes = notes.with_columns(pl.col("time").dt.date().alias("day"))
+fills = fills.with_columns(pl.col("time").dt.date().alias("day"))
+notes_by_day = {day: frame for (day,), frame in notes.group_by("day")}
+fills_by_day = {day: frame for (day,), frame in fills.group_by("day")}
+
+# A tracker with the strategy's own memory, to draw its band at every minute.
+tracker = NoiseAreaMomentum()
 days = []
 for (day,), g in bars.group_by("day", maintain_order=True):
-    start = opens.get(day)
-    if start is None:
-        continue
-    k = ((g["start"] - start).dt.total_minutes()).to_numpy()
-    keep = k >= 0
-    days.append(
-        {"day": day, "start": start, "k": k[keep].astype(int)}
-        | {
-            c: g[c].to_numpy()[keep].astype(float)
-            for c in ("open", "high", "low", "close", "volume")
-        }
-    )
-
-
-def reason(before: int, after: int, p: float, up: float, lo: float, vwap: float) -> str:
-    if before == after:
-        if after == 0:
-            return "inside the noise band: stay flat"
-        stop = max(up, vwap) if after == 1 else min(lo, vwap)
-        return f"trend holds; the stop is at {stop:.2f}"
-    if after == 1:
-        return (
-            "above the band: buy"
-            if before == 0
-            else "short stopped, and above the band: buy"
+    session = sessions_by_day[day]
+    rows = list(g.iter_rows(named=True))
+    day_open = rows[0]["open"]
+    ready = len(tracker.moves) == tracker.moves.maxlen
+    n = int((rows[-1]["start"] - session.open).total_seconds() // 60) + 1
+    if day >= FIRST and ready:
+        prev_close = tracker.closes[-1]
+        band = [
+            noise_band(list(tracker.moves), m, day_open, prev_close) for m in range(n)
+        ]
+        typical = (g["high"] + g["low"] + g["close"]) / 3
+        vwap = (typical * g["volume"]).cum_sum() / g["volume"].cum_sum()
+        minute_of = minutes_since_open(g["start"], session.open)
+        price = dict(zip(minute_of, g["close"].to_list(), strict=True))
+        vwap_at = dict(zip(minute_of, vwap.to_list(), strict=True))
+        step, last_price, last_vwap, series = 5, math.nan, math.nan, []
+        for m in range(n):
+            last_price = price.get(m, last_price)
+            last_vwap = vwap_at.get(m, last_vwap)
+            if m % step == 0:
+                series.append((m, last_price, band[m][0], band[m][1], last_vwap))
+        day_notes = notes_by_day.get(day, notes.clear())
+        day_fills = fills_by_day.get(day, fills.clear())
+        fill_minutes = minutes_since_open(day_fills["time"], session.open)
+        fill_prices = day_fills["price"].to_list()
+        held, marks = 0.0, []  # each fill, and the side it leaves the position on
+        for minute, row in zip(
+            fill_minutes, day_fills.iter_rows(named=True), strict=True
+        ):
+            held = round(
+                held + (row["quantity"] if row["side"] == "buy" else -row["quantity"]),
+                9,
+            )
+            after = 1 if held > 0 else (-1 if held < 0 else 0)
+            marks.append({"t": minute, "price": number(row["price"]), "after": after})
+        decisions = []
+        for row in day_notes.iter_rows(named=True):
+            minute = int((row["time"] - session.open).total_seconds() // 60)
+            fill = next(
+                (
+                    p
+                    for t, p in zip(fill_minutes, fill_prices, strict=True)
+                    if t == minute
+                ),
+                None,
+            )
+            decisions.append(
+                {
+                    "t": minute,
+                    "price": number(row["price"]),
+                    "upper": number(row.get("upper")),
+                    "lower": number(row.get("lower")),
+                    "vwap": number(row.get("vwap")),
+                    "position": POSITION[row["choice"]],
+                    "fill": number(fill),
+                    "why": row["reason"],
+                }
+            )
+        entry = next(
+            (r for r in day_notes.iter_rows(named=True) if r.get("shares")), None
         )
-    if after == -1:
-        return (
-            "below the band: sell short"
-            if before == 0
-            else "long stopped, and below the band: sell short"
-        )
-    return (
-        "long stopped: price fell below the band's top or VWAP"
-        if before == 1
-        else ("short stopped: price rose above the band's bottom or VWAP")
-    )
-
-
-moves, closes, out = [], [d["close"][-1] for d in days], []
-for i, d in enumerate(days):
-    n = int(d["k"].max()) + 1
-    price = np.full(n, np.nan)
-    price[d["k"]] = d["close"]
-    price = pl.Series(price).fill_nan(None).fill_null(strategy="forward").to_numpy()
-    nxt_open = np.full(n + 1, np.nan)
-    nxt_open[d["k"]] = d["open"]
-    move = np.abs(price / d["open"][0] - 1)
-    if i < LOOKBACK + 1:
-        moves.append(move)
-        continue
-    sigma = np.array(
-        [np.mean([p[m] for p in moves[-LOOKBACK:] if m < len(p)]) for m in range(n)]
-    )
-    prev_close, o = closes[i - 1], d["open"][0]
-    upper = max(o, prev_close) * (1 + sigma)
-    lower = min(o, prev_close) * (1 - sigma)
-    typical = (d["high"] + d["low"] + d["close"]) / 3
-    vwap_k = np.full(n, np.nan)
-    vwap_k[d["k"]] = np.cumsum(typical * d["volume"]) / np.maximum(
-        np.cumsum(d["volume"]), 1
-    )
-    vwap = pl.Series(vwap_k).fill_nan(None).fill_null(strategy="forward").to_numpy()
-    vol = np.diff(np.log(closes[i - LOOKBACK - 1 : i])).std(ddof=1)
-    size = min(CAP, TARGET_VOL / vol)
-    moves.append(move)
-    if d["day"] < FIRST:
-        continue
-    pos, decisions = 0, []
-    for t in range(30, n, 30):
-        p, up, lo, vw = price[t - 1], upper[t - 1], lower[t - 1], vwap[t - 1]
-        before = pos
-        if pos == 0:
-            pos = 1 if p > up else (-1 if p < lo else 0)
-        elif pos == 1 and p < max(up, vw):
-            pos = -1 if p < lo else 0
-        elif pos == -1 and p > min(lo, vw):
-            pos = 1 if p > up else 0
-        fill = nxt_open[t] if t < n and not np.isnan(nxt_open[t]) else price[t - 1]
-        decisions.append(
+        size = entry["shares"] * entry["price"] / entry["account"] if entry else 0.0
+        days.append(
             {
-                "t": t,
-                "price": p,
-                "upper": up,
-                "lower": lo,
-                "vwap": vw,
-                "position": pos,
-                "fill": fill if pos != before else None,
-                "why": reason(before, pos, p, up, lo, vw),
+                "day": day.isoformat(),
+                "open_et": session.open.astimezone(NEW_YORK).strftime("%H:%M"),
+                "net": value_after[day] / value_before[day] - 1,
+                "fees": round(float(day_fills["commission"].sum()), 2),
+                "trades": day_fills.height,
+                "size": round(abs(size), 2),
+                "prev_close": number(prev_close),
+                "minutes": [m for m, *_ in series],
+                "price": [number(v) for _, v, *_ in series],
+                "lower": [number(v) for _, _, v, *_ in series],
+                "upper": [number(v) for *_, v, _ in series],
+                "vwap": [number(v) for *_, v in series],
+                "decisions": decisions,
+                "fills": marks,
             }
         )
-    ret, traded, held, entry = 0.0, 0.0, 0, None
-    for t, want in [(x["t"], x["position"]) for x in decisions] + [(n, 0)]:
-        fill = (
-            nxt_open[t] if t < n and not np.isnan(nxt_open[t]) else price[min(t, n) - 1]
-        )
-        if want != held:
-            if held != 0:
-                ret += held * (fill / entry - 1)
-            traded += abs(want - held)
-            held, entry = want, fill
-    net = ret * size - traded * size * (PER_VALUE + PER_SHARE / o)
-    step = 5  # the chart's points: every 5th minute's close
-    out.append(
-        {
-            "day": d["day"].isoformat(),
-            "open_et": d["start"].astimezone(NEW_YORK).strftime("%H:%M"),
-            "size": round(size, 3),
-            "net": net,
-            "gross": ret * size,
-            "trades": int(traded),
-            "prev_close": prev_close,
-            "minutes": list(range(0, n, step)),
-            "price": [round(x, 3) for x in price[::step]],
-            "upper": [round(x, 3) for x in upper[::step]],
-            "lower": [round(x, 3) for x in lower[::step]],
-            "vwap": [round(x, 3) for x in vwap[::step]],
-            "decisions": [
-                {k: (round(v, 3) if isinstance(v, float) else v) for k, v in x.items()}
-                for x in decisions
-            ],
-        }
-    )
-
-if CHECK is not None:
-    expected = dict(pl.read_parquet(CHECK).select("day", "net_2x").iter_rows())
-    worst = max(abs(x["net"] - expected[date.fromisoformat(x["day"])]) for x in out)
-    print(f"largest difference from {CHECK.name}: {worst:.2e}")
-    assert worst < 1e-12
+    tracker.prices, tracker.day_open, tracker.flow, tracker.volume = {}, None, 0.0, 0
+    view = SimpleNamespace(session=session)
+    for row in rows:
+        tracker.record(SimpleNamespace(**row), view)
+    tracker.on_session_end(view)
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 page = Path(__file__).with_name("daily_choices.html").read_text()
-OUT.write_text(page.replace("/*DATA*/null", json.dumps(out, separators=(",", ":"))))
-r = np.array([x["net"] for x in out])
+OUT.write_text(page.replace("/*DATA*/null", json.dumps(days, separators=(",", ":"))))
+r = np.array([d["net"] for d in days])
 print(
-    f"{len(out)} days from {out[0]['day']} to {out[-1]['day']}: "
-    f"{np.prod(1 + r) - 1:+.1%} in all, {np.mean(r > 0):.0%} of days won, "
-    f"{np.mean([x['trades'] > 0 for x in out]):.0%} of days traded; written to {OUT}"
+    f"{len(days)} days from {days[0]['day']} to {days[-1]['day']}: "
+    f"{np.prod(1 + r) - 1:+.1%} in all after costs, Sharpe "
+    f"{r.mean() / r.std(ddof=1) * math.sqrt(252):.2f}, {np.mean(r > 0):.0%} of days won, "
+    f"{np.mean([d['trades'] > 0 for d in days]):.0%} of days traded; "
+    f"{notes.height} notes and {fills.height} fills in {LOG}; written to {OUT}"
 )

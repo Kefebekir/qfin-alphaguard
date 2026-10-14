@@ -12,6 +12,7 @@ from qfin_alphaguard.backtest.engine import (
 from qfin_alphaguard.events import (
     Bar,
     Cancellation,
+    DecisionNote,
     Delisting,
     Dividend,
     Fill,
@@ -408,8 +409,54 @@ def test_cancelling_an_order_that_is_not_open_is_refused():
 
 def test_an_answer_that_is_not_a_decision_is_refused():
     strategy = Script({at(1): lambda view: ["buy A"]})
-    with pytest.raises(TypeError, match="OrderIntent or Cancellation"):
+    with pytest.raises(TypeError, match="OrderIntent, Cancellation or DecisionNote"):
         run([bar("A", 0)], strategy)
+
+
+def note(view, reason="above the band: buy", **seen):
+    return DecisionNote("A", view.now, "long", reason, seen or {"price": 100.0})
+
+
+def test_a_decision_note_goes_into_the_log_before_the_order_it_explains():
+    strategy = Script({at(1): lambda view: [note(view), buy(view)]})
+    result = run([bar("A", 0), bar("A", 1)], strategy)
+    kinds = [type(r).__name__ for r in result.log if not isinstance(r, SessionClose)]
+    assert kinds[:3] == ["DecisionNote", "OrderIntent", "Order"]
+    (logged,) = records(result, DecisionNote)
+    assert logged.time == at(1) and logged.seen["price"] == 100.0
+
+
+def test_a_note_is_never_shown_to_guard_and_trades_nothing():
+    class CountingGuard(AllowAll):
+        def __init__(self):
+            self.asked = []
+
+        def check(self, intent, view):
+            self.asked.append(intent)
+            return super().check(intent, view)
+
+    guard = CountingGuard()
+    strategy = Script({at(1): lambda view: [note(view)]})
+    result = run([bar("A", 0), bar("A", 1)], strategy, guard=guard)
+    assert guard.asked == []
+    assert records(result, Order) == [] and result.positions == {}
+
+
+def test_a_note_dated_before_its_data_is_look_ahead():
+    def backdated(view):
+        return [DecisionNote("A", view.now - timedelta(minutes=1), "flat", "why")]
+
+    with pytest.raises(LookAheadError, match="dated"):
+        run([bar("A", 0)], Script({at(1): backdated}))
+
+
+def test_notes_are_part_of_the_fingerprint():
+    def fingerprint(reason):
+        strategy = Script({at(1): lambda view: [note(view, reason)]})
+        return run([bar("A", 0)], strategy).fingerprint()
+
+    assert fingerprint("one reason") == fingerprint("one reason")
+    assert fingerprint("one reason") != fingerprint("another")
 
 
 def test_open_orders_are_cancelled_at_the_close_and_each_day_is_valued():

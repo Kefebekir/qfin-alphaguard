@@ -10,6 +10,7 @@ from qfin_alphaguard.events import (
     Bar,
     Cancellation,
     DailyPlan,
+    DecisionNote,
     Delisting,
     Dividend,
     ExecutionSettings,
@@ -228,6 +229,57 @@ def test_a_cancellation_names_its_order_and_a_utc_time():
         Cancellation("", T)
     with pytest.raises(ValueError, match="UTC"):
         Cancellation("bt-0000001", NAIVE)
+
+
+def make_note(**changes):
+    values = {
+        "ticker": "QQQ",
+        "time": T,
+        "choice": "long",
+        "reason": "above the band: buy",
+        "seen": {"price": 101.0, "upper": 100.5, "lower": 98.0},
+    }
+    values.update(changes)
+    return DecisionNote(**values)
+
+
+def test_a_decision_note_keeps_what_was_seen_read_only_and_copied():
+    seen = {"price": 101.0}
+    note = make_note(seen=seen)
+    seen["price"] = 999.0  # the caller's dict changes later
+    assert note.seen["price"] == 101.0
+    with pytest.raises(TypeError):
+        note.seen["price"] = 1.0
+    with pytest.raises(FrozenInstanceError):
+        note.reason = "another"
+
+
+def test_a_decision_note_may_hold_nan_but_not_infinity_or_non_numbers():
+    assert math.isnan(make_note(seen={"upper": math.nan}).seen["upper"])
+    assert make_note(seen={"shares": np.float64(85.5)}).seen["shares"] == 85.5
+    with pytest.raises(ValueError, match="infinite"):
+        make_note(seen={"upper": math.inf})
+    for wrong in (True, "101", Decimal(1), None):
+        with pytest.raises(TypeError, match="number"):
+            make_note(seen={"price": wrong})
+
+
+@pytest.mark.parametrize("field", ["ticker", "choice", "reason"])
+def test_a_decision_note_needs_a_ticker_a_choice_and_a_reason(field):
+    with pytest.raises(ValueError, match=field):
+        make_note(**{field: ""})
+
+
+def test_a_decision_note_needs_a_utc_time():
+    with pytest.raises(ValueError, match="UTC"):
+        make_note(time=NAIVE)
+    with pytest.raises(ValueError, match="UTC"):
+        make_note(time=LONDON_SUMMER)
+
+
+def test_a_seen_value_needs_a_name():
+    with pytest.raises(ValueError, match="name"):
+        make_note(seen={"": 1.0})
 
 
 @pytest.mark.parametrize("ratio", [0.0, -2.0, 1.0, math.nan])

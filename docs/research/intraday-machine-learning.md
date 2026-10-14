@@ -222,41 +222,44 @@ for the nightly plan.
 
 ## 5. Seeing the choices day by day, and proving them forward
 
-### 5.1 The day book, now
+### 5.1 The day book
 
-`research/intraday_pilot/daily_choices.py` replays the QQQ rules on the
-stored minutes and writes a page for the browser
+`research/intraday_pilot/daily_choices.py` writes a page for the browser
 (`data/reports/qqq_day_book.html`):
 
 - **the days,** month by month, each with its result after costs, and the
   totals: return, Sharpe ratio, worst drawdown, the share of days won and
   traded;
 - **a day's chart:** QQQ's price, the noise band, VWAP, and a dot at each
-  fill (green into a long, red into a short, grey out);
-- **a day's decisions,** at 10:00, 10:30 and every half hour to 15:30: the
-  price, the band, VWAP, the position chosen, the fill, and why ("above the
-  band: buy", "long stopped: price fell below the band's top or VWAP",
-  "trend holds; the stop is at 735.84").
+  fill (green: now long, red: now short, grey: now flat);
+- **a day's decisions,** at 10:00, 10:30 and every half hour to 15:30, and
+  the close a minute before the end: the price, the band, VWAP, the
+  position chosen, the fill, and why ("above the band: buy", "long stopped:
+  price fell below the band's top or VWAP", "the trend holds; its stop is
+  at 735.84").
 
-It checks itself: every day's result must equal `qqq_momentum.py`'s to
-1e-12, and over the 613 sessions from May 2024 it does exactly. The page
-holds licensed prices, so it stays in the git-ignored `data/` and is for
-Efe's own use.
+The page holds licensed prices, so it stays in the git-ignored `data/` and
+is for Efe's own use.
 
-### 5.2 In the engine, next
+### 5.2 The decision log (Phase 2, step 3)
 
-The day book replays the research code. Once the strategy runs in our
-engine, the engine itself should write what the page shows:
+Since step 3 the page no longer replays research code: it runs the engine
+and reads what the strategy logged.
 
-- **A decision log:** every decision with its time, what the strategy saw,
-  the choice, its reason, and the order it sent, written by the `Strategy`
-  through one small interface. The same log in a backtest, in paper trading
-  and live.
-- **The day book reads the log** instead of replaying, and adds the broker's
-  fills and the slippage against the decision price.
-- **Each evening of paper trading,** the day's page and a replay of the same
-  day from the stored minutes are compared; Gate M3 asks that a replay
-  reproduces at least 95% of the paper decisions.
+- **A DecisionNote for every decision,** a kept position included: its time,
+  what the strategy saw (price, band, VWAP, shares, volatility, the
+  account), the choice, and the reason in words. The engine writes it into
+  the log before the orders it explains; Guard never sees it.
+- **Stored as tables** (`decision_log.py`): the notes and the fills, as
+  Parquet. The live engine is to write the same tables, so a paper day and a
+  backtest day are read the same way.
+- **The same decisions as the research.** Of the research's 32,190
+  half-hourly decisions in 2016–2026, 32,189 are the same in the log. The
+  other fell in the market-wide halt of 18 March 2020: the engine decided on
+  the first minute after trading resumed.
+- **Each evening of paper trading** (Phase 3), the day's page and a replay of
+  the same day from the stored minutes are to be compared; Gate M3 asks that
+  a replay reproduces at least 95% of the paper decisions.
 
 ### 5.3 Proving it forward
 

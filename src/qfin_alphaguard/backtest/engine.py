@@ -11,7 +11,8 @@ slice, which is handled in a fixed order:
 2. The portfolio books the fills, and the strategy hears of each one.
 3. The strategy sees the slice, now complete, and answers with decisions.
 4. Each order intent passes Guard; what Guard lets through becomes an order,
-   sent at the end of this slice.
+   sent at the end of this slice. A DecisionNote, the strategy's account of
+   why, goes into the log as it comes, before the orders it explains.
 
 The engine is the referee. It checks every fill against the broker contract
 (backtest/broker.py) and every Guard answer against GuardDecision, and stops
@@ -35,6 +36,7 @@ from qfin_alphaguard.backtest.broker import SimulatedBroker
 from qfin_alphaguard.events import (
     Bar,
     Cancellation,
+    DecisionNote,
     Delisting,
     Dividend,
     Fill,
@@ -71,7 +73,8 @@ class SessionClose:
 
 
 Record = (
-    OrderIntent
+    DecisionNote
+    | OrderIntent
     | Order
     | Fill
     | Cancellation
@@ -245,14 +248,18 @@ class _Engine:
         self.log.append(fill)
 
     def decide(self, decision: object, now: datetime) -> None:
-        if not isinstance(decision, OrderIntent | Cancellation):
+        if not isinstance(decision, OrderIntent | Cancellation | DecisionNote):
             raise TypeError(
-                f"a strategy answers with OrderIntent or Cancellation, not {decision!r}"
+                "a strategy answers with OrderIntent, Cancellation or DecisionNote, "
+                f"not {decision!r}"
             )
         if decision.time != now:
             raise LookAheadError(
                 f"a decision made at {now} is dated {decision.time}: {decision}"
             )
+        if isinstance(decision, DecisionNote):
+            self.log.append(decision)  # the decision log; Guard never sees a note
+            return
         if isinstance(decision, Cancellation):
             if decision.client_order_id not in self.open:
                 raise BacktestError(

@@ -11,11 +11,19 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from types import MappingProxyType
 
-from qfin_alphaguard.events import Bar, Cancellation, Fill, Order, OrderIntent
+from qfin_alphaguard.events import (
+    Bar,
+    Cancellation,
+    DecisionNote,
+    Fill,
+    Order,
+    OrderIntent,
+)
 from qfin_alphaguard.sessions import Session
 
-# What a strategy may answer with after a slice of bars.
-Decision = OrderIntent | Cancellation
+# What a strategy may answer with after a slice of bars: orders to send or
+# cancel, and notes for the decision log on why.
+Decision = OrderIntent | Cancellation | DecisionNote
 
 
 @dataclass(frozen=True)
@@ -63,8 +71,9 @@ class Strategy:
     def on_bars(self, bars: Mapping[str, Bar], view: View) -> Sequence[Decision]:
         """Bars that ended at `view.now`, by ticker. Answer with decisions.
 
-        Each OrderIntent and Cancellation must carry `view.now` as its time:
-        a decision cannot be dated earlier than the data it was made from.
+        Each OrderIntent, Cancellation and DecisionNote must carry `view.now`
+        as its time: a decision cannot be dated earlier than the data it was
+        made from.
         """
         return ()
 
