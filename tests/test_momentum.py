@@ -2,6 +2,7 @@ import math
 import statistics
 from datetime import date, timedelta
 from itertools import pairwise
+from pathlib import Path
 
 import pytest
 
@@ -13,9 +14,12 @@ from qfin_alphaguard.events import (
     DecisionNote,
     Fill,
     OrderIntent,
+    RiskEvent,
     Side,
 )
 from qfin_alphaguard.guard.check import GuardDecision
+from qfin_alphaguard.guard.config import load_guard_config
+from qfin_alphaguard.guard.rules import Guard
 from qfin_alphaguard.momentum import (
     MomentumSettings,
     NoiseAreaMomentum,
@@ -149,7 +153,7 @@ CASH = 30_000.0
 
 
 class AllowAll:
-    """Guard stand-in that sends every intent: step 4 sets the real limits."""
+    """Guard stand-in that sends every intent: most tests are of the strategy alone."""
 
     def check(self, intent, view):
         return GuardDecision(intent)
@@ -180,7 +184,7 @@ def session_bars(session, price, ticker="QQQ"):
         last = close
 
 
-def run(paths, settings=None, broker=None):
+def run(paths, settings=None, broker=None, guard=None):
     """The strategy over DAYS: `paths` maps a day's number to its price path."""
 
     def feed():
@@ -190,7 +194,8 @@ def run(paths, settings=None, broker=None):
 
     strategy = NoiseAreaMomentum(settings)
     broker = broker or NextBarBroker(CostModel(half_spread_bps=0.0))
-    return run_backtest(feed(), strategy, broker, AllowAll(), CASH), strategy
+    guard = guard or AllowAll()
+    return run_backtest(feed(), strategy, broker, guard, CASH), strategy
 
 
 def trend(start, slope):
@@ -293,15 +298,17 @@ def test_decisions_come_only_every_half_hour():
     assert all(t % 30 == 0 or t == 389 or t - 1 in times for t in times)
 
 
-def test_turning_from_long_to_short_closes_first_then_opens():
-    def path(minute):
-        if minute <= 60:
-            return 100.0 * (1 + 0.0003 * minute)
-        top = 100.0 * (1 + 0.0003 * 60)
-        return top * (1 - 0.001 * (minute - 60))
+def up_then_down(minute):
+    """Up for an hour, then down for the rest of the day."""
+    if minute <= 60:
+        return 100.0 * (1 + 0.0003 * minute)
+    top = 100.0 * (1 + 0.0003 * 60)
+    return top * (1 - 0.001 * (minute - 60))
 
+
+def test_turning_from_long_to_short_closes_first_then_opens():
     session = DAYS[WARM]
-    result, _ = run({WARM: path})
+    result, _ = run({WARM: up_then_down})
     sent = intents(result, session.day)
     reasons = [(ny_minutes(session, i.time), i.side, i.reason) for i in sent]
     closing = [r for r in reasons if r[2] == "close before turning"]
@@ -317,6 +324,21 @@ def test_turning_from_long_to_short_closes_first_then_opens():
         before = position
         position += fill.quantity if fill.side is Side.BUY else -fill.quantity
         assert before * position >= 0 or abs(position) < 1e-9
+
+
+def test_guard_with_the_qqq_account_s_limits_lets_a_turn_and_the_close_through():
+    # guard_qqq.yaml as it is in the repository (decision 0019).
+    limits = load_guard_config(Path(__file__).resolve().parents[1] / "guard_qqq.yaml")
+    session = DAYS[WARM]
+    result, _ = run({WARM: up_then_down}, guard=Guard(limits))
+    assert not [record for record in result.log if isinstance(record, RiskEvent)]
+    reasons = [intent.reason for intent in intents(result, session.day)]
+    assert reasons == [
+        "decision",
+        "close before turning",
+        "decision",
+        "close at the day's end",
+    ]
 
 
 def test_every_order_is_inside_guards_collar():
@@ -344,31 +366,95 @@ def test_the_account_value_at_the_open_and_the_volatility_size_the_day():
     assert value_before > CASH  # the first day's gain is in it
 
 
-def test_an_unfilled_order_is_cancelled_and_sent_again():
-    class FillsLate(NextBarBroker):
-        """Lets the first minute after each order pass without a fill."""
+class Refuses(NextBarBroker):
+    """Fills nothing for the orders `refused` picks, until `until`."""
 
-        def __init__(self):
-            super().__init__(CostModel(half_spread_bps=0.0))
-            self.skipped = set()
+    def __init__(self, refused, until=None):
+        super().__init__(CostModel(half_spread_bps=0.0))
+        self.refused, self.until = refused, until
 
-        def on_bar(self, bar):
-            waiting = [o for o in self.waiting.values() if o.sent_at <= bar.start]
-            new = [o for o in waiting if o.client_order_id not in self.skipped]
-            if new:
-                self.skipped.update(o.client_order_id for o in new)
-                return []
-            return super().on_bar(bar)
+    def on_bar(self, bar):
+        held_back = {
+            client_order_id: order
+            for client_order_id, order in self.waiting.items()
+            if self.refused(order) and (self.until is None or bar.start < self.until)
+        }
+        for client_order_id in held_back:
+            del self.waiting[client_order_id]
+        fills = super().on_bar(bar)
+        self.waiting.update(held_back)
+        return fills
 
+
+def test_an_order_still_open_waits_for_the_next_decision_to_go_again():
     session = DAYS[WARM]
-    result, _ = run({WARM: trend(100.0, 0.0002)}, broker=FillsLate())
-    cancelled = [
+    first_buy = "bt-0000001"
+    broker = Refuses(
+        lambda order: order.client_order_id == first_buy,
+        until=session.open + timedelta(minutes=75),
+    )
+    result, _ = run({WARM: trend(100.0, 0.0002)}, broker=broker)
+    sent = intents(result, session.day)
+    # The 10:00 buy does not fill; nothing is sent again until 10:30.
+    assert [ny_minutes(session, i.time) for i in sent][:2] == [30, 60]
+    (cancelled,) = [
         r
         for r in result.log
         if isinstance(r, Cancellation) and r.time.date() == session.day
     ]
-    assert cancelled
+    assert (cancelled.client_order_id, ny_minutes(session, cancelled.time)) == (
+        first_buy,
+        60,
+    )
+    assert result.positions == {}  # it filled at 10:30 and closed at the end
+
+
+def test_a_close_that_does_not_fill_is_closed_on_the_next_sessions_first_bar():
+    def refused(order):
+        return (
+            order.intent.reason == "close at the day's end"
+            and order.sent_at.date() == DAYS[WARM].day
+        )
+
+    session, next_session = DAYS[WARM], DAYS[WARM + 1]
+    paths = {WARM: trend(100.0, 0.0002), WARM + 1: lambda minute: calm(0, minute)}
+    result, _ = run(paths, broker=Refuses(refused))
+    closes = [r for r in result.log if isinstance(r, SessionClose)]
+    assert closes[WARM].day == session.day
+    # The close was refused: the position stays overnight ...
+    held = [f for f in fills(result, session.day)]
+    assert len(held) == 1 and held[0].side is Side.BUY
+    # ... and goes on the next session's first bar, before any decision.
+    (sale,) = intents(result, next_session.day)[:1]
+    assert sale.side is Side.SELL and ny_minutes(next_session, sale.time) == 1
+    assert sale.quantity == held[0].quantity
     assert result.positions == {}
+
+
+def test_a_refused_order_is_not_sent_again_on_every_bar():
+    class RejectsAll:
+        def check(self, intent, view):
+            from qfin_alphaguard.events import RiskAction, RiskEvent
+
+            event = RiskEvent(view.now, "test", RiskAction.REJECT, "no", intent.ticker)
+            return GuardDecision(None, event)
+
+    def feed():
+        for number, session in enumerate(DAYS[: WARM + 1]):
+            path = (
+                trend(100.0, 0.0002)
+                if number == WARM
+                else (lambda minute, n=number: calm(n, minute))
+            )
+            yield from session_bars(session, path)
+
+    result = run_backtest(
+        feed(), NoiseAreaMomentum(), NextBarBroker(), RejectsAll(), CASH
+    )
+    session = DAYS[WARM]
+    times = [ny_minutes(session, i.time) for i in intents(result, session.day)]
+    # one try at each decision, never one a minute
+    assert times == [*range(30, 361, 30)]  # nothing held, so nothing to close at 15:59
 
 
 def test_settings_are_checked():

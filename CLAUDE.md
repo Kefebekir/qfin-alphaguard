@@ -72,7 +72,8 @@ Both ruff commands must pass before a commit.
   equal-spaced child orders that Phase 2's timing model has to beat
 - `src/qfin_alphaguard/backtest/`: the event loop, the simulated broker, and
   `qfin backtest`'s runs and report
-- `guard.yaml`, `src/qfin_alphaguard/guard/`: the risk limits and the code that
+- `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
+  of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
 - `src/qfin_alphaguard/data/`: downloads from EODHD and Alpaca, validation,
   S&P 500 membership by date, splits and dividends, Parquet and DuckDB
@@ -87,8 +88,8 @@ Both ruff commands must pass before a commit.
   the backtester fills an order no earlier than the next bar.
 - **UTC everywhere.** Every timestamp is a timezone-aware UTC `datetime`.
 - **Events validate themselves** in `__post_init__` and are frozen dataclasses.
-- **Risk limits belong in `guard.yaml`** and change only by hand, never from
-  code or a model.
+- **Risk limits belong in `guard.yaml` and `guard_qqq.yaml`** and change only
+  by hand, never from code or a model.
 - **No tests, no merge.** Every new module comes with tests.
 
 ## Never

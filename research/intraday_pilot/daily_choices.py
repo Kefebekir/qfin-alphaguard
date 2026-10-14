@@ -2,9 +2,11 @@
 
 The engine runs momentum.py's NoiseAreaMomentum on the stored QQQ minutes
 from 30,000 USD, at Alpaca's fees and QQQ's measured half spread (0.3 bps,
-engine_check.py), with a stand-in for Guard that sends every order: Guard's
-limits for this strategy are Phase 2's step 4, and nothing here trades. Its
-decision log is stored under LOG (decision_log.py) and read back into a page:
+engine_check.py), behind Guard with the QQQ account's limits, GUARD_QQQ_YAML
+(decision 0019). Its max_order_usd is for a 30,000 USD account and is lifted
+here: over ten years this account grows several times over, and the cap
+would cut every later order. Nothing here trades. Its decision log is stored
+under LOG (decision_log.py) and read back into a page:
 the days with their results after costs, and for each day its chart (price,
 noise band, VWAP, fills) and every decision with the reason the strategy
 wrote for it.
@@ -15,12 +17,13 @@ the history the strategy keeps.
 The page holds prices from licensed data, so it is written under data/,
 which git ignores, and is for personal use only: do not publish it.
 
-Usage: daily_choices.py ROOT FIRST OUT.html LOG
+Usage: daily_choices.py ROOT FIRST OUT.html LOG GUARD_QQQ_YAML
 """
 
 import json
 import math
 import sys
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,22 +36,18 @@ from qfin_alphaguard.backtest.broker import CostModel, NextBarBroker
 from qfin_alphaguard.backtest.engine import SessionClose, run_backtest
 from qfin_alphaguard.data.intraday import intraday_path, minute_feed
 from qfin_alphaguard.decision_log import read_decision_log, write_decision_log
-from qfin_alphaguard.guard.check import GuardDecision
+from qfin_alphaguard.events import RiskEvent
+from qfin_alphaguard.guard.config import load_guard_config
+from qfin_alphaguard.guard.rules import Guard
 from qfin_alphaguard.momentum import NoiseAreaMomentum, noise_band
 from qfin_alphaguard.sessions import sessions
 
 ROOT, FIRST, OUT = Path(sys.argv[1]), date.fromisoformat(sys.argv[2]), Path(sys.argv[3])
 LOG = Path(sys.argv[4])
+LIMITS = replace(load_guard_config(sys.argv[5]), max_order_usd=1e12)
 CASH = 30_000.0
 NEW_YORK = ZoneInfo("America/New_York")
 POSITION = {"long": 1, "flat": 0, "short": -1}
-
-
-class SendsEverything:
-    """Not Guard: lets every intent through, for this replay only."""
-
-    def check(self, intent, view):
-        return GuardDecision(intent)
 
 
 bars = (
@@ -71,7 +70,7 @@ result = run_backtest(
     ),
     NoiseAreaMomentum(),
     NextBarBroker(CostModel(half_spread_bps=0.3)),
-    SendsEverything(),
+    Guard(LIMITS),
     CASH,
 )
 write_decision_log(result.log, LOG)
@@ -199,5 +198,7 @@ print(
     f"{np.prod(1 + r) - 1:+.1%} in all after costs, Sharpe "
     f"{r.mean() / r.std(ddof=1) * math.sqrt(252):.2f}, {np.mean(r > 0):.0%} of days won, "
     f"{np.mean([d['trades'] > 0 for d in days]):.0%} of days traded; "
-    f"{notes.height} notes and {fills.height} fills in {LOG}; written to {OUT}"
+    f"{notes.height} notes and {fills.height} fills in {LOG}; "
+    f"{sum(isinstance(r, RiskEvent) for r in result.log)} Guard events; "
+    f"written to {OUT}"
 )

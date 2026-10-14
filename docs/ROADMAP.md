@@ -19,14 +19,16 @@ week alongside university.
 - **The day book shows every decision:** `daily_choices.py` runs the
   engine and writes a page with each day's chart, and every decision with
   the reason the strategy logged for it, from May 2024.
-- **Steps 2 and 3 are done:** the QQQ strategy runs in our engine, trades on
-  the same days as the research (#33), and writes a decision log (#34).
-  **Step 4 is next:** Guard's limits for it, Efe's, by hand.
+- **Steps 2, 3 and 4 are done:** the QQQ strategy runs in our engine,
+  trades on the same days as the research (#33), writes a decision log
+  (#34), and trades behind Guard with its own account's limits,
+  `guard_qqq.yaml` (decision 0019). **Step 5 is next:** the shadow record
+  for ML challengers.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
-  - the plan, 10.6–10.8% a year with 12.8% volatility;
-  - SPY, 15.2% with 17.7%;
+  - the plan, 10.7–10.8% a year with 12.7% volatility;
+  - SPY, 15.3% with 17.7%;
   - equal weight, 17.5% with 19.3%.
 
   Guard checks every order (decision 0014), and the trades go out in
@@ -213,8 +215,8 @@ January exams.
 | 1. Research: what ML can do within the day, and the day book | Claude | done, #32 |
 | 2. The QQQ strategy as its own `Strategy` in our engine | Efe's rules; Claude's skeleton | done, #33 |
 | 3. The decision log, and the day book reading it | Claude | done, #34 |
-| 4. Guard's limits for an intraday strategy | Efe, in `guard.yaml` | next |
-| 5. The shadow record for ML challengers | Claude | planned |
+| 4. Guard's limits for an intraday strategy | Efe: the rules, and the limits in `guard_qqq.yaml` | done |
+| 5. The shadow record for ML challengers | Claude | next |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
    band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
@@ -242,9 +244,24 @@ January exams.
      32,189 of the research's 32,190 half-hourly decisions are the same;
      the other fell in the market-wide halt of 18 March 2020, when the
      engine decided on the first minute after trading resumed.
-4. [ ] **Guard's limits for an intraday strategy,** set by Efe: round trips
-   and reversals allowed for it, the 2× cap, the daily loss limit
-   (`no_same_day_reversal` and 3 orders a stock a day forbid it today).
+4. [x] **Guard's limits for an intraday strategy** (decision 0019):
+   - **A position can always be closed.** An order that only reduces one
+     faces only the price collar and the orders a minute. Under the old
+     rules, with the numbers loosened, Guard dropped the strategy's closing
+     orders: 412 nights held, and the account at −705 USD in January 2018.
+   - An order through zero is dropped (close first), and shorts count as
+     exposure, with the open orders that add to it.
+   - **The QQQ account has its own file, `guard_qqq.yaml`:** shorts and
+     2.1×, 70,000 USD an order for a 30,000 USD account, 12 orders a day,
+     reversals allowed, and no daily loss limit, by Efe's choice (`false`).
+     `guard.yaml` stays the nightly plan's.
+   - Over 2016–2026 the new limits change none of the strategy's fills once
+     the order cap follows the account's growth. A daily loss limit of 3% or
+     more would never have acted.
+   - The strategy sends an order only when something calls for it, not
+     again on every bar after Guard drops one.
+   - The nightly plan's sales now go out after its 2% loss limit: the same
+     10.8% a year, and its worst day −6.5% instead of −7.7%.
 5. [ ] **The shadow record for ML challengers:**
    - a frozen model (commit, training dates, hash of its weights) and its
      test, written down before its record starts: the paired daily

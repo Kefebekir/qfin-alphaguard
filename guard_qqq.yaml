@@ -1,0 +1,20 @@
+# Risk limits for the QQQ intraday strategy's account (decision 0019): one
+# ETF, long or short, at up to 2x, and flat before every close. The nightly
+# plan keeps guard.yaml. Change only by hand, through a commit; never from
+# code or a model. Every key is required and an unknown key is an error, so a
+# typo cannot switch a rule off.
+#
+# An order that only reduces a position faces only price_collar_bps and
+# max_orders_per_min: no limit may keep a position from being closed.
+
+allow_short: true              # the strategy goes short below the noise band
+max_weight: 2.1                # QQQ is at most 2.1 times the account, long or short
+max_gross_exposure: 2.1        # the strategy's 2x, and room for the price to move after the open
+max_order_usd: 70000           # for a 30,000 USD account; raise it by hand as the account grows
+price_collar_bps: 50           # limit price within 0.5% of the last price
+max_orders_per_min: 10         # the strategy sends at most 1 a minute
+max_trades_per_symbol_day: 12  # then no new risk that day; the strategy sent at most 10 in 10.7 years
+no_same_day_reversal: false    # the strategy turns from long to short by design
+daily_loss_limit_pct: false    # none: new risk may go after any loss that day
+stale_data_sec: 15             # no new risk on a price older than 15 seconds
+live_trading: false            # set to true by hand for a live account

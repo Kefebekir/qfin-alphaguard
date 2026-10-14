@@ -36,17 +36,17 @@ in [docs/ROADMAP.md](docs/ROADMAP.md).
 ## First results
 
 `qfin backtest` replays the nightly plan on the stored 1-minute bars from 5
-January 2016 to 8 October 2026, with Alpaca's costs and Guard. The baselines
+January 2016 to 9 October 2026, with Alpaca's costs and Guard. The baselines
 are before costs:
 - the same stocks at equal weight, bought anew each 1 January and held;
 - SPY.
 
 | | A year | Volatility | Sharpe | Max drawdown |
 | --- | --- | --- | --- | --- |
-| The plan, 500 USD | +10.6% | 12.8% | 0.85 | −23.4% |
-| The plan, 30,000 USD | +10.8% | 12.8% | 0.86 | −23.3% |
+| The plan, 500 USD | +10.7% | 12.7% | 0.87 | −23.3% |
+| The plan, 30,000 USD | +10.8% | 12.7% | 0.88 | −23.3% |
 | The same stocks, equal weight | +17.5% | 19.3% | 0.93 | −31.7% |
-| SPY | +15.2% | 17.7% | 0.89 | −33.7% |
+| SPY | +15.3% | 17.7% | 0.89 | −33.7% |
 
 **The plan loses to both baselines.** It is the least-variance mix of each
 year's 50 most liquid S&P 500 stocks.
@@ -95,9 +95,13 @@ The system runs three loops at three speeds:
 2. **Every one-minute bar, in the engine.** Update features, score each stock with
    the intraday model and decide whether to send the next slice of the day's
    rebalance or wait.
-3. **Every order, in Guard.** Check the order against `guard.yaml`: position and
-   order size limits, a price collar, no same-day reversals and a daily loss limit.
-   Guard is a rule-based referee, not a model, and its limits change only by hand.
+3. **Every order, in Guard.** Check the order against its account's limits
+   (`guard.yaml` for the nightly plan, `guard_qqq.yaml` for QQQ): position and
+   order size limits, a price collar, orders a minute and a day, and for the
+   nightly plan no same-day reversals and a daily loss limit. An order that only
+   reduces a position faces only the price collar and the orders a minute, so a
+   position can always be closed. Guard is a rule-based referee, not a model, and
+   its limits change only by hand.
 
 Research and the models use the S&P 500 as it was on each day, including
 companies that later left the index; the system trades the most liquid of these
