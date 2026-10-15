@@ -63,3 +63,5 @@ All of it stays in the git-ignored `data/` (licensed or bulky):
 | `tsmom.py` | Time-series momentum on the ETFs |
 | `gex.py`, `gamma_top_third.py`, `gamma_validate.py` | Real dealer gamma: test 5, the exploration, test 6 |
 | `b1_b2.py`, `b3.py`, `b4.py`, `b5.py`, `b6.py`, `rsi.py` | Tests 7 and 8 |
+| `evidence_power.py` | The shadow record's betting test by simulation: false promotions, time to find an edge, the shares of alpha, the clip (decision 0020) |
+| `shadow_demo.py` | The shadow record on real minutes: the rule against a variant deciding every 15 minutes, each in its own account behind `guard_qqq.yaml` |

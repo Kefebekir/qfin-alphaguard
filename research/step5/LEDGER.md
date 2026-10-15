@@ -6,8 +6,10 @@ down, with its direction, data and threshold, before its result was computed; it
 output is in `results/`. An **exploration** was looked at without such a note: it can suggest a
 hypothesis, never confirm one. Times are UTC.
 
-Ideas tried count against every later claim: with this many tests, a single t of 2 means
-little. The shadow record (step 5's platform) counts its challengers on top of these.
+Ideas tried count against every later claim on this data: with this many tests, a single t
+of 2 means little. The shadow record (step 5's platform, decision 0020) judges its challengers
+on days after they were frozen, which none of these tests saw, so they spend nothing from its
+alpha. They still say what to expect: most ideas fail.
 
 ## Pre-registered tests
 

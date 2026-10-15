@@ -1,0 +1,14 @@
+training 2016-01-04 to 2022-12-30, 1762 days
+   rule +13.9% a year, Sharpe 1.19
+   variant +13.6% a year, Sharpe 1.08
+   card: scale 0.9299, clip 2.8%, alpha 2.5%: promoted at wealth 40
+record 2023-01-03 to 2026-10-09, 946 days
+   rule +18.7% a year, Sharpe 1.56
+   variant at the rule's risk +13.9% a year, Sharpe 1.14
+   difference -1.87 bps a day, t -1.46
+   wealth at the end 0.982, at most 1.002; promoted: no
+   days beyond the clip: ['2025-04-07']
+   wealth at the end of 2023: 0.982
+   wealth at the end of 2024: 0.982
+   wealth at the end of 2025: 0.982
+   wealth at the end of 2026: 0.982
