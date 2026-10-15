@@ -27,8 +27,22 @@
   is no better, the winnings never grow on average, and the chance that they
   ever reach 1/α is at most α, however often they are read and whenever the
   record stops (Ville's inequality).
-- **Efe chose** that each challenger trade in its own virtual account, with
-  the rule's costs and Guard.
+- **Efe chose:**
+  - each challenger trades in its own virtual account, with the rule's
+    costs and Guard;
+  - the test compares at equal risk, and the record shows the raw results
+    beside it.
+- **Why equal risk.** Efe asked about a model that keeps taking more risk
+  and earns much more. On real minutes, the rule at double size earned 37.3%
+  a year in 2023–2026 against the rule's 18.7%. It made the same decisions,
+  so it had no new skill. Compared raw, the same test would have promoted it
+  on 9 April 2025; at equal risk it never moved.
+  - **Equal risk only removes the average level of risk.** The scale is one
+    number from the training days, so a model that takes more risk on good
+    days and less on bad ones keeps that advantage.
+  - **Taking more risk is a setting, not a skill:** the rule's size, within
+    Guard's limits. A model that earns more for each unit of risk wins at
+    equal risk, and can then run at whatever size Efe chooses.
 
 ## Decision
 
@@ -65,6 +79,15 @@
 - **scale** puts the challenger at the rule's risk: the rule's standard
   deviation over the challenger's on its training days. Without it, a
   challenger that only held more would beat the rule in a rising market.
+- **The raw results are shown beside the test** (`shadow.describe`). The
+  record shows three rows:
+  - the rule;
+  - the challenger as it traded;
+  - the challenger at the rule's risk.
+
+  Each row gives the return a year, the volatility, the Sharpe ratio and the
+  total, and the record gives the mean difference a day both ways. Only the
+  test decides.
 - **The bet** is aGRAPA: mean / (variance + mean²) of the x seen so far, with
   one prior day of mean 0 and variance 0.25, never below 0 and never above
   0.5. It uses only the days before.
@@ -138,21 +161,28 @@ difference; the share promoted within 2 / 4 / 8 years, and the median:
 | 2 | 51 / 88 / 100%, 2.0 years | 39 / 83 / 99%, 2.3 years | 23 / 75 / 99%, 2.8 years |
 | 3 | 92 / 100 / 100%, 1.1 years | 86 / 100 / 100%, 1.3 years | 75 / 100 / 100%, 1.5 years |
 
-**On real minutes** (`research/step5/shadow_demo.py`, `results/13_shadow_demo.txt`). It
-replays the rule and a variant that decides every 15 minutes, each in its own
-account behind `guard_qqq.yaml`. The variant's card is written as if frozen
-at the end of 2022: scale 0.9299 and clip 2.8% from 2016–2022.
+**On real minutes** (`research/step5/shadow_demo.py`,
+`results/13_shadow_demo.txt`). The rule and two challengers each run in
+their own account behind `guard_qqq.yaml`. Each card is written as if frozen
+at the end of 2022, with its scale and clip from 2016–2022.
 
-- From 3 January 2023 to 9 October 2026, the rule earned 18.7% a year
-  (Sharpe 1.56) and the variant 13.9% at the rule's risk (1.14), 1.87 bps a
-  day less.
-- The bet never grew: W ended at 0.982, and the variant was not promoted.
-- One day was beyond the clip: 7 April 2025, after the tariff announcement.
-- It is a demonstration, not a test. The research had looked at 2023–2026,
-  so its card stays out of `challengers/` and spends no share.
+From 3 January 2023 to 9 October 2026, the rule earned 18.7% a year
+(Sharpe 1.56).
 
-The tests break each part of the platform one at a time. Of 29 such changes,
-28 fail a test. The 29th turns `ceil` into `floor` plus the guard after it,
+| Challenger | Raw: a year, Sharpe | At the rule's risk | A day against the rule, raw / at equal risk | The test | The same test on raw results |
+| --- | --- | --- | --- | --- | --- |
+| decides every 15 minutes (scale 0.9299, clip 2.8%) | +15.0%, 1.14 | +13.9% | −1.46 / −1.87 bps | W 0.982; not promoted | not promoted |
+| the rule at double size (scale 0.4997, clip 0.1%) | +37.3%, 1.56 | +18.6% | +7.38 / −0.01 bps | W 1.000; not promoted | promoted on 9 April 2025 |
+
+- **One day was beyond the variant's clip:** 7 April 2025, after the tariff
+  announcement.
+- **The double-size account had its size limits doubled too,** to 4.2. It is
+  a thought experiment: `guard_qqq.yaml`'s 2.1 would cut it.
+- **These are demonstrations, not tests.** The research had looked at
+  2023–2026, so their cards stay out of `challengers/` and spend no share.
+
+The tests break each part of the platform one at a time. Of 34 such changes,
+33 fail a test. The 34th turns `ceil` into `floor` plus the guard after it,
 which is the same function.
 
 ## Consequences

@@ -351,8 +351,8 @@ Vovk; Waudby-Smith and Ramdas 2024).
 Each challenger is frozen on a card in `challengers/` before its record starts, and runs in
 its own account beside the rule's, with the same minutes, costs and Guard. Every day,
 `evidence.py` bets against the rule that the challenger does better at equal risk, with a
-stake fixed from the days before. The simulations in `research/step5/evidence_power.py` set
-three of its choices:
+stake fixed from the days before. The simulations in `research/step5/evidence_power.py` and
+the replays in `shadow_demo.py` set four of its choices:
 
 - **A bet, not a t-test.** A t-test read every evening promoted 26% of challengers with no
   edge within 12 years. The bet promoted 1.3% at alpha 2.5%, as Ville's inequality allows.
@@ -365,11 +365,16 @@ three of its choices:
   with no edge, one that earns a little every day and loses 10% once a year, in 56% of
   records, and would slow a challenger whose differences are small. The clip is the largest
   difference on the training days, and a record day beyond it is listed.
+- **Equal risk decides; the raw results are shown beside it.** On real minutes
+  (`research/step5/shadow_demo.py`), the rule at double size earned 37.3% a year in
+  2023-2026 against 18.7%, with the same decisions. The same test on raw results would have
+  promoted it on 9 April 2025; at equal risk it was level. The scale is one number from the
+  training days, so a model that takes more risk on good days and less on bad ones keeps
+  that advantage.
 
 What it can prove: an edge whose daily difference has a Sharpe ratio of 2 is found in about
-two years, one of 1 in eight or more. A variant replayed on 2023-2026 shows the platform at
-work on real minutes (`research/step5/shadow_demo.py`): it decided every 15 minutes, lost
-1.87 bps a day to the rule, and was not promoted.
+two years, one of 1 in eight or more. A variant that decided every 15 minutes, replayed on
+2023-2026, lost 1.87 bps a day to the rule and was not promoted.
 
 ## References
 

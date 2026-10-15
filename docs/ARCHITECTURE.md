@@ -210,7 +210,9 @@ A model trades only after it beats the rule forward (decisions 0018 and
    days before, and the difference is clipped where its training days ended.
    If the challenger is no better, the winnings reach 1 / its `alpha` with a
    chance of at most that `alpha`, however often they are read. The `alpha`s
-   of every card ever add to at most 2.5%.
+   of every card ever add to at most 2.5%. The record shows the challenger's
+   raw results beside those at the rule's risk (`shadow.describe`); only the
+   test decides.
 4. **Promotion is evidence, not a switch.** A promoted challenger trades
    only by Efe's decision record. In Phase 3 the same accounts run on live
    bars, and only the rule's orders go to the paper account.

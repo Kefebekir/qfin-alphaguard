@@ -293,9 +293,14 @@ January exams.
          records.
      - **What it can prove:** an edge whose difference has a Sharpe ratio of
        2 is found in about two years; one of 1 takes eight or more.
-     - **On real minutes:** a variant that decides every 15 minutes, replayed
-       as if frozen at the end of 2022, lost 1.87 bps a day to the rule in
-       2023–2026 and was not promoted.
+     - **Equal risk decides, and the raw results are shown beside it** (Efe's
+       choice).
+     - **On real minutes,** replayed as if frozen at the end of 2022:
+       - a variant that decides every 15 minutes lost 1.87 bps a day to the
+         rule in 2023–2026 and was not promoted;
+       - the rule at double size earned 37.3% a year against 18.7%. Compared
+         raw, it would have been promoted on 9 April 2025; at equal risk it
+         was level, as it should be.
    - [ ] **The first challengers:** Efe's own model, trained by him; then any idea that
      earns a place in the ledger.
 

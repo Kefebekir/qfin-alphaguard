@@ -47,8 +47,12 @@ ones frozen.
   If the challenger is no better than the rule, the wealth reaches
   1 / `alpha` with a chance of at most `alpha`, however often it is read.
 - **Promoted** when the wealth reaches 1 / `alpha`. A promotion is evidence
-  for Efe's decision record, never a switch. The record shows the days beyond
-  the clip: results the challenger never showed in training.
+  for Efe's decision record, never a switch.
+- **What the record shows** (`shadow.describe`):
+  - the challenger's raw results beside those at the rule's risk. A model
+    that only takes more risk is ahead raw and level at equal risk;
+  - the days beyond the clip: results the challenger never showed in
+    training.
 
 ## Choosing the share
 
