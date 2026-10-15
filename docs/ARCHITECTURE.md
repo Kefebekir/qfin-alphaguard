@@ -191,6 +191,30 @@ replays the nightly plan on the stored data only, never on a fresh download:
    - the stock-days on which the plan held a stock without minutes;
    - each run's fingerprint. The same inputs give the same report.
 
+## The shadow record
+
+A model trades only after it beats the rule forward (decisions 0018 and
+0020). Until then it is a challenger:
+
+1. **Frozen on a card,** `challengers/<name>.yaml` (`challengers.py`). The card
+   holds the commit of its code, the hash of its weights, its training dates
+   and the first day of its record, after both. It is committed before that
+   day. Weights whose hash differs are refused.
+2. **Run in its own account.** The challenger and the rule each go through the
+   engine on the same minutes, with the same simulated broker, costs and
+   `guard_qqq.yaml`. Neither account's orders leave the engine.
+   `backtest/shadow.py` turns each account's closing values into daily
+   returns and keeps the days both have.
+3. **Judged by a bet** (`evidence.py`). Each day it bets, against the rule,
+   that the challenger does better at equal risk. The stake is set from the
+   days before, and the difference is clipped where its training days ended.
+   If the challenger is no better, the winnings reach 1 / its `alpha` with a
+   chance of at most that `alpha`, however often they are read. The `alpha`s
+   of every card ever add to at most 2.5%.
+4. **Promotion is evidence, not a switch.** A promoted challenger trades
+   only by Efe's decision record. In Phase 3 the same accounts run on live
+   bars, and only the rule's orders go to the paper account.
+
 ## Risk file
 
 Each account has its own limits file at the repository root: `guard.yaml`

@@ -79,7 +79,11 @@ to October 2026, after costs:
 
 So the rules make the decisions, every decision is shown day by day with
 its reason, and ML models run beside them in shadow until one proves
-better.
+better. Each model is frozen before its record starts and trades in its own
+virtual account. It is judged by a daily bet against the rule that stays
+valid however often it is read; a t-test read every evening would promote
+a model with no edge about a quarter of the time
+([decision 0020](docs/decisions/0020-the-shadow-record.md)).
 
 An earlier pilot for the nightly plan, a monthly ranking of stocks, is set
 aside with its result: about 8% a year over equal weight after costs, but

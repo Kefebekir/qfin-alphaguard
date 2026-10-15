@@ -70,8 +70,11 @@ Both ruff commands must pass before a commit.
   DecisionNote and fill, stored as Parquet
 - `src/qfin_alphaguard/execution.py`: when the day's trades go out; the
   equal-spaced child orders that Phase 2's timing model has to beat
-- `src/qfin_alphaguard/backtest/`: the event loop, the simulated broker, and
-  `qfin backtest`'s runs and report
+- `src/qfin_alphaguard/backtest/`: the event loop, the simulated broker,
+  `qfin backtest`'s runs and report, and the shadow record (`shadow.py`)
+- `src/qfin_alphaguard/challengers.py`, `evidence.py`, `challengers/`: the
+  shadow record's frozen challenger cards and the betting test that judges
+  them against the rule (decision 0020)
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
