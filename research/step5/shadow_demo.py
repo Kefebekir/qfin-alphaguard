@@ -1,40 +1,44 @@
-"""The shadow record on real minutes: the rule against a variant, each in its own account.
+"""The shadow record on real minutes: the rule against two challengers, each in its own account.
 
 Shows the platform (decision 0020) working end to end on the stored QQQ minutes, behind the
 real Guard (guard_qqq.yaml, with max_order_usd lifted as the accounts grow, as in
-research/intraday_pilot/guard_needs.py), from 30,000 USD at QQQ's half spread of 0.3 bps:
+research/intraday_pilot/guard_needs.py), from 30,000 USD at QQQ's half spread of 0.3 bps.
+The rule is momentum.py's NoiseAreaMomentum, deciding every 30 minutes from 10:00. Against it:
 
-- the rule: momentum.py's NoiseAreaMomentum, deciding every 30 minutes from 10:00;
-- a variant as the challenger: the same rules every 15 minutes from 09:45
-  (MomentumSettings(every_min=15)), its settings file standing for the weights.
+1. a variant that applies the same rules every 15 minutes from 09:45
+   (MomentumSettings(every_min=15));
+2. the rule at double size (cap 4, target volatility 4%), in an account whose size limits are
+   doubled too (max_weight and max_gross_exposure 4.2): a thought experiment, since
+   guard_qqq.yaml's 2.1 would cut it. It makes the same decisions, so it has no new skill. It
+   shows why the test compares at equal risk while the raw results are shown beside it.
 
-Its card is written as if frozen on 30 December 2022: its scale and clip from 2016-2022
-(evidence.training_settings), its record from 3 January 2023 to 9 October 2026. This is not a
-test. The step 5 research looked at 2023-2026, so this record spends nothing from the platform's
-alpha and its card stays out of challengers/. It shows the parts working together on real data:
-two engine runs, their daily returns, the card, its checks, the record and its evidence.
+For each, the last line says what the same test on raw results (scale 1, its clip from the
+same training days) would have said, for comparison only.
+
+Each card is written as if frozen on 30 December 2022, with its settings file standing for the
+weights: its scale and clip from 2016-2022 (evidence.training_settings), its record from 3
+January 2023 to 9 October 2026. These are not tests. The step 5 research looked at 2023-2026,
+so the records spend nothing from the platform's alpha and the cards stay out of challengers/.
 
 Usage: shadow_demo.py ROOT GUARD_QQQ_YAML OUT_DIR
 """
 
 import hashlib
 import json
-import math
 import subprocess
 import sys
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-import numpy as np
 import yaml
 
 from qfin_alphaguard.backtest.broker import CostModel, NextBarBroker
 from qfin_alphaguard.backtest.engine import run_backtest
-from qfin_alphaguard.backtest.shadow import daily_returns, shadow_record
+from qfin_alphaguard.backtest.shadow import daily_returns, describe, shadow_record
 from qfin_alphaguard.challengers import load_card, weights_path
 from qfin_alphaguard.data.intraday import minute_feed
-from qfin_alphaguard.evidence import training_settings
+from qfin_alphaguard.evidence import BettingTest, round_up, training_settings
 from qfin_alphaguard.guard.config import load_guard_config
 from qfin_alphaguard.guard.rules import Guard
 from qfin_alphaguard.momentum import MomentumSettings, NoiseAreaMomentum
@@ -48,76 +52,86 @@ FIRST, TRAINED_TO, RECORD_FROM, LAST = (
     date(2026, 10, 9),
 )
 GUARD = replace(load_guard_config(LIMITS), max_order_usd=1e12)
-VARIANT = MomentumSettings(every_min=15)
+DOUBLED = replace(GUARD, max_weight=4.2, max_gross_exposure=4.2)
+COMMIT = subprocess.run(
+    ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+).stdout.strip()
 
 
-def returns(settings):
+def returns(settings, limits):
     feed = minute_feed(
         ROOT, {year: ["QQQ"] for year in range(FIRST.year, LAST.year + 1)}, FIRST, LAST
     )
     broker = NextBarBroker(CostModel(half_spread_bps=0.3))
-    result = run_backtest(feed, NoiseAreaMomentum(settings), broker, Guard(GUARD), CASH)
+    result = run_backtest(
+        feed, NoiseAreaMomentum(settings), broker, Guard(limits), CASH
+    )
     return daily_returns(result, CASH)
 
 
-def year_stats(values):
-    v = np.asarray(values)
-    return f"{v.mean() * 252:+.1%} a year, Sharpe {v.mean() / v.std(ddof=1) * math.sqrt(252):.2f}"
+def freeze(name, description, settings, challenger, rule):
+    """Write the challenger's card as if frozen at the end of 2022, and read it back."""
+    training = sorted(d for d in rule.keys() & challenger.keys() if d <= TRAINED_TO)
+    scale, clip = training_settings(
+        [challenger[d] for d in training], [rule[d] for d in training]
+    )
+    OUT.mkdir(parents=True, exist_ok=True)
+    weights = OUT / f"{name}.json"
+    weights.write_text(json.dumps(asdict(settings), sort_keys=True) + "\n")
+    card = {
+        "name": name,
+        "description": description,
+        "owner": "Efe",
+        "code_commit": COMMIT,
+        "weights": weights.as_posix(),
+        "weights_sha256": hashlib.sha256(weights.read_bytes()).hexdigest(),
+        "trained_from": training[0],
+        "trained_to": training[-1],
+        "frozen_at": datetime(2022, 12, 30, 23, 0, tzinfo=UTC),
+        "record_from": RECORD_FROM,
+        "scale": scale,
+        "clip": clip,
+        "alpha": 0.025,
+        "retired_on": None,
+    }
+    path = OUT / f"{name}.yaml"
+    path.write_text(yaml.safe_dump(card, sort_keys=False))
+    frozen = load_card(path)
+    weights_path(frozen)  # the settings file is the one frozen
+    raw_clip = round_up(max(abs(challenger[d] - rule[d]) for d in training))
+    return frozen, len(training), raw_clip
 
 
-rule, challenger = returns(MomentumSettings()), returns(VARIANT)
-training = sorted(d for d in rule.keys() & challenger.keys() if d <= TRAINED_TO)
-scale, clip = training_settings(
-    [challenger[d] for d in training], [rule[d] for d in training]
-)
-
-OUT.mkdir(parents=True, exist_ok=True)
-settings_file = OUT / "variant.json"
-settings_file.write_text(json.dumps(asdict(VARIANT), sort_keys=True) + "\n")
-card = {
-    "name": "every-15-minutes",
-    "description": "The rule's decisions every 15 minutes from 09:45 (a demonstration).",
-    "owner": "Efe",
-    "code_commit": subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-    ).stdout.strip(),
-    "weights": settings_file.as_posix(),
-    "weights_sha256": hashlib.sha256(settings_file.read_bytes()).hexdigest(),
-    "trained_from": training[0],
-    "trained_to": training[-1],
-    "frozen_at": datetime(2022, 12, 30, 23, 0, tzinfo=UTC),
-    "record_from": RECORD_FROM,
-    "scale": scale,
-    "clip": clip,
-    "alpha": 0.025,
-    "retired_on": None,
-}
-card_file = OUT / "every-15-minutes.yaml"
-card_file.write_text(yaml.safe_dump(card, sort_keys=False))
-frozen = load_card(card_file)
-weights_path(frozen)  # the settings file is the one frozen
-
-record = shadow_record(frozen, challenger, rule, until=LAST)
-evidence = record.evidence
-print(f"training {training[0]} to {training[-1]}, {len(training)} days")
-print(f"   rule {year_stats([rule[d] for d in training])}")
-print(f"   variant {year_stats([challenger[d] for d in training])}")
-print(f"   card: scale {scale}, clip {clip:.1%}, alpha 2.5%: promoted at wealth 40")
-print(f"record {record.days[0]} to {record.days[-1]}, {len(record.days)} days")
-print(f"   rule {year_stats(record.rule)}")
-print(
-    f"   variant at the rule's risk {year_stats([scale * c for c in record.challenger])}"
-)
-diff = np.asarray(record.challenger) * scale - np.asarray(record.rule)
-print(
-    f"   difference {diff.mean() * 1e4:+.2f} bps a day, t "
-    f"{diff.mean() / diff.std(ddof=1) * math.sqrt(len(diff)):+.2f}"
-)
-print(
-    f"   wealth at the end {evidence.wealth[-1]:.3f}, at most {max(evidence.wealth):.3f}; "
-    f"promoted: {'on ' + str(record.days[evidence.promoted_on]) if evidence.promoted else 'no'}"
-)
-print(f"   days beyond the clip: {[str(record.days[i]) for i in evidence.clipped]}")
-for year in sorted({d.year for d in record.days}):
-    last = max(i for i, d in enumerate(record.days) if d.year == year)
-    print(f"   wealth at the end of {year}: {evidence.wealth[last]:.3f}")
+rule = returns(MomentumSettings(), GUARD)
+challengers = [
+    (
+        "every-15-minutes",
+        "The rule's decisions every 15 minutes from 09:45.",
+        MomentumSettings(every_min=15),
+        GUARD,
+    ),
+    (
+        "double-size",
+        "The rule at double size: the same decisions, no new skill.",
+        MomentumSettings(cap=4.0, target_vol=0.04),
+        DOUBLED,
+    ),
+]
+for number, (name, description, settings, limits) in enumerate(challengers, 1):
+    challenger = returns(settings, limits)
+    card, trained, raw_clip = freeze(name, description, settings, challenger, rule)
+    print(f"{number}. {name}: {description}")
+    print(
+        f"card: trained on {card.trained_from} to {card.trained_to} ({trained} days), "
+        f"scale {card.scale}, clip {card.clip:.1%}, alpha {card.alpha}"
+    )
+    record = shadow_record(card, challenger, rule, until=LAST)
+    print(describe(record))
+    raw = BettingTest(scale=1.0, clip=raw_clip).run(record.challenger, record.rule)
+    verdict = (
+        f"promoted on {record.days[raw.promoted_on]}"
+        if raw.promoted
+        else "not promoted"
+    )
+    print(f"the same test on raw results (clip {raw_clip:.1%}): {verdict}")
+    print()
