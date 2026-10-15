@@ -1,0 +1,143 @@
+done gru QQQ 2023: {'epochs': [16, 41, 7, 1, 1], 'valid_sharpe': 1.55, 'off_rule': 0.177, 'seconds': 259}
+done gru QQQ 2024: {'epochs': [3, 1, 1, 13, 13], 'valid_sharpe': 2.58, 'off_rule': 0.117, 'seconds': 194}
+done gru QQQ 2025: {'epochs': [2, 1, 2, 1, 2], 'valid_sharpe': 2.21, 'off_rule': 0.014, 'seconds': 139}
+done gru QQQ 2026: {'epochs': [18, 14, 17, 13, 18], 'valid_sharpe': 1.59, 'off_rule': 0.295, 'seconds': 270}
+done gru index 2023: {'epochs': [9, 11, 11, 13, 45], 'valid_sharpe': 0.78, 'off_rule': 0.178, 'seconds': 349}
+done gru index 2024: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': 0.52, 'off_rule': 0.013, 'seconds': 181}
+done gru index 2025: {'epochs': [1, 1, 1, 2, 1], 'valid_sharpe': 0.0, 'off_rule': 0.012, 'seconds': 232}
+done gru index 2026: {'epochs': [26, 39, 20, 28, 68], 'valid_sharpe': 0.95, 'off_rule': 0.43, 'seconds': 823}
+done gru all 2023: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.33, 'off_rule': 0.024, 'seconds': 695}
+done gru all 2024: {'epochs': [1, 1, 6, 10, 1], 'valid_sharpe': -0.42, 'off_rule': 0.116, 'seconds': 986}
+done gru all 2025: {'epochs': [1, 13, 11, 1, 12], 'valid_sharpe': -0.34, 'off_rule': 0.333, 'seconds': 1369}
+done gru all 2026: {'epochs': [12, 19, 18, 19, 12], 'valid_sharpe': 0.37, 'off_rule': 0.813, 'seconds': 2048}
+done attention QQQ 2023: {'epochs': [14, 14, 6, 40, 1], 'valid_sharpe': 1.67, 'off_rule': 0.282, 'seconds': 617}
+done attention QQQ 2024: {'epochs': [3, 1, 3, 5, 1], 'valid_sharpe': 2.53, 'off_rule': 0.032, 'seconds': 371}
+done attention QQQ 2025: {'epochs': [8, 27, 1, 5, 1], 'valid_sharpe': 2.34, 'off_rule': 0.192, 'seconds': 537}
+done attention QQQ 2026: {'epochs': [9, 9, 8, 10, 10], 'valid_sharpe': 1.66, 'off_rule': 0.283, 'seconds': 542}
+done attention index 2023: {'epochs': [14, 14, 12, 12, 7], 'valid_sharpe': 0.6, 'off_rule': 0.24, 'seconds': 729}
+done attention index 2024: {'epochs': [1, 1, 2, 1, 1], 'valid_sharpe': 0.52, 'off_rule': 0.013, 'seconds': 540}
+done attention index 2025: {'epochs': [1, 2, 2, 1, 7], 'valid_sharpe': 0.02, 'off_rule': 0.035, 'seconds': 646}
+done attention index 2026: {'epochs': [23, 10, 16, 6, 8], 'valid_sharpe': 0.37, 'off_rule': 0.265, 'seconds': 1122}
+done attention all 2023: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.32, 'off_rule': 0.017, 'seconds': 1612}
+done attention all 2024: {'epochs': [1, 1, 8, 1, 1], 'valid_sharpe': -0.42, 'off_rule': 0.103, 'seconds': 1820}
+done attention all 2025: {'epochs': [10, 10, 9, 21, 8], 'valid_sharpe': -0.27, 'off_rule': 0.675, 'seconds': 2538}
+done attention all 2026: {'epochs': [9, 20, 7, 10, 7], 'valid_sharpe': 0.41, 'off_rule': 0.797, 'seconds': 2484}
+done rule QQQ 2023: {'off_rule': 0.0, 'seconds': 0}
+done rule QQQ 2024: {'off_rule': 0.0, 'seconds': 0}
+done rule QQQ 2025: {'off_rule': 0.0, 'seconds': 0}
+done rule QQQ 2026: {'off_rule': 0.0, 'seconds': 0}
+done tuned_rule QQQ 2023: {'widen': 0.6, 'off_rule': 0.14, 'seconds': 0}
+done tuned_rule QQQ 2024: {'widen': 1.0, 'off_rule': 0.0, 'seconds': 0}
+done tuned_rule QQQ 2025: {'widen': 1.0, 'off_rule': 0.0, 'seconds': 0}
+done tuned_rule QQQ 2026: {'widen': 1.0, 'off_rule': 0.0, 'seconds': 0}
+done tuned_rule index 2023: {'widen': 1.5, 'off_rule': 0.122, 'seconds': 0}
+done tuned_rule index 2024: {'widen': 1.5, 'off_rule': 0.11, 'seconds': 0}
+done tuned_rule index 2025: {'widen': 1.5, 'off_rule': 0.124, 'seconds': 1}
+done tuned_rule index 2026: {'widen': 1.5, 'off_rule': 0.125, 'seconds': 1}
+done tuned_rule all 2023: {'widen': 1.5, 'off_rule': 0.122, 'seconds': 2}
+done tuned_rule all 2024: {'widen': 1.5, 'off_rule': 0.11, 'seconds': 2}
+done tuned_rule all 2025: {'widen': 1.5, 'off_rule': 0.124, 'seconds': 2}
+done tuned_rule all 2026: {'widen': 1.5, 'off_rule': 0.125, 'seconds': 2}
+done knn QQQ 2023: {'off_rule': 0.503, 'seconds': 3}
+done knn QQQ 2024: {'off_rule': 0.459, 'seconds': 2}
+done knn QQQ 2025: {'off_rule': 0.453, 'seconds': 4}
+done knn QQQ 2026: {'off_rule': 0.455, 'seconds': 3}
+done knn index 2023: {'off_rule': 0.551, 'seconds': 13}
+done knn index 2024: {'off_rule': 0.569, 'seconds': 15}
+done knn index 2025: {'off_rule': 0.56, 'seconds': 18}
+done knn index 2026: {'off_rule': 0.555, 'seconds': 20}
+done knn all 2023: {'off_rule': 0.591, 'seconds': 70}
+done knn all 2024: {'off_rule': 0.596, 'seconds': 85}
+done knn all 2025: {'off_rule': 0.585, 'seconds': 100}
+done knn all 2026: {'off_rule': 0.609, 'seconds': 115}
+done linear QQQ 2023: {'epochs': [1, 1, 1, 1, 2], 'valid_sharpe': 1.37, 'off_rule': 0.023, 'seconds': 4}
+done linear QQQ 2024: {'epochs': [1, 1, 1, 3, 1], 'valid_sharpe': 2.49, 'off_rule': 0.019, 'seconds': 5}
+done linear QQQ 2025: {'epochs': [1, 1, 2, 1, 1], 'valid_sharpe': 2.18, 'off_rule': 0.02, 'seconds': 5}
+done linear QQQ 2026: {'epochs': [18, 42, 66, 60, 16], 'valid_sharpe': 0.69, 'off_rule': 0.111, 'seconds': 16}
+done linear index 2023: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': 0.21, 'off_rule': 0.02, 'seconds': 5}
+done linear index 2024: {'epochs': [2, 1, 1, 1, 1], 'valid_sharpe': 0.51, 'off_rule': 0.02, 'seconds': 6}
+done linear index 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.0, 'off_rule': 0.02, 'seconds': 7}
+done linear index 2026: {'epochs': [32, 31, 40, 36, 43], 'valid_sharpe': 0.02, 'off_rule': 0.173, 'seconds': 23}
+done linear all 2023: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.37, 'off_rule': 0.037, 'seconds': 21}
+done linear all 2024: {'epochs': [138, 96, 200, 1, 122], 'valid_sharpe': -0.32, 'off_rule': 0.322, 'seconds': 209}
+done linear all 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.53, 'off_rule': 0.035, 'seconds': 27}
+done linear all 2026: {'epochs': [44, 42, 37, 43, 54], 'valid_sharpe': -0.12, 'off_rule': 0.474, 'seconds': 110}
+done mlp QQQ 2023: {'epochs': [23, 22, 12, 22, 13], 'valid_sharpe': 1.85, 'off_rule': 0.283, 'seconds': 28}
+done mlp QQQ 2024: {'epochs': [29, 27, 22, 35, 26], 'valid_sharpe': 2.06, 'off_rule': 0.292, 'seconds': 37}
+done mlp QQQ 2025: {'epochs': [3, 9, 2, 5, 10], 'valid_sharpe': 1.86, 'off_rule': 0.272, 'seconds': 19}
+done mlp QQQ 2026: {'epochs': [11, 19, 18, 14, 13], 'valid_sharpe': 1.31, 'off_rule': 0.271, 'seconds': 26}
+done mlp index 2023: {'epochs': [1, 19, 41, 15, 1], 'valid_sharpe': -0.16, 'off_rule': 0.298, 'seconds': 32}
+done mlp index 2024: {'epochs': [37, 27, 34, 29, 22], 'valid_sharpe': 0.62, 'off_rule': 0.303, 'seconds': 59}
+done mlp index 2025: {'epochs': [3, 4, 4, 5, 2], 'valid_sharpe': 0.17, 'off_rule': 0.262, 'seconds': 28}
+done mlp index 2026: {'epochs': [9, 9, 13, 9, 17], 'valid_sharpe': 1.08, 'off_rule': 0.293, 'seconds': 42}
+done mlp all 2023: {'epochs': [1, 1, 49, 1, 1], 'valid_sharpe': -0.77, 'off_rule': 0.301, 'seconds': 123}
+done mlp all 2024: {'epochs': [33, 26, 26, 2, 11], 'valid_sharpe': -0.2, 'off_rule': 0.336, 'seconds': 177}
+done mlp all 2025: {'epochs': [19, 15, 10, 7, 4], 'valid_sharpe': -0.1, 'off_rule': 0.314, 'seconds': 159}
+done mlp all 2026: {'epochs': [14, 21, 33, 14, 17], 'valid_sharpe': 1.01, 'off_rule': 0.352, 'seconds': 228}
+done anchored QQQ 2023: {'epochs': [1, 1, 13, 1, 13], 'valid_sharpe': 1.44, 'off_rule': 0.092, 'seconds': 20}
+done anchored QQQ 2024: {'epochs': [3, 1, 28, 1, 1], 'valid_sharpe': 2.61, 'off_rule': 0.077, 'seconds': 19}
+done anchored QQQ 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': 2.21, 'off_rule': 0.012, 'seconds': 13}
+done anchored QQQ 2026: {'epochs': [17, 40, 29, 44, 20], 'valid_sharpe': 1.35, 'off_rule': 0.246, 'seconds': 38}
+done anchored index 2023: {'epochs': [14, 11, 12, 12, 13], 'valid_sharpe': 0.41, 'off_rule': 0.157, 'seconds': 28}
+done anchored index 2024: {'epochs': [1, 1, 64, 2, 1], 'valid_sharpe': 0.64, 'off_rule': 0.088, 'seconds': 38}
+done anchored index 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': 0.0, 'off_rule': 0.012, 'seconds': 22}
+done anchored index 2026: {'epochs': [6, 6, 7, 5, 7], 'valid_sharpe': -0.07, 'off_rule': 0.078, 'seconds': 33}
+done anchored all 2023: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.33, 'off_rule': 0.018, 'seconds': 66}
+done anchored all 2024: {'epochs': [15, 11, 14, 9, 13], 'valid_sharpe': -0.22, 'off_rule': 0.414, 'seconds': 133}
+done anchored all 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.51, 'off_rule': 0.016, 'seconds': 92}
+done anchored all 2026: {'epochs': [11, 15, 83, 10, 39], 'valid_sharpe': -0.06, 'off_rule': 0.61, 'seconds': 299}
+done gate QQQ 2023: {'epochs': [6, 6, 3, 4, 1], 'valid_sharpe': 1.46, 'off_rule': 0.027, 'seconds': 17}
+done gate QQQ 2024: {'epochs': [18, 20, 19, 24, 12], 'valid_sharpe': 2.88, 'off_rule': 0.094, 'seconds': 30}
+done gate QQQ 2025: {'epochs': [1, 1, 1, 1, 2], 'valid_sharpe': 2.2, 'off_rule': 0.004, 'seconds': 15}
+done gate QQQ 2026: {'epochs': [23, 19, 41, 41, 35], 'valid_sharpe': 1.45, 'off_rule': 0.12, 'seconds': 42}
+done gate index 2023: {'epochs': [19, 46, 6, 19, 1], 'valid_sharpe': 0.75, 'off_rule': 0.039, 'seconds': 33}
+done gate index 2024: {'epochs': [34, 53, 43, 40, 55], 'valid_sharpe': 0.92, 'off_rule': 0.091, 'seconds': 69}
+done gate index 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.01, 'off_rule': 0.001, 'seconds': 23}
+done gate index 2026: {'epochs': [21, 93, 40, 68, 45], 'valid_sharpe': 0.48, 'off_rule': 0.102, 'seconds': 109}
+done gate all 2023: {'epochs': [1, 1, 1, 2, 1], 'valid_sharpe': -0.31, 'off_rule': 0.004, 'seconds': 66}
+done gate all 2024: {'epochs': [19, 11, 11, 45, 85], 'valid_sharpe': -0.39, 'off_rule': 0.083, 'seconds': 252}
+done gate all 2025: {'epochs': [1, 1, 1, 1, 1], 'valid_sharpe': -0.52, 'off_rule': 0.005, 'seconds': 90}
+done gate all 2026: {'epochs': [42, 39, 11, 34, 24], 'valid_sharpe': 0.33, 'off_rule': 0.104, 'seconds': 269}
+done day_size QQQ 2023: {'epochs': [21, 18, 15, 17, 7], 'valid_sharpe': 1.96, 'off_rule': 0.109, 'seconds': 29}
+done day_size QQQ 2024: {'epochs': [6, 10, 32, 10, 8], 'valid_sharpe': 2.74, 'off_rule': 0.061, 'seconds': 26}
+done day_size QQQ 2025: {'epochs': [15, 38, 29, 21, 9], 'valid_sharpe': 2.7, 'off_rule': 0.124, 'seconds': 35}
+done day_size QQQ 2026: {'epochs': [7, 9, 8, 10, 6], 'valid_sharpe': 0.98, 'off_rule': 0.103, 'seconds': 22}
+done day_size index 2023: {'epochs': [9, 12, 29, 34, 25], 'valid_sharpe': 0.8, 'off_rule': 0.067, 'seconds': 40}
+done day_size index 2024: {'epochs': [14, 8, 12, 12, 8], 'valid_sharpe': 0.92, 'off_rule': 0.103, 'seconds': 33}
+done day_size index 2025: {'epochs': [70, 45, 24, 25, 8], 'valid_sharpe': 0.55, 'off_rule': 0.189, 'seconds': 75}
+done day_size index 2026: {'epochs': [9, 59, 18, 9, 10], 'valid_sharpe': 0.23, 'off_rule': 0.204, 'seconds': 52}
+done day_size all 2023: {'epochs': [11, 37, 12, 35, 14], 'valid_sharpe': 0.03, 'off_rule': 0.149, 'seconds': 127}
+done day_size all 2024: {'epochs': [23, 15, 41, 14, 14], 'valid_sharpe': 0.26, 'off_rule': 0.163, 'seconds': 131}
+done day_size all 2025: {'epochs': [5, 7, 5, 8, 3], 'valid_sharpe': -0.19, 'off_rule': 0.174, 'seconds': 88}
+done day_size all 2026: {'epochs': [25, 20, 36, 8, 33], 'valid_sharpe': 0.29, 'off_rule': 0.24, 'seconds': 170}
+
+QQQ, 2023-2026, after costs, each against the rule:
+gru         QQQ   +14.2% a year, Sharpe  1.17, minus the rule -4.48% a year, t -1.54
+gru         index +11.9% a year, Sharpe  0.97, minus the rule -6.48% a year, t -2.06
+gru         all   +15.0% a year, Sharpe  1.13, minus the rule -3.61% a year, t -0.69
+attention   QQQ   +13.0% a year, Sharpe  1.06, minus the rule -5.56% a year, t -1.74
+attention   index +14.7% a year, Sharpe  1.19, minus the rule -4.00% a year, t -1.58
+attention   all   +17.6% a year, Sharpe  1.22, minus the rule -1.28% a year, t -0.20
+rule        QQQ   +19.5% a year, Sharpe  1.55, minus the rule +0.00% a year, t +0.00
+tuned_rule  QQQ   +16.2% a year, Sharpe  1.25, minus the rule -2.66% a year, t -1.24
+tuned_rule  index  +6.0% a year, Sharpe  0.67, minus the rule -12.18% a year, t -3.38
+tuned_rule  all    +6.0% a year, Sharpe  0.67, minus the rule -12.18% a year, t -3.38
+knn         QQQ    -0.8% a year, Sharpe  0.03, minus the rule -18.07% a year, t -2.16
+knn         index  +4.9% a year, Sharpe  0.38, minus the rule -12.44% a year, t -1.31
+knn         all    -9.5% a year, Sharpe -0.52, minus the rule -27.07% a year, t -2.67
+linear      QQQ   +18.5% a year, Sharpe  1.51, minus the rule -0.85% a year, t -0.83
+linear      index +16.8% a year, Sharpe  1.40, minus the rule -2.25% a year, t -1.95
+linear      all    +9.1% a year, Sharpe  0.76, minus the rule -9.00% a year, t -2.39
+mlp         QQQ    +2.5% a year, Sharpe  0.92, minus the rule -15.95% a year, t -3.02
+mlp         index  +1.7% a year, Sharpe  0.54, minus the rule -16.79% a year, t -3.22
+mlp         all    +2.7% a year, Sharpe  0.77, minus the rule -15.80% a year, t -2.81
+anchored    QQQ   +16.5% a year, Sharpe  1.37, minus the rule -2.54% a year, t -1.32
+anchored    index +15.2% a year, Sharpe  1.26, minus the rule -3.62% a year, t -2.19
+anchored    all    +9.5% a year, Sharpe  0.75, minus the rule -8.52% a year, t -1.77
+gate        QQQ   +15.5% a year, Sharpe  1.41, minus the rule -3.49% a year, t -1.45
+gate        index +16.3% a year, Sharpe  1.46, minus the rule -2.81% a year, t -1.14
+gate        all   +14.1% a year, Sharpe  1.24, minus the rule -4.66% a year, t -1.90
+day_size    QQQ   +14.5% a year, Sharpe  1.69, minus the rule -4.59% a year, t -1.37
+day_size    index +13.0% a year, Sharpe  1.85, minus the rule -5.99% a year, t -1.41
+day_size    all    +6.2% a year, Sharpe  1.19, minus the rule -12.35% a year, t -2.54
+EXIT 0

@@ -1,0 +1,8 @@
+Written 2026-10-15T18:21:58Z, before this was computed.
+Replication of Zarattini, Aziz, Barbon (2024), section 4.5: the intraday momentum strategy's
+daily return falls with SPY's 5-day RSI at the previous close (beta -3.25 bps per RSI point,
+p 0.001, 2007-2024), read as a proxy for dealers' gamma.
+R1: the QQQ rule's daily result after costs (policy_data.py's simulation), regressed on SPY's
+    5-day RSI (Wilder) at the previous close, 2016-01-26 to 2026-10-09. Negative slope, t <= -2.0.
+R2: the same with QQQ's own 5-day RSI. Reported beside R1 (R1 is the replication).
+Also reported: the period after the paper (from 2024-06-01) alone.

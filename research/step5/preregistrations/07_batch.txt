@@ -1,0 +1,24 @@
+Written 2026-10-15T18:17:06Z, before any of these was computed. Six ideas from the source
+pool that our data can test. Each has a direction from its paper. Six at once: Bonferroni,
+one-sided 2.5%/6, |t| >= 2.64. Data: 2016-01-05 to 2026-10-09 unless stated.
+
+B1 Heston, Korajczyk, Sadka (JF 2010) at the index level: QQQ's return in a half hour of the
+   day is positively related to the mean of its returns in the same half hour over the previous
+   20 sessions. Pooled over the 13 half hours. Test: slope > 0.
+B2 Harris (JFE 1986): QQQ's last 15 minutes (15:45 to the close) earn more than its average
+   15 minutes of the day. Test: mean of (last 15 minutes' return minus 1/26 of the day's
+   open-to-close return) > 0.
+B3 Lou, Yan, Zhang (RFS 2013) Treasury auction cycle: TLT's close-to-close return over the
+   5 sessions before a 10-year or 30-year Treasury auction is lower than over other 5-session
+   windows; its return from the auction day's close over the next 5 sessions is higher. Test:
+   (after minus before) > 0, over the auctions in 2016-2026. Auction dates from TreasuryDirect.
+B4 Hirshleifer, Shumway (JF 2003): QQQ's open-to-close return is higher on mornings with less
+   cloud in New York (Central Park / LaGuardia, 06:00-10:00 local). Test: slope on cloud cover
+   < 0. Weather from a public archive (Meteostat or NOAA).
+B5 Ang, Timmermann (2012) regimes: a two-state Gaussian hidden Markov model on QQQ's daily
+   returns, fitted each year on the years before only; the noise-area rule's daily result is
+   higher on days the model puts in its high-volatility state (momentum pays in turbulence,
+   Gao et al. 2018). Test: difference > 0.
+B6 Liu, Tsyvinski (RFS 2021); Shen, Urquhart, Wang (2022) crypto: Bitcoin's (BTC/USD, Alpaca)
+   last-week return predicts next week's (time-series momentum), weekly, from Alpaca's first
+   crypto bar to 2026-10-09. Test: slope > 0.

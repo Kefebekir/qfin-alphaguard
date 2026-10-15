@@ -1,0 +1,15 @@
+Written 2026-10-15T11:19:06Z, before any result on 2023-2026 was computed or seen.
+
+Selection stage (2019-2022, QQQ, after costs): 26 learned variants against the rule.
+Only one cleared the Bonferroni hurdle for 26 variants (one-sided 2.5%, t about 2.89):
+the gate fitted on the index ETFs (QQQ, SPY, IWM, DIA), +1.38% a year over the rule, t +3.35.
+Its gain came almost all in 2022 (+5.18%, t 3.43; 2019-2021 +0.04 to +0.22).
+
+Holdout test, fixed now: the same model (policy_nets.py, gate, pool "index", same settings and
+seeds), walk-forward on 2023-2026, judged on QQQ: the paired daily difference against the rule,
+one-sided, passes if t >= 2.0. Reported beside it: the Sharpe ratios, the rule scaled to the
+gate's mean factor, each year, and every other variant (which cannot change the verdict).
+
+Correction, written 2026-10-15T11:19:24Z, still before any 2023-2026 result was seen:
+the Bonferroni hurdle for 26 variants at one-sided 2.5% is t 3.10, not 2.89 (2.89 is the
+one-sided 5% hurdle). The gate's t of 3.35 clears it either way; the selection does not change.

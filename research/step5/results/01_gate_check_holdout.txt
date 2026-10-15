@@ -1,0 +1,49 @@
+2023: refit reproduces the stored daily results: True
+2024: refit reproduces the stored daily results: True
+2025: refit reproduces the stored daily results: True
+2026: refit reproduces the stored daily results: True
+
+the gate's factor on the rule's positions: mean 0.874, median 0.999, 10th-90th percentile 0.268-1.125
+
+rule                                       +19.5% a year, Sharpe  1.55, vol 11.9%, against the rule +0.00% a year, t  +nan
+gate (index ETFs)                          +16.3% a year, Sharpe  1.46, vol 10.8%, against the rule -2.81% a year, t -1.14
+rule x 0.874, its mean factor              +16.9% a year, Sharpe  1.55, vol 10.4%, against the rule -2.32% a year, t -3.00
+rule scaled to the gate's volatility       +17.5% a year, Sharpe  1.55, vol 10.8%, against the rule -1.82% a year, t -3.00
+
+costs doubled:
+rule                                       +15.9% a year, Sharpe  1.29, vol 11.9%, against the rule +0.00% a year, t  +nan
+gate                                       +13.1% a year, Sharpe  1.20, vol 10.8%, against the rule -2.56% a year, t -1.03
+
+by year, against the rule:
+  2023: rule Sharpe  2.51, gate  2.71, difference +1.17% a year, t +0.56
+  2024: rule Sharpe  2.22, gate  1.48, difference -11.71% a year, t -1.75
+  2025: rule Sharpe  0.47, gate  0.48, difference +0.15% a year, t +0.93
+  2026: rule Sharpe  1.19, gate  1.62, difference -0.18% a year, t -0.02
+
+the factor by decision time (slot 0 is 10:00):
+  10:00  0.821
+  10:30  0.806
+  11:00  0.832
+  11:30  0.866
+  12:00  0.864
+  12:30  0.883
+  13:00  0.887
+  13:30  0.883
+  14:00  0.893
+  14:30  0.898
+  15:00  0.915
+  15:30  0.926
+
+the factor against each feature, over the rule's positions:
+  above_upper    correlation +0.390
+  below_lower    correlation +0.354
+  from_vwap      correlation +0.298
+  from_open      correlation +0.328
+  last_30        correlation +0.201
+  gap            correlation +0.328
+  time           correlation +0.102
+  minutes_left   correlation -0.107
+  volume_so_far  correlation -0.252
+  vol_so_far     correlation -0.282
+  sigma          correlation +0.004
+  yesterday      correlation +0.292

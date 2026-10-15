@@ -1,0 +1,20 @@
+G1 (QQQ GEX), 1477 days 2017-2022: slope -10.85 bps per unit rank, t -1.58 -> fail (needs <= -2.24)
+   rank 0.00-0.33: 531 days, rule mean +7.96 bps, Sharpe 1.43
+   rank 0.33-0.67: 533 days, rule mean +10.27 bps, Sharpe 2.24
+   rank 0.67-1.00: 413 days, rule mean +1.19 bps, Sharpe 0.32
+   2017: slope -0.76 bps per unit rank
+   2018: slope -39.72 bps per unit rank
+   2019: slope -19.96 bps per unit rank
+   2020: slope -13.93 bps per unit rank
+   2021: slope -0.20 bps per unit rank
+   2022: slope +8.11 bps per unit rank
+G2 (SPY GEX), 1477 days 2017-2022: slope -12.48 bps per unit rank, t -1.85 -> fail (needs <= -2.24)
+   rank 0.00-0.33: 547 days, rule mean +9.14 bps, Sharpe 1.63
+   rank 0.33-0.67: 456 days, rule mean +12.29 bps, Sharpe 2.85
+   rank 0.67-1.00: 474 days, rule mean -0.88 bps, Sharpe -0.22
+   2017: slope -16.00 bps per unit rank
+   2018: slope -37.30 bps per unit rank
+   2019: slope -34.12 bps per unit rank
+   2020: slope -14.85 bps per unit rank
+   2021: slope +17.72 bps per unit rank
+   2022: slope +15.70 bps per unit rank

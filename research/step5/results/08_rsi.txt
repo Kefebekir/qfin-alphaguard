@@ -1,0 +1,4 @@
+R1 SPY RSI(5) 2016-2026: slope -0.140 bps per RSI point, t -1.88 (n 2693) -> fail
+R1 SPY RSI(5) after the paper, 2024-06 on: slope -0.120 bps per RSI point, t -0.69 (n 591)
+R2 QQQ RSI(5) 2016-2026: slope -0.071 bps per RSI point, t -0.98 (n 2693) -> fail
+R2 QQQ RSI(5) after the paper, 2024-06 on: slope -0.048 bps per RSI point, t -0.29 (n 591)

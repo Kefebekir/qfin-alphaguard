@@ -1,0 +1,18 @@
+B1: QQQ half-hour return on the mean of the same half hour over the 20 sessions before: slope -0.105, t -4.10 (n 34671) -> fail
+B2: last 15 minutes minus an average 15 minutes: -0.18 bps a day, t -0.34 (n 2687) -> fail
+260 10- and 30-year nominal auctions 2016-01-13 .. 2026-09-10
+B3: TLT, after minus before: +9.9 bps per auction over 260 auctions, t +0.63 -> fail
+B4: QQQ open-to-close on morning cloud cover (oktas, 06-10 NY, LaGuardia): slope +0.51 bps per okta, t +0.58 (n 2687) -> fail
+   clear mornings (<= 2 oktas) +3.81 bps (587), overcast (>= 6) +3.49 bps (1151)
+Model is not converging.  Current: 11877.686113463547 is not greater than 11877.733526557753. Delta is -0.047413094205694506
+Model is not converging.  Current: 12681.701094471717 is not greater than 12681.766724046363. Delta is -0.06562957464666397
+Model is not converging.  Current: 13556.201098860087 is not greater than 13556.210836114547. Delta is -0.009737254460560507
+Model is not converging.  Current: 14293.26980290975 is not greater than 14293.32177559818. Delta is -0.051972688430396374
+Model is not converging.  Current: 15099.18867802441 is not greater than 15099.249206844292. Delta is -0.06052881988216541
+Model is not converging.  Current: 15748.353933606164 is not greater than 15748.451430594552. Delta is -0.09749698838822951
+Model is not converging.  Current: 16521.566367531555 is not greater than 16521.7141335457. Delta is -0.1477660141463275
+Model is not converging.  Current: 17119.74317776825 is not greater than 17119.762761601844. Delta is -0.019583833593060263
+Model is not converging.  Current: 17879.80129441606 is not greater than 17879.81095648488. Delta is -0.00966206882003462
+Model is not converging.  Current: 18652.528339461704 is not greater than 18652.549541074288. Delta is -0.021201612584263785
+B5: rule in the HMM's high-volatility state +5.91 bps (608 days, Sharpe 1.17) vs low +6.21 bps (2085, Sharpe 1.35); t -0.08 -> fail
+B6: BTC next week's return on last week's: slope +0.110, t +1.92 (300 weeks, 2021-01-04 00:00:00+00:00 .. 2026-10-05 00:00:00+00:00) -> fail

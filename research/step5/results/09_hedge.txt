@@ -1,0 +1,36 @@
+33 experts, 1954 days 2019-01-02 .. 2026-10-09, eta 0.1196
+2019-2026
+  rule                           +15.1% a year, Sharpe  1.26; minus the rule +0.00%, t +0.00
+  Hedge                          +10.1% a year, Sharpe  1.10; minus the rule -4.70%, t -3.67
+  Fixed-Share                     +8.9% a year, Sharpe  1.06; minus the rule -5.86%, t -3.80
+  equal weight of all experts     +8.9% a year, Sharpe  1.07; minus the rule -5.88%, t -3.72
+  best in hindsight: day_size_index +11.4% a year, Sharpe  1.33; minus the rule -3.62%, t -1.66
+2019-2022
+  rule                           +11.2% a year, Sharpe  0.98; minus the rule +0.00%, t +0.00
+  Hedge                           +7.2% a year, Sharpe  0.84; minus the rule -3.88%, t -2.13
+  Fixed-Share                     +6.8% a year, Sharpe  0.82; minus the rule -4.32%, t -2.15
+  equal weight of all experts     +6.9% a year, Sharpe  0.84; minus the rule -4.21%, t -2.03
+  best in hindsight: gamma_H1    +15.9% a year, Sharpe  1.28; minus the rule +4.26%, t +1.81
+2023-2026
+  rule                           +19.5% a year, Sharpe  1.55; minus the rule +0.00%, t +0.00
+  Hedge                          +13.3% a year, Sharpe  1.36; minus the rule -5.58%, t -3.10
+  Fixed-Share                    +11.2% a year, Sharpe  1.31; minus the rule -7.50%, t -3.17
+  equal weight of all experts    +11.0% a year, Sharpe  1.31; minus the rule -7.67%, t -3.18
+  best in hindsight: gamma_inverse +21.8% a year, Sharpe  1.86; minus the rule +1.84%, t +0.65
+
+the largest weights at the end (Hedge | Fixed-Share):
+  tuned_rule_QQQ       0.056 | 0.034
+  attention_all        0.054 | 0.028
+  no_fomc              0.054 | 0.033
+  rule_QQQ             0.054 | 0.034
+  gate_index           0.052 | 0.034
+  day_size_index       0.049 | 0.032
+the rule's weight at the start of each year (Hedge, Fixed-Share):
+  2019: 0.030, 0.030
+  2020: 0.031, 0.030
+  2021: 0.031, 0.030
+  2022: 0.033, 0.030
+  2023: 0.038, 0.031
+  2024: 0.044, 0.032
+  2025: 0.051, 0.033
+  2026: 0.048, 0.030

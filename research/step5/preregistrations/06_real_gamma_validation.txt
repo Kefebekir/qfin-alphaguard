@@ -1,0 +1,21 @@
+Written 2026-10-15T18:06:07Z, before any open interest after 2022 was downloaded.
+
+Seen on 2017-2022 after the pre-registered test G1/G2 failed (result.txt; exploratory): on days
+whose GEX rank is in its top third (dealers most long gamma), the QQQ rule earns about nothing
+(QQQ's GEX: +1.2 bps against +9.1 on other days, t -2.07; SPY's GEX: -0.9 against +10.6,
+t -2.97), in 2017-2020 and in 2021-2022 alike. The literature predicts this (Baltussen et al.
+2021; Dim, Eraker, Vilkov; Adams et al.): positive dealer gamma turns momentum into reversal.
+
+Validation, run once, on 2023-01-03 to 2026-10-09 with the same GEX measure (gex.py, same
+code; open interest from the 06:30 ET publication, the morning window 10:00-12:00 UTC):
+V-G: the rule's mean daily result after costs on days whose QQQ GEX rank (trailing 250
+sessions) is at least 2/3 is below its mean on the other days. One-sided Welch t <= -2.0.
+Reported beside it: each year, each third's Sharpe ratio, and what the rule earns if flat on
+those days.
+Only QQQ's options are tested (the budget left fits one: about 89 USD for QQQ, 108 for SPY).
+
+Implementation note, written 2026-10-15T18:12:11Z, before GEX for 2023-2026 was computed:
+from OPRA's Pillar format (28 March 2023) each contract's open interest is sent once per
+exchange, 17 identical copies (checked on the 2024-06-03 sample: no contract's copies differ).
+The validation keeps one record per contract and day. 2016-2022 has a single publisher, so its
+GEX is unchanged by this.

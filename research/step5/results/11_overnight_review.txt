@@ -1,0 +1,21 @@
+EODHD daily bars, 2017-01-23..2026-10-09; mean equal-risk weight 1.03 (10-90%: 0.59-1.48); corr(rule, overnight) +0.022
+2017-2026
+  rule                                 +18.2% a year, Sharpe  1.46, worst fall -12.8%, worst day -4.4%
+  overnight at 1x                      +11.8% a year, Sharpe  0.87, worst fall -28.3%, worst day -9.5%
+  rule + overnight, equal-risk weight  +31.7% a year, Sharpe  1.64, worst fall -17.2%, worst day -6.0%
+  rule + overnight at 0.5x             +25.3% a year, Sharpe  1.69, worst fall -13.4%, worst day -5.2%
+2017-2019
+  rule                                 +21.3% a year, Sharpe  1.72, worst fall  -7.2%, worst day -3.0%
+  overnight at 1x                      +14.7% a year, Sharpe  1.47, worst fall -11.4%, worst day -3.4%
+  rule + overnight, equal-risk weight  +46.5% a year, Sharpe  2.22, worst fall -14.0%, worst day -5.1%
+  rule + overnight at 0.5x             +30.0% a year, Sharpe  2.13, worst fall  -7.3%, worst day -3.1%
+2020-2022
+  rule                                 +13.8% a year, Sharpe  1.12, worst fall  -7.0%, worst day -4.4%
+  overnight at 1x                       +3.0% a year, Sharpe  0.25, worst fall -27.6%, worst day -9.5%
+  rule + overnight, equal-risk weight  +10.6% a year, Sharpe  0.64, worst fall -17.2%, worst day -5.2%
+  rule + overnight at 0.5x             +16.0% a year, Sharpe  1.04, worst fall -13.4%, worst day -5.2%
+2023-2026
+  rule                                 +19.5% a year, Sharpe  1.55, worst fall -12.8%, worst day -2.3%
+  overnight at 1x                      +17.1% a year, Sharpe  1.31, worst fall -18.0%, worst day -5.4%
+  rule + overnight, equal-risk weight  +39.4% a year, Sharpe  2.02, worst fall -14.0%, worst day -6.0%
+  rule + overnight at 0.5x             +29.5% a year, Sharpe  1.97, worst fall  -9.1%, worst day -2.7%
