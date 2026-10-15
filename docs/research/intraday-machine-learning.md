@@ -293,22 +293,78 @@ says (two to three months of paper trading). Proving the edge itself takes
 years, and a small improvement from a challenger cannot be proven in any
 reasonable time; only a large one can.
 
+## 6. Before the shadow record: can anything beat the rule? (step 5)
+
+Before building the platform that records ML challengers (step 5), the research asked what a
+challenger could be. It read 97 sources, from journals, arXiv, SSRN, NBER, fund research and
+theses (`research/step5/SOURCES.md`), and tested every idea our data could test. Each
+confirmatory test was written down with its direction, data and threshold before it ran
+(`research/step5/LEDGER.md`).
+
+**Nothing beat the rule out of sample.**
+
+- **Learned trading policies.** Networks trained on the Sharpe ratio after costs (Deep
+  Momentum Networks, Lim, Zohren and Roberts 2019), a linear "direct reinforcement" policy
+  (Moody and Saffell), a GRU and causal attention reading the day's path (Momentum
+  Transformer, Wood et al. 2022), a network that only scales the rule's position (the gate), a
+  day sizer, nearest past days and a re-tuned rule: 26 variants, fitted on QQQ, on four
+  index ETFs and on 16 ETFs. On 2019-2022 one cleared the multiple-testing hurdle (the gate,
+  t 3.35 against 3.10), its gain nearly all from 2022. On 2023-2026, looked at once, it lost
+  2.8% a year to the rule (t -1.14), and no variant beat the rule (19.5% a year, Sharpe 1.55).
+- **Dealer gamma, the mechanism behind the rule** (Baltussen, Da, Lammers and Martens 2021;
+  Dim, Eraker and Vilkov; Barbon and Buraschi):
+  - Measured from prices (yesterday's variance ratio, realised over implied volatility), it
+    sorted the rule's days strongly in 2016-2022 and the other way in 2023-2026: sizing on it
+    lost (t -2.51). QQQ's options became daily in November 2022; the 0DTE era may have changed
+    how dealers' hedging shows in prices (Adams, Dim, Eraker et al.), though that is a reading
+    after the fact.
+  - Measured from real options open interest (OPRA via Databento, Baltussen et al.'s
+    construction), the rule earns less on days of high dealer gamma in every year from 2017
+    to 2026, as the theory predicts, but the effect is small: the linear test failed on
+    2017-2022 (t -1.58), the top-third effect seen there failed its 2023-2026 validation
+    (t -1.07), and standing aside on those days lowers the result (Sharpe 1.55 to 1.43).
+- **Calendar, news, sentiment and regimes:** FOMC and payrolls days, the pre-FOMC drift, the
+  turn of the month, the last 15 minutes, the same half hour across days, Treasury auctions,
+  New York sunshine, a hidden Markov regime, the source paper's RSI proxy: none passed.
+- **Breadth.** The same rule earns nothing before costs on 97 large stocks, bonds, gold or
+  the sector ETFs; only SPY and XLK, both close to QQQ. Intraday momentum is an index effect,
+  where index options and leveraged index ETFs force trades.
+- **The overnight return.** About 60% of QQQ's return comes from the close to the next open,
+  uncorrelated with the rule. Holding QQQ overnight beside the rule raised the Sharpe ratio
+  in 2017-2019 and 2023-2026 and lowered it in 2020-2022: it adds market risk, not an edge,
+  and is a choice of risk, not a research result.
+
+**What this means for the AI.** A model that predicts better than the rule was not found, and
+the literature agrees: price-only intraday signals rarely survive costs (Mesfin 2026), most of
+a published anomaly's return disappears after publication (McLean and Pontiff 2016), and
+reported alpha from LLM trading agents does not hold out of sample (Profit Mirage, FINSABER).
+With one instrument and about 250 days a year, a challenger that beats the rule by a few
+points a year needs years to show it. The shadow record is therefore built to judge
+challengers forward and honestly, not to find them: each is frozen and written down before
+its record starts, every idea tried is counted, and the evidence is a bet against the rule
+that stays valid however often it is looked at (testing by betting, e-values: Shafer and
+Vovk; Waudby-Smith and Ramdas 2024).
+
 ## References
 
+- Adams, G., Dim, C., Eraker, B., Fontaine, J.-S., Ornthanalai, C., and Vilkov, G. Do
+  S&P 500 Options Increase Market Volatility? Evidence from 0DTEs. SSRN 5641974.
 - Aït-Sahalia, Y., Fan, J., Xue, L., and Zhou, Y. (2022). How and When Are
   High-Frequency Stock Returns Predictable? NBER Working Paper 30366.
 - Aleti, S., Bollerslev, T., and Siggaard, M. (2025). Intraday Market Return
   Predictability Culled from the Factor Zoo. *Management Science* 71(9),
   7731–7751.
+- Baltussen, G., Da, Z., and Soebhag, A. (2025). End-of-Day Reversal.
+  Working paper.
 - Baltussen, G., Da, Z., Lammers, S., and Martens, M. (2021). Hedging Demand
   and Market Intraday Momentum. *Journal of Financial Economics* 142(1),
   377–403.
-- Baltussen, G., Da, Z., and Soebhag, A. (2025). End-of-Day Reversal.
-  Working paper.
 - Briola, A., Bartolucci, S., and Aste, T. Deep Limit Order Book
   Forecasting: A Microstructural Guide. arXiv 2403.09267.
 - Chinco, A., Clark-Joseph, A. D., and Ye, M. (2019). Sparse Signals in the
   Cross-Section of Returns. *Journal of Finance* 74(1), 449–492.
+- Dim, C., Eraker, B., and Vilkov, G. 0DTEs: Trading, Gamma Risk and Volatility
+  Propagation. SSRN 4692190.
 - Gao, L., Han, Y., Li, S. Z., and Zhou, G. (2018). Market Intraday Momentum.
   *Journal of Financial Economics* 129(2), 394–414.
 - Ghosh, P., Neufeld, A., and Sahoo, J. K. (2022). Forecasting Directional
@@ -322,12 +378,24 @@ reasonable time; only a large one can.
 - Kolm, P. N., Turiel, J., and Westray, N. (2023). Deep Order Flow Imbalance:
   Extracting Alpha at Multiple Horizons from the Limit Order Book.
   *Mathematical Finance* 33(4), 1044–1081.
+- Lim, B., Zohren, S., and Roberts, S. (2019). Enhancing Time-Series Momentum Strategies
+  Using Deep Neural Networks. Journal of Financial Data Science.
 - Liu, F., and Stentoft, L. (2023). Intraday Stock Predictability
   Everywhere. SSRN 4496917.
 - López de Prado, M. (2018). *Advances in Financial Machine Learning*.
   Wiley.
+- McLean, R. D., and Pontiff, J. (2016). Does Academic Research Destroy Stock Return
+  Predictability? Journal of Finance 71(1).
+- Mesfin, M. (2026). Structural Limits of OHLCV-Based Intraday Momentum Signals in MNQ
+  Futures. arXiv 2605.04004.
+- Moody, J., and Saffell, M. (2001). Learning to Trade via Direct Reinforcement. IEEE
+  Transactions on Neural Networks 12(4).
 - Paz, S. (2026). Out-of-Sample Evaluation of an Intraday Momentum Strategy
   for the S&P 500 ETF (SPY). SSRN 7290621.
+- Waudby-Smith, I., and Ramdas, A. (2024). Estimating Means of Bounded Random Variables by
+  Betting. Journal of the Royal Statistical Society Series B.
+- Wood, K., Giegerich, S., Roberts, S., and Zohren, S. (2022). Trading with the Momentum
+  Transformer. arXiv 2112.08534.
 - Zarattini, C., Aziz, A., and Barbon, A. (2024). Beat the Market: An
   Effective Intraday Momentum Strategy for S&P500 ETF (SPY). SSRN 4824172.
 - Zarattini, C., Barbon, A., and Aziz, A. (2024). A Profitable Day Trading
