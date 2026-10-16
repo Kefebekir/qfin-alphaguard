@@ -1,0 +1,16 @@
+20,072 ranked earnings events of 590 members, 2015-04-29 to 2026-10-09
+Reaction and drift after it, less SPY, mean in bps (t by event; events overlap in time)
+   top     4,125: reaction    +728,  1d   +7.5 (t +2.1),  5d   +8.9 (t +1.4), 20d  +24.3 (t +2.1), 60d  -22.9 (t -1.1)
+   middle 11,815: reaction      +5,  1d   -1.7 (t -0.9),  5d   -3.2 (t -0.9), 20d   -2.3 (t -0.4), 60d  -57.6 (t -5.2)
+   bottom  4,132: reaction    -780,  1d   -0.6 (t -0.1),  5d   -9.0 (t -1.3), 20d   -6.7 (t -0.5), 60d  -74.2 (t -3.4)
+Holding 60 sessions after the reaction; about 86 stocks long
+   all:
+      top fifth less bottom fifth: +0.8% a year, Sharpe +0.14, t +0.46
+      top fifth less SPY        : -0.8% a year, Sharpe -0.13, t -0.42
+   2016-2020:
+      top fifth less bottom fifth: -1.4% a year, Sharpe -0.27, t -0.61
+      top fifth less SPY        : -0.2% a year, Sharpe -0.03, t -0.08
+   2021-2026:
+      top fifth less bottom fifth: +2.8% a year, Sharpe +0.45, t +1.07
+      top fifth less SPY        : -1.4% a year, Sharpe -0.22, t -0.52
+A 10 bps round trip on each leg costs about 0.84% a year for the long-short (1.4 new top events a day)

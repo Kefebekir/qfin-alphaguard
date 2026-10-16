@@ -1,0 +1,15 @@
+98 stocks; 54,596 articles in hours, 50,602 moments without news
+Does the move carry on? Slope of what follows on the reaction (t), and for the biggest
+tenth of reactions, the move after it in the reaction's direction, in bps (t)
+   react_1 -> after_1_30:
+      news: slope +0.065 (t +4.7), biggest tenth +0.5 bps (t +0.4), reaction 38 bps
+      no news: slope -0.082 (t -5.4), biggest tenth -1.5 bps (t -1.5), reaction 25 bps
+   react_1 -> after_1_60:
+      news: slope +0.057 (t +3.1), biggest tenth -0.6 bps (t -0.4), reaction 38 bps
+      no news: slope -0.073 (t -3.5), biggest tenth -0.9 bps (t -0.7), reaction 25 bps
+   react_5 -> after_5_60:
+      news: slope +0.035 (t +3.5), biggest tenth +2.0 bps (t +1.3), reaction 63 bps
+      no news: slope -0.016 (t -1.3), biggest tenth -0.7 bps (t -0.6), reaction 41 bps
+   react_5 -> after_5_close:
+      news: slope +0.081 (t +4.4), biggest tenth +3.3 bps (t +1.2), reaction 63 bps
+      no news: slope -0.108 (t -4.7), biggest tenth -3.6 bps (t -1.6), reaction 41 bps

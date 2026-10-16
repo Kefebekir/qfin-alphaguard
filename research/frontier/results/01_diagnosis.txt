@@ -1,0 +1,26 @@
+1. Direction against size, out of sample 2018-2026
+   QQQ, 26,352 test half hours
+      ridge: direction R2 -0.10%, IC +0.007, sign right 50.7%  |  size R2 +17.9%, IC +0.375
+      trees: direction R2 -2.50%, IC +0.003, sign right 50.0%  |  size R2 +17.7%, IC +0.389
+   16 ETFs pooled, 420,690 test half hours
+      ridge: direction R2 -0.07%, IC -0.002, sign right 49.7%  |  size R2 +14.9%, IC +0.340
+      trees: direction R2 -0.68%, IC +0.006, sign right 50.0%  |  size R2 +16.7%, IC +0.363
+2. More parameters, QQQ: R2 of the direction on the training years / the test years
+       2 leaves x    50 rounds: training  +0.66%, test  -0.05%
+       8 leaves x   200 rounds: training +11.07%, test  -1.43%
+      32 leaves x   500 rounds: training +49.85%, test  -7.98%
+     128 leaves x  1000 rounds: training +94.71%, test -17.87%
+     512 leaves x  2000 rounds: training +99.98%, test -20.13%
+    1024 leaves x  2000 rounds: training +99.98%, test -20.36%
+3. More data: trees (16 leaves, 200 rounds), direction R2 on 2022-2026
+   trained on QQQ, last 2 years    : QQQ test R2 -5.19%, IC +0.002 (up to 29,862 training rows)
+   trained on QQQ, last 4 years    : QQQ test R2 -2.31%, IC +0.009 (up to 29,862 training rows)
+   trained on QQQ, all years before: QQQ test R2 -0.91%, IC +0.007 (up to 29,862 training rows)
+   trained on 16 ETFs pooled, last 2 years    : QQQ test R2 -0.63%, IC +0.004 (up to 476,478 training rows)
+   trained on 16 ETFs pooled, last 4 years    : QQQ test R2 -0.32%, IC +0.009 (up to 476,478 training rows)
+   trained on 16 ETFs pooled, all years before: QQQ test R2 +0.02%, IC +0.001 (up to 476,478 training rows)
+4. How much data an edge needs: t ~ IC x sqrt(n)
+   QQQ has 32,190 half hours; days 2,693
+   IC 0.01: t 1.8 on every half hour, 0.5 on one decision a day; t = 2 needs 40,000 independent bets
+   IC 0.02: t 3.6 on every half hour, 1.0 on one decision a day; t = 2 needs 10,000 independent bets
+   IC 0.05: t 9.0 on every half hour, 2.6 on one decision a day; t = 2 needs 1,600 independent bets
