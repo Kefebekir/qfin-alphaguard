@@ -1,7 +1,8 @@
 """N1's and N2's features from the headline embeddings, for each ChronoBERT vintage.
 
-For each vintage written by embed.py, with the index of articles in the order they became
-known:
+For each vintage written by embed.py, over the sessions it serves (to its last test year),
+with the index of articles in the order they became known and each article's embedding found
+by its id:
 
 - N1, one row a session: the articles known from 16:00 New York time on the session before
   to 09:55 on the day (every article, whatever it tags). Features: their mean embedding and
@@ -72,9 +73,8 @@ def normal(symbol: str) -> str:
 
 
 # N2's (article row, day, ticker) pairs, from the articles tagging one or two stocks.
-first = np.searchsorted(
-    known, starts, "right"
-)  # first article after each window's start
+# the first article after each window's start
+first = np.searchsorted(known, starts, "right")
 last_n2 = np.searchsorted(known, n2_ends, "right")
 pairs = []
 symbols = index["symbols"].to_list()
@@ -90,34 +90,50 @@ for w, (a, b) in enumerate(zip(first, last_n2, strict=True)):
                 pairs.append((row, w, fits[0]))
 print(f"N2: {len(pairs):,} member articles in windows")
 
-for vintage_file in sorted(EMB.glob("v*.npy")):
-    vintage = vintage_file.stem
-    if ".part" in vintage:
-        continue
-    emb = np.load(vintage_file, mmap_mode="r")
-    rows = len(emb)
+ids = index["id"].to_numpy()
 
-    # N1: every session whose window lies within the articles this vintage embedded.
+
+def last_test_year(vintage: int) -> int:
+    return 2026 if vintage == 2024 else vintage + 1
+
+
+for vintage_file in sorted(EMB.glob("v*.npy")):
+    if not re.fullmatch(r"v\d{4}", vintage_file.stem):
+        continue  # the ids, or a vintage not finished
+    vintage = vintage_file.stem
+    emb = np.load(vintage_file, mmap_mode="r")
+    emb_ids = np.load(EMB / f"{vintage}.ids.npy")
+    # Each index row's row in this vintage's embeddings, by article id (-1 if absent).
+    order = np.argsort(emb_ids)
+    found = np.minimum(np.searchsorted(emb_ids[order], ids), len(order) - 1)
+    row_of = np.where(emb_ids[order][found] == ids, order[found], -1)
+    cover = last_test_year(int(vintage[1:]))
+    keep = [w for w in range(len(window_days)) if window_days[w].year <= cover]
+    missing = 0
+
+    # N1: the sessions this vintage serves; every article in a window must be embedded.
     last_n1 = np.searchsorted(known, n1_ends, "right")
-    keep = [
-        w for w in range(len(window_days)) if last_n1[w] <= rows and first[w] < rows
-    ]
     n1 = np.zeros((len(keep), emb.shape[1]), dtype=np.float32)
     counts = np.zeros(len(keep), dtype=np.int64)
     for k, w in enumerate(keep):
-        a, b = first[w], last_n1[w]
-        counts[k] = b - a
-        if b > a:
-            n1[k] = emb[a:b].astype(np.float32).mean(0)
+        rows = row_of[first[w] : last_n1[w]]
+        missing += int((rows < 0).sum())
+        counts[k] = len(rows)
+        if len(rows):
+            n1[k] = emb[np.sort(rows)].astype(np.float32).mean(0)
     pl.DataFrame(
         {"day": [window_days[w] for w in keep], "count": counts}
     ).write_parquet(EMB / f"n1_{vintage}.parquet")
     np.save(EMB / f"n1_{vintage}.npy", n1.astype(np.float16))
 
-    # N2: group the pairs by (ticker, day) within this vintage's articles.
+    # N2: group the pairs by (ticker, day) on the sessions this vintage serves.
     groups, sums, counts2 = {}, [], []
     for row, w, ticker in pairs:
-        if row >= rows:
+        if window_days[w].year > cover:
+            continue
+        r = row_of[row]
+        if r < 0:
+            missing += 1
             continue
         key = (ticker, w)
         g = groups.get(key)
@@ -125,8 +141,10 @@ for vintage_file in sorted(EMB.glob("v*.npy")):
             g = groups[key] = len(sums)
             sums.append(np.zeros(emb.shape[1], dtype=np.float32))
             counts2.append(0)
-        sums[g] += emb[row].astype(np.float32)
+        sums[g] += emb[r].astype(np.float32)
         counts2[g] += 1
+    if missing:
+        sys.exit(f"{vintage}: {missing} articles in its windows were not embedded")
     keys = list(groups)
     n2 = np.stack(sums) / np.array(counts2, dtype=np.float32)[:, None]
     pl.DataFrame(
