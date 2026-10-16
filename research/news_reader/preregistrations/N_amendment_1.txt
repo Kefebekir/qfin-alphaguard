@@ -1,0 +1,7 @@
+AMENDMENT 1 TO N1 AND N2
+Written 2026-10-16 13:44:34 UTC, before any result of either test was computed.
+
+The newest published ChronoBERT vintage is manelalab/chrono-bert-v1-20241231; there is no
+vintage for 2025 (checked on Hugging Face on 16 October 2026). For test year 2026, N1 and N2
+use vintage 2024 in place of 2025. It knows less than the files ask for, never more, so the
+change cannot let a model see the future. Every other year uses vintage Y-1 as written.
