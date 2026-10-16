@@ -19,6 +19,20 @@ tried on them is listed here before its holdout run.
 |---|---|---|---|---|
 | 1 | 2026-10-16 13:44:34 | `N_amendment_1.txt` | `11cb20b829668176c245947081e80c967cc8cee97e5c5bce5722e8076d25f196` | No ChronoBERT vintage for 2025 is published: test year 2026 uses vintage 2024, which knows less |
 
+## The pre-registered comparison on the development years
+
+`harness.run(test, None, count_only=True)`: a linear regression on log(1 + the number of
+headlines) alone, run on 16 October 2026 to check the pipeline end to end. It is the bar a
+variant should clear; it is not one of the variants.
+
+| Test | Days | Mean a day | t | 2018 / 2019 / 2020 / 2021, bps a day |
+|---|---|---|---|---|
+| N1 | 1,008 | −0.16 bps | −0.15 | +1.76 / +1.79 / −2.93 / −1.24 |
+| N2 | 998 | −25.06 bps | −6.26 | −30.43 / −20.65 / −28.73 / −20.53 |
+
+N2's costs are 20 bps a day (its positions turn over daily), so a variant must earn more
+than that before costs.
+
 ## Variants tried on the development years (2018-2021)
 
 At most 10 for each test. None yet.

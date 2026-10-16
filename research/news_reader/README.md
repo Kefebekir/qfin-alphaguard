@@ -50,7 +50,18 @@ uv pip install --python data/llmenv/bin/python torch --index-url https://downloa
 uv pip install --python data/llmenv/bin/python "transformers>=4.48" numpy polars safetensors huggingface_hub
 ```
 
-Efe's GPU, an RTX 5070 Laptop (8 GB), embeds about 1,200 headlines a second.
+Efe's GPU, an RTX 5070 Laptop (8 GB), embeds about 1,500 headlines a second, headlines
+sorted by length; `embed.py` runs beside the download and starts each vintage once its
+months are on disk.
+
+## The data, as built on 16 October 2026
+
+- 2,093,052 articles, 1 January 2016 to 15 October 2026, 130 months, no failed request.
+- N1: 2,711 sessions from 5 January 2016, 342-497 headlines a morning on average (rising
+  over the years). Checked by hand on 5 January 2016 (430) and 11 March 2024, the Monday
+  after the switch to summer time (540), with the stored mean embedding.
+- N2: 260,186 member-days with news (vintage 2024, every year), from 503,998 member
+  articles. Checked by hand on Apple's 3 May 2024, the day after its results (36).
 
 ## Run
 
