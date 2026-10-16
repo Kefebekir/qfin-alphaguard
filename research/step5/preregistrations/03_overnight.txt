@@ -1,0 +1,13 @@
+Written 2026-10-15T16:42:42Z, before these two relations were computed on any data.
+(QQQ's and SPY's unconditional overnight and intraday means for 2016-2026 have been seen.)
+
+O1 (closing pressure reverses overnight: Bogousslavsky and Muravyev; Barbon et al.; Krohn,
+   Mueller and Whelan for FX fixes): QQQ's overnight return (last close to next open) is
+   lower after sessions that rose from open to close and higher after sessions that fell.
+   Test: the slope of the overnight return on the session's open-to-close return is negative,
+   t <= -2.0, over 2016-01-05 to 2026-10-09. Also reported: the same with the last half hour's
+   return, and SPY.
+O2 (announcement premium: Savor and Wilson 2013): the overnight return into a CPI or payrolls
+   release morning (08:30 ET, before the open) is higher than on other nights. Test: the
+   difference of means, t >= 2.0, same period. FOMC days are not in O2 (14:00 release).
+Both at once: Bonferroni, t beyond 2.24.

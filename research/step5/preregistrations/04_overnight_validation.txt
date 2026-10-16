@@ -1,0 +1,14 @@
+Written 2026-10-15T17:04:03Z, before any data before 2016 was looked at for this.
+
+Found on 2016-2026 (data/step5/overnight/result.txt, a side report, not the pre-registered
+test): QQQ's and SPY's overnight return (last close to next open) falls by about 0.42-0.48
+of the last half hour's return (t -9.2 and -10.8).
+
+Validation on data before 2016, as far back as the minute bars go:
+V1: the same slope, overnight return on the last half hour's return (15:30 to the close), is
+    negative with t <= -2.0, separately for SPY and for QQQ.
+V2 (what can be traded): the signal known when closing-auction orders must be in, the return
+    from 15:30 to 15:50, against the return from the close to the next open. Negative, t <= -2.0.
+V3 (daily bars, 1993 on for SPY, 1999 on for QQQ): the overnight return on the same session's
+    open-to-close return, negative, t <= -2.0 (O1 of the first note, on independent years).
+All six at once: Bonferroni over six, t beyond 2.64.

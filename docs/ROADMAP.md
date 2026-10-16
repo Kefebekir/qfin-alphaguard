@@ -22,8 +22,9 @@ week alongside university.
 - **Steps 2, 3 and 4 are done:** the QQQ strategy runs in our engine,
   trades on the same days as the research (#33), writes a decision log
   (#34), and trades behind Guard with its own account's limits,
-  `guard_qqq.yaml` (decision 0019). **Step 5 is next:** the shadow record
-  for ML challengers.
+  `guard_qqq.yaml` (decision 0019). **Step 5 is under way:** its research
+  found nothing that beats the rule out of sample (`research/step5/LEDGER.md`);
+  the shadow record that judges challengers forward is next.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -216,7 +217,7 @@ January exams.
 | 2. The QQQ strategy as its own `Strategy` in our engine | Efe's rules; Claude's skeleton | done, #33 |
 | 3. The decision log, and the day book reading it | Claude | done, #34 |
 | 4. Guard's limits for an intraday strategy | Efe: the rules, and the limits in `guard_qqq.yaml` | done |
-| 5. The shadow record for ML challengers | Claude | next |
+| 5. The shadow record for ML challengers | Claude; Efe's models | research done; platform next |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
    band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
@@ -263,14 +264,20 @@ January exams.
    - The nightly plan's sales now go out after its 2% loss limit: the same
      10.8% a year, and its worst day −6.5% instead of −7.7%.
 5. [ ] **The shadow record for ML challengers:**
-   - a frozen model (commit, training dates, hash of its weights) and its
-     test, written down before its record starts: the paired daily
-     difference against the rules, with a t-statistic above 2, counting
-     every challenger tried;
-   - its forecast and the position it would take, logged at every decision
-     beside the rules', first on backtest replays;
-   - the first challengers: the factor-zoo ensemble, a model that sizes the
-     day, and the 09:35 stock ranker.
+   - [x] **Research first: can anything beat the rule?** 97 sources and every idea our data
+     could test, each confirmatory test written down before it ran
+     (`research/step5/LEDGER.md`): 26 learned policies, dealer gamma from prices and from
+     real options open interest, calendar and news effects, regimes, breadth across stocks
+     and ETFs, the overnight return. **Nothing beat the rule out of sample.** Dealer gamma
+     works in the predicted direction every year but is too weak to trade on; the overnight
+     return adds market risk, not an edge. Research document, section 6.
+   - [ ] **The platform:** a frozen challenger (commit, training dates, hash of its
+     weights) and its test written down before its record starts; its positions in its own
+     virtual account, with the rule's costs and Guard, first on backtest replays; the
+     evidence a bet against the rule that stays valid however often it is looked at
+     (e-values), counting every idea tried in the ledger.
+   - [ ] **The first challengers:** Efe's own model, trained by him; then any idea that
+     earns a place in the ledger.
 
 **Gate M2:**
 - the engine's backtest reproduces the research result for every day;

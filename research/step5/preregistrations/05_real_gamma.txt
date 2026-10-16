@@ -1,0 +1,46 @@
+Written 2026-10-15T16:14:02Z, before any options open interest was downloaded or seen.
+
+Question: does the options dealers' gamma, measured from real open interest, tell the
+QQQ noise-area rule's good days from its bad ones? (Baltussen, Da, Lammers and Martens 2021:
+intraday momentum on negative-gamma days, none on positive; Dim, Eraker and Vilkov 2024:
+positive dealer gamma strengthens reversals, negative strengthens momentum.)
+
+Data: OPRA open interest (Databento statistics schema; published about 06:30 ET for the
+previous session's close, so known before the open) and contract definitions, for the QQQ
+options and, as a second test, the SPY options; 2016-01-26 to 2026-10-09, every day the rule
+has.
+
+Measure, fixed now (the "naive" dealer gamma of the practitioner literature, SqueezeMetrics):
+dealers are assumed long the calls and short the puts customers hold.
+  GEX(day) = sum over calls of gamma x OI x 100 x S^2 x 0.01  -  the same sum over puts,
+with S the underlying's last close, gamma from Black-Scholes with one volatility for every
+contract (the VXN close for QQQ, the VIX close for SPY, from the session before), the 3-month
+T-bill rate, no dividend, and every expiry from the next session to one year. GEX is divided
+by the underlying's average daily dollar volume over the 20 sessions before, and ranked
+against its own previous 250 sessions (no look-ahead).
+
+Primary test (G1), on QQQ's GEX: the regression of the rule's daily result after costs on
+that rank has a negative slope (more dealer gamma, worse for momentum). One-sided, passes if
+t <= -2.0 over 2017-2026 (the rank needs a year). Reported beside it: the rule's Sharpe ratio
+in each third of the rank, and each year.
+Secondary (G2): the same with SPY's GEX. Both together: Bonferroni, t <= -2.24.
+
+Neither GEX nor any options data has been looked at for this project before this note.
+
+Amendment, written 2026-10-15T16:47:25Z, still before any open interest was looked at
+(only one day, 2024-06-03, was downloaded to see the record layout; its values were not used):
+Databento charges about 5 USD for QQQ's 2016-2022 statistics and 380 USD for 2016-2026,
+because its records from 2023 are far larger. The free credit covers 2016-2022 only, so G1
+and G2 are tested on 2017-2022 (the rank needs 2016). 2023-2026 is tested only if Efe pays
+for it, with the same measure. The contract terms come from each record's OCC symbol, not from
+the definition schema. Everything else is unchanged.
+
+Implementation details, written 2026-10-15T17:07:05Z, before GEX was computed:
+- Day t's GEX uses the open interest record published at 09:31 ET on day t (the close of the
+  session before), known before the rule's first decision at 10:00.
+- Contracts alive on day t count: expiry on or after day t and within 365 days. Time to expiry
+  is the calendar days from day t to the expiry, at least half a day (0.5/365), so an option
+  expiring on day t has a finite gamma.
+- S, sigma (VXN or VIX close, /100) and the T-bill rate are those of the session before day t.
+- The average daily dollar volume: the sum over minutes of close x volume, over the 20
+  sessions before day t, from the stored minutes.

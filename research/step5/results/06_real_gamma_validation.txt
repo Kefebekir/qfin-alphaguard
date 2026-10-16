@@ -1,0 +1,11 @@
+946 sessions of 2023-2026 open interest
+2016-2022 GEX unchanged: True
+V-G, 941 days 2023-2026: top third +4.24 bps (375 days) vs other days +9.37 bps (566); Welch t -1.07 -> fail (needs <= -2.0)
+   rank 0.00-0.33: 289 days, mean +8.95 bps, Sharpe 1.67
+   rank 0.33-0.67: 277 days, mean +9.82 bps, Sharpe 2.07
+   rank 0.67-1.00: 375 days, mean +4.24 bps, Sharpe 1.01
+   2023: top third +7.51 bps (139), others +15.51 bps (110)
+   2024: top third +7.77 bps (101), others +10.67 bps (149)
+   2025: top third -4.34 bps (74), others +6.08 bps (174)
+   2026: top third +1.36 bps (61), others +7.17 bps (133)
+   the rule +19.4% a year, Sharpe 1.55; flat on top-third days +14.7%, Sharpe 1.43

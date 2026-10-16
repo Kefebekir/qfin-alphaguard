@@ -1,0 +1,23 @@
+Written 2026-10-15T16:01:11Z, before any result of these rules on 2023-2026 was computed.
+The QQQ rule's own results in 2023-2026 are known (Sharpe 1.55, from the policy-network test);
+how the gamma-state measures relate to them there has not been looked at.
+
+Hypotheses formed on 2016-2022 (exploration: flow_explore.py, data/step5/gamma_proxies.py):
+dealers' gamma decides whether intraday moves continue or revert (Baltussen, Da, Lammers and
+Martens 2021; Dim, Eraker and Vilkov 2024; Barbon and Buraschi). Two free proxies of it, from
+the session before: the variance ratio of QQQ's 15-minute to 1-minute returns, and QQQ's
+realized volatility (1-minute returns) over the VIX close. Each is ranked against its previous
+250 sessions; the score is the mean of the two ranks.
+
+H1: the rule's day scaled by 0 / 1 / 1.5 when the score is in its bottom / middle / top third
+    (never above the 2x cap).
+H2: H1, and flat on FOMC announcement days and on monthly (not quarterly) options expiry days.
+
+Test, run once, on QQQ 2023-01-01 to 2026-10-09 (data/step5/gamma_test.py, PHASE=holdout):
+the paired daily difference between k x (the sized day) and the rule's day, where k makes the
+two equally volatile on 2017-2022 and is fixed now: k1 = 0.9287, k2 = 0.9448. One-sided;
+passes if t >= 2.24 (Bonferroni over the two hypotheses at 2.5%). Reported beside it: the
+Sharpe ratios, the raw difference, each year, and the rule's Sharpe by third of the score.
+
+This is the second family tested on 2023-2026; the first, the learned policies of
+policy_nets.py, failed.

@@ -1,0 +1,15 @@
+holdout: 946 days, 2023-01-03 .. 2026-10-09
+rule: Sharpe 1.55, +19.5% a year
+H1: Sharpe 1.07, +12.0% a year, mean size 0.78; equal vol (k 0.9287) minus rule -7.36% a year, t -2.51 -> fail (needs 2.24); raw -6.51%, t -2.20
+   2023: rule Sharpe  2.51, H1  1.83
+   2024: rule Sharpe  2.22, H1  1.46
+   2025: rule Sharpe  0.47, H1  0.24
+   2026: rule Sharpe  1.19, H1  1.20
+H2: Sharpe 1.19, +12.9% a year, mean size 0.73; equal vol (k 0.9448) minus rule -6.52% a year, t -1.97 -> fail (needs 2.24); raw -5.82%, t -1.75
+   2023: rule Sharpe  2.51, H2  1.97
+   2024: rule Sharpe  2.22, H2  1.47
+   2025: rule Sharpe  0.47, H2  0.36
+   2026: rule Sharpe  1.19, H2  1.39
+   score 0.00-0.33: 262 days, rule Sharpe 1.82
+   score 0.33-0.67: 449 days, rule Sharpe 2.33
+   score 0.67-1.00: 235 days, rule Sharpe -0.52

@@ -1,0 +1,10 @@
+SPY 2014-2015 minutes, 357 nights: V1 slope -0.046, t -0.32; V2 (15:30-15:50 signal) slope +0.047, t +0.27
+QQQ 2014-2015 minutes, 503 nights: V1 slope -0.021, t -0.16; V2 (15:30-15:50 signal) slope -0.031, t -0.18
+SPY daily 1993-2015, 5773 nights: V3 slope +0.0127, t +1.52
+     1993-2003: slope +0.0180, t +1.67
+     2004-2009: slope +0.0053, t +0.32
+     2010-2015: slope +0.0115, t +0.55
+QQQ daily 1999-2015, 4231 nights: V3 slope +0.0296, t +3.41
+     1999-2003: slope +0.0421, t +2.77
+     2004-2009: slope -0.0066, t -0.45
+     2010-2015: slope +0.0279, t +1.42
