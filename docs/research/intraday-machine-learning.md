@@ -276,7 +276,8 @@ choices are made:
    position it would take at every decision, in the same log, without
    trading. Its test is written down before its record starts: the paired
    daily difference against the rule, with a t-statistic above 2 after
-   counting every challenger tried.
+   counting every challenger tried. Decision 0020 replaces this t-test with
+   a betting test that stays valid however often it is read: section 6.1.
 4. **Judge by what holds forward:** the daily result against the backtest's
    5–95% range for the same number of days.
 
@@ -341,9 +342,39 @@ reported alpha from LLM trading agents does not hold out of sample (Profit Mirag
 With one instrument and about 250 days a year, a challenger that beats the rule by a few
 points a year needs years to show it. The shadow record is therefore built to judge
 challengers forward and honestly, not to find them: each is frozen and written down before
-its record starts, every idea tried is counted, and the evidence is a bet against the rule
+its record starts, its chance of error is fixed in advance, and the evidence is a bet against the rule
 that stays valid however often it is looked at (testing by betting, e-values: Shafer and
 Vovk; Waudby-Smith and Ramdas 2024).
+
+### 6.1 The platform (decision 0020)
+
+Each challenger is frozen on a card in `challengers/` before its record starts, and runs in
+its own account beside the rule's, with the same minutes, costs and Guard. Every day,
+`evidence.py` bets against the rule that the challenger does better at equal risk, with a
+stake fixed from the days before. The simulations in `research/step5/evidence_power.py` and
+the replays in `shadow_demo.py` set four of its choices:
+
+- **A bet, not a t-test.** A t-test read every evening promoted 26% of challengers with no
+  edge within 12 years. The bet promoted 1.3% at alpha 2.5%, as Ville's inequality allows.
+- **Shares of alpha fixed in advance.** Each card states its share of a total of 2.5%. A
+  threshold that counted the challengers so far would test the first one at a lower bar
+  while it was alone, so its guarantee would no longer hold. The research's ideas do not
+  count against the shares: a record's days come after its challenger was frozen, so no
+  choice made on earlier data could have seen them.
+- **The clip from the training days.** A fixed clip of 5% would promote an insurance seller
+  with no edge, one that earns a little every day and loses 10% once a year, in 56% of
+  records, and would slow a challenger whose differences are small. The clip is the largest
+  difference on the training days, and a record day beyond it is listed.
+- **Equal risk decides; the raw results are shown beside it.** On real minutes
+  (`research/step5/shadow_demo.py`), the rule at double size earned 37.3% a year in
+  2023-2026 against 18.7%, with the same decisions. The same test on raw results would have
+  promoted it on 9 April 2025; at equal risk it was level. The scale is one number from the
+  training days, so a model that takes more risk on good days and less on bad ones keeps
+  that advantage.
+
+What it can prove: an edge whose daily difference has a Sharpe ratio of 2 is found in about
+two years, one of 1 in eight or more. A variant that decided every 15 minutes, replayed on
+2023-2026, lost 1.87 bps a day to the rule and was not promoted.
 
 ## References
 

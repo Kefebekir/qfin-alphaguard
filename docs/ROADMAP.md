@@ -22,9 +22,13 @@ week alongside university.
 - **Steps 2, 3 and 4 are done:** the QQQ strategy runs in our engine,
   trades on the same days as the research (#33), writes a decision log
   (#34), and trades behind Guard with its own account's limits,
-  `guard_qqq.yaml` (decision 0019). **Step 5 is under way:** its research
-  found nothing that beats the rule out of sample (`research/step5/LEDGER.md`);
-  the shadow record that judges challengers forward is next.
+  `guard_qqq.yaml` (decision 0019).
+- **Step 5's research and platform are done.** The research found nothing
+  that beats the rule out of sample (`research/step5/LEDGER.md`). The shadow
+  record now judges challengers forward (decision 0020): each frozen on a
+  card before its record starts, each in its own account, judged by a bet
+  against the rule that stays valid however often it is read. **Next:** Efe
+  trains and freezes the first challenger.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -217,7 +221,7 @@ January exams.
 | 2. The QQQ strategy as its own `Strategy` in our engine | Efe's rules; Claude's skeleton | done, #33 |
 | 3. The decision log, and the day book reading it | Claude | done, #34 |
 | 4. Guard's limits for an intraday strategy | Efe: the rules, and the limits in `guard_qqq.yaml` | done |
-| 5. The shadow record for ML challengers | Claude; Efe's models | research done; platform next |
+| 5. The shadow record for ML challengers | Claude; Efe's models | research and platform done; Efe's first challenger next |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
    band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
@@ -271,11 +275,32 @@ January exams.
      and ETFs, the overnight return. **Nothing beat the rule out of sample.** Dealer gamma
      works in the predicted direction every year but is too weak to trade on; the overnight
      return adds market risk, not an edge. Research document, section 6.
-   - [ ] **The platform:** a frozen challenger (commit, training dates, hash of its
-     weights) and its test written down before its record starts; its positions in its own
-     virtual account, with the rule's costs and Guard, first on backtest replays; the
-     evidence a bet against the rule that stays valid however often it is looked at
-     (e-values), counting every idea tried in the ledger.
+   - [x] **The platform** (decision 0020): `challengers.py`, `evidence.py`,
+     `backtest/shadow.py`, and the cards in `challengers/`.
+     - **A card, committed before the record starts:** the commit, the training
+       dates and the hash of the weights.
+     - **The record:** the challenger and the rule each run in their own account
+       on the same minutes, with the same costs and `guard_qqq.yaml`.
+     - **The evidence:** a daily bet on the difference at equal risk (testing by
+       betting, e-values).
+       - Its chance of a false promotion is at most the card's share of 2.5%,
+         however often it is read. A t-test read every evening would promote
+         26% of challengers with no edge.
+       - Each card states its share in advance, and the shares of all cards
+         add to at most 2.5%.
+       - The scale and the clip come from the training days. A narrow fixed
+         clip would promote an insurance seller with no edge in 56% of
+         records.
+     - **What it can prove:** an edge whose difference has a Sharpe ratio of
+       2 is found in about two years; one of 1 takes eight or more.
+     - **Equal risk decides, and the raw results are shown beside it** (Efe's
+       choice).
+     - **On real minutes,** replayed as if frozen at the end of 2022:
+       - a variant that decides every 15 minutes lost 1.87 bps a day to the
+         rule in 2023–2026 and was not promoted;
+       - the rule at double size earned 37.3% a year against 18.7%. Compared
+         raw, it would have been promoted on 9 April 2025; at equal risk it
+         was level, as it should be.
    - [ ] **The first challengers:** Efe's own model, trained by him; then any idea that
      earns a place in the ledger.
 
