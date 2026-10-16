@@ -41,7 +41,11 @@ def make(components=16, penalty=10.0):
                 "features",
                 ColumnTransformer(
                     [
-                        ("pca", PCA(n_components=components, random_state=0), embedding),
+                        (
+                            "pca",
+                            PCA(n_components=components, random_state=0),
+                            embedding,
+                        ),
                         ("count", "passthrough", count),
                     ]
                 ),
