@@ -47,7 +47,10 @@ def page(query: dict) -> dict:
         except (OSError, ValueError) as error:  # network errors, rate limits
             if attempt == 5:
                 raise RuntimeError(f"news page {query.get('start')}: {error}") from None
-            time.sleep(5 * 2**attempt)
+            print(
+                f"   retry {attempt + 1} for {query.get('start')}: {error}", flush=True
+            )
+            time.sleep(2 * 2**attempt)
     raise AssertionError
 
 
