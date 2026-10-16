@@ -1,0 +1,50 @@
+PRE-REGISTRATION N1
+Written 2026-10-16 13:43:43 UTC; approved by Efe before any result of this test was computed.
+
+Does the morning's news, read by a language model that knows nothing after the year before,
+tell the QQQ rule's day?
+
+HYPOTHESIS
+On days whose news before 10:00 New York time leads a model, trained only on earlier years,
+to forecast a better day for the noise-area rule, the rule earns more. Mechanism: intraday
+momentum is stronger when information arrives (Gao, Han, Li and Zhou 2018; Li, Sakkas and
+Urquhart 2022); days with news trend, quiet days chop, and the rule earns on trends.
+
+DATA
+- Articles: every Benzinga article on Alpaca's news API (research/news_reader/news_all.py).
+  An article is known at created_at, or at updated_at when that is more than 5 minutes later
+  (the text kept may be the edited one; 2.5% of articles).
+- A day's window: from 16:00 New York time on the session before to 09:55 on the day.
+- The rule's day: momentum.py's NoiseAreaMomentum in the engine, guard_qqq.yaml with
+  max_order_usd lifted, a 0.3 bps half spread, from 30,000 USD; its daily return from
+  SessionClose values (backtest/shadow.daily_returns), every session, traded or not.
+
+FEATURES (fixed here)
+- For test year Y, ChronoBERT vintage Y-1 (manelalab/chrono-bert-v1-<Y-1>1231): each
+  headline's embedding is the mean of the last hidden layer over its tokens (at most 64),
+  computed once. Every year's features for that test year come from the same vintage.
+- A day's features: the mean embedding of its window's headlines (768 numbers) and
+  log(1 + the number of articles in the window).
+
+MODEL (trained by Efe; the protocol fixed here)
+- Target: the rule's day return divided by QQQ's 14-day volatility known at the open.
+- Family: principal components of the day's mean embedding, fitted on the training years,
+  and a ridge regression on them and the log count. Efe chooses the number of components
+  and the ridge penalty on the development years only, from at most 10 variants, each
+  recorded in the ledger with its development result.
+- Policy: the rule's size that day times 1.5 if the forecast is in the top third of the
+  training years' forecasts, 0.5 if in the bottom third, 1 otherwise. Nothing else changes.
+
+SPLITS
+- Development: test years 2018-2021, each fitted on the years from 2016 before it. Efe may
+  look at these as often as he likes.
+- Holdout: 2022 to 9 October 2026, each year fitted on all years before it with the variant
+  chosen on development, run once after this file and the chosen variant are committed.
+
+TEST
+- The daily difference between the sized rule at the rule's risk (the scale from the
+  training years) and the rule, over the holdout: one-sided t >= 2.24 (Bonferroni over N1
+  and N2 at 2.5% each side).
+- Reported, not part of the pass: the same with log(count) alone; each holdout year.
+- If it passes, the model is frozen on a challenger card and judged forward in the shadow
+  record (decision 0020). If it fails, it is recorded as failed.

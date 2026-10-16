@@ -1,0 +1,46 @@
+PRE-REGISTRATION N2
+Written 2026-10-16 13:43:43 UTC; approved by Efe before any result of this test was computed.
+
+Does a member's news, read by a language model that knows nothing after the year before,
+tell its next day against the other members with news?
+
+HYPOTHESIS
+Among S&P 500 members with news since the last close, those whose headlines lead a model,
+trained only on earlier years, to forecast a better next day earn more from today's close to
+tomorrow's close than those it forecasts worst. Mechanism: prices underreact to firm news
+and absorb it over days, more for bad news (Tetlock 2008; Ke, Kelly and Xiu 2019;
+Lopez-Lira and Tang 2023). Our measure (research/frontier/news_reaction.py): moves after
+news carry on, moves without news reverse.
+
+DATA
+- Articles: as N1, tagging at most two stocks; an article counts for each tagged stock that
+  is an S&P 500 member that day (the sp500 flag of data/raw/prices.parquet).
+- A day's window for a member: from 16:00 New York time on the session before to 15:30 on
+  the day, so that a market-on-close order can be sent before 15:50.
+- Returns: the stored daily closes (adjusted for splits and dividends), from the day's close
+  to the next session's close, less the equal-weighted mean of all members with news that day.
+
+FEATURES (fixed here)
+- As N1: ChronoBERT vintage Y-1 for test year Y; a member-day's features are the mean
+  embedding of its window's headlines and log(1 + their number).
+
+MODEL (trained by Efe; the protocol fixed here)
+- Target: the next day's return less the mean of members with news, as above.
+- Family: as N1 (principal components, ridge); at most 10 variants on development, each in
+  the ledger.
+- Policy: each day, equal weights long the top tenth of forecasts and short the bottom tenth
+  among members with news (at least 20 such members, else no trade), bought or sold at the
+  day's close and closed at the next close. Costs: 10 bps a round trip on each side.
+
+SPLITS
+- Development: test years 2018-2021, fitted on the years from 2016 before each.
+- Holdout: 2022 to 9 October 2026, each year fitted on all years before it, run once after
+  this file and the chosen variant are committed.
+
+TEST
+- The long-short's mean daily return after costs over the holdout: one-sided t >= 2.24
+  (Bonferroni over N1 and N2).
+- Reported, not part of the pass: before costs; long side and short side apart; each year;
+  the same with log(count) alone.
+- If it passes, the model is frozen on a card and judged forward in the shadow record; if it
+  fails, it is recorded as failed.
