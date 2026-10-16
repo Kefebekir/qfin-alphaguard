@@ -27,8 +27,14 @@ week alongside university.
   that beats the rule out of sample (`research/step5/LEDGER.md`). The shadow
   record now judges challengers forward (decision 0020): each frozen on a
   card before its record starts, each in its own account, judged by a bet
-  against the rule that stays valid however often it is read. **Next:** Efe
-  trains and freezes the first challenger.
+  against the rule that stays valid however often it is read.
+- **Next: the news reader, the first challengers.** Prices tell how much the
+  market will move, not which way (research/frontier, #38), so the first
+  challengers read the news: two pre-registered tests (`research/news_reader`),
+  N1 the QQQ rule's day from the morning's headlines and N2 members' next day,
+  read by ChronoBERT of the year before, so the model cannot know the year it
+  is tested on. The data (2.09 million Benzinga headlines, 2016 – October 2026)
+  and the harness are ready; Efe trains the model.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -221,7 +227,8 @@ January exams.
 | 2. The QQQ strategy as its own `Strategy` in our engine | Efe's rules; Claude's skeleton | done, #33 |
 | 3. The decision log, and the day book reading it | Claude | done, #34 |
 | 4. Guard's limits for an intraday strategy | Efe: the rules, and the limits in `guard_qqq.yaml` | done |
-| 5. The shadow record for ML challengers | Claude; Efe's models | research and platform done; Efe's first challenger next |
+| 5. The shadow record for ML challengers | Claude; Efe's models | research and platform done |
+| 6. The news reader: pre-registered tests N1 and N2 | Efe's model; Claude's data and harness | data and harness done; Efe trains |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
    band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
@@ -303,6 +310,12 @@ January exams.
          was level, as it should be.
    - [ ] **The first challengers:** Efe's own model, trained by him; then any idea that
      earns a place in the ledger.
+6. [ ] **The news reader** (`research/news_reader`): does a language model reading the
+   news help? Pre-registered before any result: N1, the morning's headlines size the QQQ
+   rule's day (×1.5 / ×1 / ×0.5); N2, a member's headlines rank its next day. ChronoBERT
+   of the year before each test year reads them; Efe trains the model on 2018-2021 (at
+   most 10 variants each) and runs 2022 – October 2026 once (t ≥ 2.24). A pass goes to
+   the shadow record. N2 turns over daily, so it must clear 20 bps a day of costs.
 
 **Gate M2:**
 - the engine's backtest reproduces the research result for every day;
