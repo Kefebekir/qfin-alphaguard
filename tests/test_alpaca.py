@@ -108,6 +108,19 @@ def test_minute_bars_ask_for_every_exchange_and_prices_as_traded():
     }
 
 
+def test_minute_bars_can_ask_for_iex_s_trades_alone():
+    alpaca, fake = client(page())
+    alpaca.minute_bars("QQQ", date(2026, 10, 9), date(2026, 10, 9), feed="iex")
+    assert fake.query(0)["feed"] == "iex"
+
+
+def test_an_unknown_feed_is_refused_before_any_request():
+    alpaca, fake = client(page())
+    with pytest.raises(ValueError, match="feed"):
+        alpaca.minute_bars("QQQ", date(2026, 10, 9), date(2026, 10, 9), feed="otc")
+    assert fake.requests == []
+
+
 def test_the_keys_travel_in_headers_never_in_the_url():
     alpaca, fake = client(page())
 
