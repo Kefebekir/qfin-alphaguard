@@ -1,0 +1,12 @@
+1448 sessions in both, 2021-01-04 to 2026-10-09; IEX minutes with a trade: 92.4% of the session's
+check against session_rule.simulate: largest difference 0.0e+00
+decisions with the same position: 98.4% of 17,136; days with every decision the same: 85.1% of 1433
+SIP decides (the backtest): +16.4% a year, Sharpe 1.36
+IEX decides, fills at SIP: +17.3% a year, Sharpe 1.44
+IEX less SIP: +0.36 bps a day (t +0.78); correlation of the daily results 0.973
+   2021: SIP +9.3%, IEX +11.1% a year
+   2022: SIP +16.9%, IEX +17.3% a year
+   2023: SIP +27.8%, IEX +28.5% a year
+   2024: SIP +25.1%, IEX +22.5% a year
+   2025: SIP +4.6%, IEX +8.9% a year
+   2026: SIP +13.6%, IEX +14.6% a year
