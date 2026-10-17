@@ -34,7 +34,9 @@ week alongside university.
   N1 the QQQ rule's day from the morning's headlines and N2 members' next day,
   read by ChronoBERT of the year before, so the model cannot know the year it
   is tested on. The data (2.09 million Benzinga headlines, 2016 – October 2026)
-  and the harness are ready; Efe trains the model.
+  and the harness are ready. **N1 failed** (Efe's model, six variants, holdout
+  run once): the morning's headlines do not tell the rule's day (−1.52 bps a
+  day against the rule on 2022 – October 2026, t −1.75). N2 is next to decide.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -228,7 +230,7 @@ January exams.
 | 3. The decision log, and the day book reading it | Claude | done, #34 |
 | 4. Guard's limits for an intraday strategy | Efe: the rules, and the limits in `guard_qqq.yaml` | done |
 | 5. The shadow record for ML challengers | Claude; Efe's models | research and platform done |
-| 6. The news reader: pre-registered tests N1 and N2 | Efe's model; Claude's data and harness | data and harness done; Efe trains |
+| 6. The news reader: pre-registered tests N1 and N2 | Efe's model; Claude's data and harness | N1 failed; N2 to decide |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
    band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
@@ -316,6 +318,12 @@ January exams.
    of the year before each test year reads them; Efe trains the model on 2018-2021 (at
    most 10 variants each) and runs 2022 – October 2026 once (t ≥ 2.24). A pass goes to
    the shadow record. N2 turns over daily, so it must clear 20 bps a day of costs.
+   - **N1 failed** (17 October 2026). Efe tried 1, 2, 4, 8, 16 and 64 components; none
+     beat the count of headlines alone on 2018-2021, and the ridge penalty barely
+     changes which days are sized (the components are independent and scaled alike).
+     The variant with the best development mean (2 components, +0.98 bps a day, all of
+     it 2018) lost 1.52 bps a day to the rule on the holdout (t −1.75); sizing by the
+     count alone lost 3.35 (t −3.29).
 
 **Gate M2:**
 - the engine's backtest reproduces the research result for every day;
