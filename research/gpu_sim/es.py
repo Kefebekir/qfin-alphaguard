@@ -137,14 +137,21 @@ def walk_forward(
     }
 
 
-def run_holdout(policy: gym.Policy, n_params: int, settings: dict) -> dict:
-    """The holdout, once: the chosen settings must be committed, and no earlier run."""
+def run_holdout(
+    policy: gym.Policy, n_params: int, settings: dict, network: dict
+) -> dict:
+    """The holdout, once: the chosen settings must be committed, and no earlier run.
+
+    `network` is the network's own settings (e.g. {"hidden": 16, "see_rule": True}), and
+    `settings` evolve's; both must equal those committed in variants/G1_chosen.json.
+    """
     chosen, lock = VARIANTS / "G1_chosen.json", LOCKS / "holdout_G1.json"
     if lock.exists():
         raise RuntimeError(f"G1's holdout has been run: {lock}")
     if not chosen.exists():
         raise RuntimeError(f"write and commit {chosen} with the chosen settings first")
-    if json.loads(chosen.read_text()).get("settings") != settings:
+    committed = json.loads(chosen.read_text())
+    if committed.get("settings") != settings or committed.get("network") != network:
         raise RuntimeError(f"the settings differ from those committed in {chosen}")
     dirty = subprocess.run(
         ["git", "status", "--porcelain", "--", "research/gpu_sim"],

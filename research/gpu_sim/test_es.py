@@ -64,14 +64,16 @@ def test_the_noise_comes_in_pairs(tmp_path):
 def test_the_holdout_needs_its_settings_committed_and_runs_once(tmp_path, monkeypatch):
     monkeypatch.setattr(es, "VARIANTS", tmp_path / "variants")
     monkeypatch.setattr(es, "LOCKS", tmp_path)
+    net = {"hidden": 16, "see_rule": True}
     with pytest.raises(RuntimeError, match="commit"):
-        es.run_holdout(linear, 11, {"generations": 10})
+        es.run_holdout(linear, 11, {"generations": 10}, net)
     (tmp_path / "variants").mkdir()
-    (tmp_path / "variants" / "G1_chosen.json").write_text(
-        json.dumps({"settings": {"generations": 20}})
-    )
+    chosen = {"settings": {"generations": 20}, "network": net}
+    (tmp_path / "variants" / "G1_chosen.json").write_text(json.dumps(chosen))
     with pytest.raises(RuntimeError, match="differ"):
-        es.run_holdout(linear, 11, {"generations": 10})
+        es.run_holdout(linear, 11, {"generations": 10}, net)
+    with pytest.raises(RuntimeError, match="differ"):
+        es.run_holdout(linear, 11, {"generations": 20}, net | {"see_rule": False})
     (tmp_path / "holdout_G1.json").write_text("{}")
     with pytest.raises(RuntimeError, match="has been run"):
-        es.run_holdout(linear, 11, {"generations": 20})
+        es.run_holdout(linear, 11, {"generations": 20}, net)
