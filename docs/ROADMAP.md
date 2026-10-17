@@ -40,7 +40,15 @@ week alongside university.
 - **The rule on other markets: F1 failed.** The QQQ rule, unchanged, on CME Nikkei 225
   futures over the Tokyo session (`research/futures`, pre-registered): −5.4% a year after
   one tick a fill (t −1.82), 0.0% at half a tick. Uncorrelated with the QQQ rule, but
-  without an edge: together they have a Sharpe ratio of 0.62 against 1.44. **Next: N2.**
+  without an edge: together they have a Sharpe ratio of 0.62 against 1.44.
+- **A network trained by evolution: G1 failed** (#42). A GPU simulator of the rule (6,500
+  times the CPU's speed) and a gym of 16 ETFs trained Efe's network by evolution
+  strategies, pre-registered: −7.88 bps a day against the rule on 2022 – October 2026
+  (t −2.92). N2 waits, ready.
+- **Now: Phase 3, paper trading (decision 0021).** The rule decides as well on Alpaca's
+  free IEX feed as on the consolidated tape (`research/phase3`: the same position at 98.4%
+  of decisions, 17.3% a year against 16.4%, t +0.78). The live engine runs on a small AWS
+  server with 30,000 USD on paper; Efe writes the order state machine's transitions.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
@@ -361,7 +369,7 @@ it aside; a later decision can bring it back. Its steps, kept here:
   Sharpe ratio of at least 0.95, positive after 10 bps in most years, and
   the plan beating SPY at similar risk.
 
-### Phase 3: Paper trading (February – May 2027)
+### Phase 3: Paper trading (from 17 October 2026, decision 0021)
 
 Prove the live system behaves like the backtest. Eight weeks cannot prove
 profit; this phase asks whether the system works correctly.
@@ -371,11 +379,12 @@ profit; this phase asks whether the system works correctly.
       replay of each day from the stored minutes.
 - [ ] Always-on server for the engine, alerts, and the `live_trading` lock.
 - [ ] Alpaca paper account and its API: orders by REST, fills by WebSocket.
-- [ ] Live data: trades from a free single-exchange feed (EODHD's EDGX
-      WebSocket or Alpaca's IEX) built into 1-minute bars, and compared with
-      the consolidated tape every day (decision 0008).
-- [ ] Order state machine: new → sent → acknowledged → partial → filled /
-      cancelled / rejected; a unique client order id per order.
+- [ ] Live data: Alpaca's free IEX feed, its 1-minute bars by WebSocket, and
+      compared with the consolidated tape every day (decision 0008). The rule
+      decides as well on IEX's minutes (decision 0021, `research/phase3`).
+- [ ] Order state machine: new → submitted → accepted → partly filled →
+      filled / cancelled / rejected / expired; a unique client order id per
+      order. Efe writes the transitions (decision 0021).
 - [ ] Guard live: every rule, halt and kill switch. The View's price times
       come from the feed and its last close value from the broker's equity;
       Efe decides whether the daily loss limit halts the engine until he

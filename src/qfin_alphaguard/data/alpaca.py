@@ -95,7 +95,9 @@ class AlpacaClient:
         ticker = re.sub(r"_old\d*$", "", code).replace("-", ".")
         return (ticker, *EARLIER_TICKERS.get(code, ()))
 
-    def minute_bars(self, code: str, first: date, last: date) -> pl.DataFrame:
+    def minute_bars(
+        self, code: str, first: date, last: date, feed: str = "sip"
+    ) -> pl.DataFrame:
         """1-minute bars from `first` to `last` (UTC days), both included, as traded.
 
         Like EodhdClient.minute_bars, a bar is labelled with the minute it
@@ -105,13 +107,18 @@ class AlpacaClient:
         request if the end of `last`, at midnight UTC, is less than 15
         minutes ago. Long answers come in pages, oldest first, followed one by
         one.
+
+        `feed` is "sip", the consolidated tape (every exchange), or "iex", IEX's trades
+        alone: the only live feed of Alpaca's free plan, kept back to 2021.
         """
+        if feed not in ("sip", "iex"):
+            raise ValueError(f"feed must be sip or iex, got {feed!r}")
         params = {
             "symbols": code,
             "timeframe": "1Min",
             "start": f"{first.isoformat()}T00:00:00Z",
             "end": f"{last.isoformat()}T23:59:59Z",
-            "feed": "sip",
+            "feed": feed,
             "adjustment": "raw",
             "sort": "asc",
             "limit": str(PAGE_SIZE),
