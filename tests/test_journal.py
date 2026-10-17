@@ -330,21 +330,31 @@ while True:
 """
 
 
+def lines_in(path):
+    return path.read_bytes().count(b"\n") if path.exists() else 0
+
+
 def test_a_journal_survives_its_writer_being_killed(tmp_path):
     path = tmp_path / "day.jsonl"
     rng = random.Random(21)
     for _ in range(5):
+        before = lines_in(path)
         writer = subprocess.Popen(
             [sys.executable, "-c", WRITER, str(path)],
             stdout=subprocess.PIPE,
             text=True,
         )
         assert writer.stdout.readline() == "ready\n"
-        time.sleep(rng.uniform(0.02, 0.2))
+        # Killed mid-stream, after at least 3 new records, however fast the disk is.
+        deadline = time.monotonic() + 30
+        while lines_in(path) < before + 3:
+            assert time.monotonic() < deadline, "the writer wrote nothing"
+            time.sleep(0.005)
+        time.sleep(rng.uniform(0, 0.05))
         writer.kill()  # SIGKILL: no clean-up, as a crash
         writer.wait()
         writer.stdout.close()
         with Journal(path) as j:  # the dead writer's lock is gone
             volumes = [b.volume for b in j.records]
         assert volumes == list(range(len(volumes)))  # nothing lost, nothing twice
-    assert len(volumes) > 20
+    assert len(volumes) >= 15
