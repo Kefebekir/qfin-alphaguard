@@ -41,3 +41,4 @@ At most 10 for each test. Each row is written before the next variant is run.
 |---|---|---|---|---|---|---|---|
 | 1 | N1 | 2026-10-17 | components 16, penalty 10.0 | −0.18 bps | −0.22 | +1.74 / −1.13 / +0.09 / −1.42 | No better than the count alone (−0.16); signs mixed across years |
 | 2 | N1 | 2026-10-17 | components 4, penalty 1000.0 | −0.25 bps | −0.31 | +3.45 / +1.57 / −3.60 / −2.38 | The count's pattern, stronger: up in 2018-2019, down in 2020-2021. Before it, on training data only: the penalty barely changes which days are sized (rank correlation 0.97-0.998 from 100 to 100,000), the number of components does (0.48 for 4) |
+| 3 | N1 | 2026-10-17 | components 64, penalty 1000.0 | −1.11 bps | −1.20 | −2.11 / +0.49 / −0.87 / −1.98 | The worst: more detail, more noise learned; down in three of four years |
