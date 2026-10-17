@@ -178,7 +178,8 @@ def run_holdout(
         raise RuntimeError(
             "commit the network, the settings and the harness before the holdout"
         )
-    result = walk_forward(policy, n_params, HOLDOUT, settings) | {
+    details = str(LOCKS / "holdout_G1_details.json")
+    result = walk_forward(policy, n_params, HOLDOUT, settings, record=details) | {
         "chosen": json.loads(chosen.read_text()),
         "commit": subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
