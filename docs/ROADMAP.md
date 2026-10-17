@@ -397,6 +397,8 @@ profit; this phase asks whether the system works correctly.
       Efe decides whether the daily loss limit halts the engine until he
       restarts it (decision 0014).
 - [ ] Reconciliation at open and close: broker positions equal engine positions.
+      The check is done (`live/reconcile.py`): open orders both ways and
+      positions, asked again for Alpaca's lag; the live loop will call it.
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
 - [ ] Daily report: PnL, slippage, deviation from backtest, share of winning days.
