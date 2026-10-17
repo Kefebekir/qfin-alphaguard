@@ -36,7 +36,11 @@ week alongside university.
   is tested on. The data (2.09 million Benzinga headlines, 2016 – October 2026)
   and the harness are ready. **N1 failed** (Efe's model, six variants, holdout
   run once): the morning's headlines do not tell the rule's day (−1.52 bps a
-  day against the rule on 2022 – October 2026, t −1.75). N2 is next to decide.
+  day against the rule on 2022 – October 2026, t −1.75).
+- **The rule on other markets: F1 failed.** The QQQ rule, unchanged, on CME Nikkei 225
+  futures over the Tokyo session (`research/futures`, pre-registered): −5.4% a year after
+  one tick a fill (t −1.82), 0.0% at half a tick. Uncorrelated with the QQQ rule, but
+  without an edge: together they have a Sharpe ratio of 0.62 against 1.44. **Next: N2.**
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
