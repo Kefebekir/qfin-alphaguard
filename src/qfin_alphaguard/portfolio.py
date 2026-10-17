@@ -14,11 +14,19 @@ from qfin_alphaguard.events import Fill, Side, round_shares
 
 
 class Portfolio:
-    def __init__(self, cash: float) -> None:
+    def __init__(
+        self, cash: float, positions: Mapping[str, float] | None = None
+    ) -> None:
+        """Books starting from `cash` and, for an account already open, its `positions`."""
         if not math.isfinite(cash):
             raise ValueError(f"cash must be a finite number, got {cash!r}")
         self._cash = float(cash)
         self._positions: dict[str, float] = {}
+        for ticker, shares in (positions or {}).items():
+            if not (math.isfinite(shares) and round_shares(shares) == shares):
+                raise ValueError(f"{ticker}: {shares!r} is not a number of shares")
+            if shares:
+                self._positions[ticker] = float(shares)
         # Built once: a read-only window that always shows the current positions.
         self.positions: Mapping[str, float] = MappingProxyType(self._positions)
 
