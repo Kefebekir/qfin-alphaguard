@@ -378,12 +378,14 @@ profit; this phase asks whether the system works correctly.
       with the ML challengers in shadow, the day book every evening, and a
       replay of each day from the stored minutes.
 - [ ] Always-on server for the engine, alerts, and the `live_trading` lock.
-- [ ] Alpaca paper account and its API: orders by REST, fills by WebSocket.
-      The REST side is done (`live/alpaca_broker.py`): a send or a cancel
-      whose answer is lost is never repeated, only asked about.
+- [x] Alpaca paper account and its API: orders by REST, fills by WebSocket
+      (`live/alpaca_broker.py` #45, `live/streams.py`). A send or a cancel
+      whose answer is lost is never repeated, only asked about. The paper
+      account holds 30,000 USD since 17 October 2026.
 - [ ] Live data: Alpaca's free IEX feed, its 1-minute bars by WebSocket, and
       compared with the consolidated tape every day (decision 0008). The rule
       decides as well on IEX's minutes (decision 0021, `research/phase3`).
+      The stream is done (`live/streams.py`); the daily comparison is not.
 - [x] Order state machine: new → submitted → accepted → partly filled →
       filled / cancelled / rejected / expired; a unique client order id per
       order. Efe wrote the transitions (decision 0021, #44).
