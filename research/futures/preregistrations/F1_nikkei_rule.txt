@@ -1,0 +1,56 @@
+PRE-REGISTRATION F1
+Written 2026-10-17 13:18:46 UTC; approved by Efe before any Nikkei result was computed.
+
+Does the QQQ rule, unchanged, earn on Nikkei 225 futures in the Tokyo session?
+
+HYPOTHESIS
+The noise-area intraday momentum rule (decision 0011, src/qfin_alphaguard/momentum.py), with
+none of its settings changed, earns after costs on Nikkei 225 futures over the Tokyo Stock
+Exchange's session. Mechanism: intraday momentum holds in index futures across developed
+markets, Japan among them (Li, Sakkas and Urquhart 2022; Baltussen, Da, Lammers and Martens
+2021, from the hedging of index options and leveraged ETFs, both large in Japan). The Tokyo
+session does not overlap the US one, so a pass would add breadth to the QQQ rule.
+
+DATA
+- CME Nikkei 225 yen futures (NIY), 1-minute bars of the most traded contract each day
+  (Databento GLBX.MDP3, NIY.v.0), 4 January 2016 to 9 October 2026, bought 17 October 2026
+  (12.09 USD), data/raw/futures/. Nothing of it was looked at before this file but the bars'
+  count and volume by hour and the contract each day.
+- Sessions: the Tokyo Stock Exchange's trading days and hours from exchange_calendars
+  (XTKS): 09:00 Tokyo time to the close (15:00 until 1 November 2024, 15:30 from
+  5 November 2024). A minute without a trade carries the last price. The CME's minutes in the
+  lunch break (11:30-12:30) are kept; no decision is taken in it.
+- Rolls: a session whose contract differs from the previous session's is not traded, since
+  its contract's previous close is not in the data (about four a year); its return is left
+  out of the volatility windows.
+
+THE RULE, AS FOR QQQ
+- The noise band at each minute from the 14 sessions before: the mean of |price / open - 1|
+  at that minute, around max and min of the open and the previous session's close.
+- VWAP of the session so far, on CME volume.
+- Decisions at :00 and :30 from 09:30 Tokyo time (none at 11:30 and 12:00): long above the
+  band and VWAP, short below both, flat otherwise; each filled at the next minute's open.
+- Size min(2, 2% / the standard deviation of the last 14 sessions' close-to-close returns).
+- Flat at the open of the session's last minute.
+
+COSTS
+- Each fill pays one tick (5 index points) from the minute's open, plus 0.1 bps of fees: the
+  CME's Tokyo-hours book is thin (7-20 contracts a minute). Reported also at half a tick.
+
+IMPLEMENTATION CHECK, BEFORE ANY NIKKEI RESULT
+- The same research code, run on QQQ's US sessions, must reproduce
+  research/intraday_pilot/qqq_momentum.py's daily results: correlation at least 0.99, and
+  the same trading days within 1%.
+- 2016 is the implementation year: its Nikkei results may be looked at to find bugs, and
+  are reported but not tested.
+
+TEST, RUN ONCE
+- The rule's daily return on Nikkei after one-tick costs, 3 January 2017 to 9 October 2026:
+  one-sided t >= 2.0.
+- Reported, not part of the pass: Sharpe ratio and each year; half-tick costs; the correlation
+  of its daily returns with the QQQ rule's (the Tokyo session comes before the US one on the
+  same date); and the Sharpe ratio of the two rules together at equal risk, each scaled by
+  its volatility over the year before.
+- If it passes: a decision record on adding Nikkei to the strategy, paper first (its UK route
+  is Phase 3b's), and the FTSE 100 becomes worth its 55.82 USD. If it fails, it is recorded as
+  failed.
