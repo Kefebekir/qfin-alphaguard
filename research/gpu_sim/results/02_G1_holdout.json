@@ -1,0 +1,76 @@
+{
+  "days": 1197,
+  "mean_bps": -7.8784990310668945,
+  "t": -2.9152297973632812,
+  "passes": false,
+  "years": {
+    "2022": {
+      "days": 251,
+      "mean_bps": -8.477705001831055,
+      "t": -1.0414412021636963,
+      "model_sharpe": -0.1392078399658203,
+      "rule_sharpe": 1.520878791809082,
+      "scale": 0.7364720702171326,
+      "last_fitness": 2.205559492111206
+    },
+    "2023": {
+      "days": 250,
+      "mean_bps": -11.622347831726074,
+      "t": -2.457629919052124,
+      "model_sharpe": 0.03870447725057602,
+      "rule_sharpe": 2.6287243366241455,
+      "scale": 0.7526741027832031,
+      "last_fitness": 1.8838632106781006
+    },
+    "2024": {
+      "days": 252,
+      "mean_bps": -9.322559356689453,
+      "t": -1.9075887203216553,
+      "model_sharpe": 0.34045279026031494,
+      "rule_sharpe": 2.228217840194702,
+      "scale": 0.7405270934104919,
+      "last_fitness": 1.7069878578186035
+    },
+    "2025": {
+      "days": 250,
+      "mean_bps": -1.2272398471832275,
+      "t": -0.20975877344608307,
+      "model_sharpe": 0.21969687938690186,
+      "rule_sharpe": 0.39146170020103455,
+      "scale": 0.795067310333252,
+      "last_fitness": 1.6074280738830566
+    },
+    "2026": {
+      "days": 194,
+      "mean_bps": -8.97411060333252,
+      "t": -1.5539562702178955,
+      "model_sharpe": -1.0043091773986816,
+      "rule_sharpe": 1.1796084642410278,
+      "scale": 0.7599356770515442,
+      "last_fitness": 1.4822039604187012
+    }
+  },
+  "settings": {
+    "generations": 600,
+    "population": 256,
+    "sigma": 0.05,
+    "lr": 0.02,
+    "seed": 0
+  },
+  "chosen": {
+    "network": {
+      "hidden": 16,
+      "see_rule": false
+    },
+    "settings": {
+      "generations": 600,
+      "population": 256,
+      "sigma": 0.05,
+      "lr": 0.02,
+      "seed": 0
+    },
+    "setting": 4,
+    "rule": "the highest development mean, fixed in the pre-registration"
+  },
+  "commit": "a8ef197a5270ff46976e1dfd8e8acf5797ad4e7d"
+}

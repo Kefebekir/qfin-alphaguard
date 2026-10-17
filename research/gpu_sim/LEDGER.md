@@ -8,7 +8,7 @@ its results on real data was computed; its file is unchanged since (SHA-256 belo
 
 | # | Written (UTC) | File | SHA-256 | Hypothesis | Pass if | Result |
 |---|---|---|---|---|---|---|
-| G1 | 2026-10-17 15:12:02 | `G1_es_network.txt` | `f079a348eb8451206f337120a8b2677bb5d309bdc682745a55abd8d9cf0c8227` | A small network trained by evolution strategies on 16 ETFs' earlier years beats the QQQ rule at equal risk on QQQ | one-sided t ≥ 2.0 on 2022 – 9 October 2026 | pending |
+| G1 | 2026-10-17 15:12:02 | `G1_es_network.txt` | `f079a348eb8451206f337120a8b2677bb5d309bdc682745a55abd8d9cf0c8227` | A small network trained by evolution strategies on 16 ETFs' earlier years beats the QQQ rule at equal risk on QQQ | one-sided t ≥ 2.0 on 2022 – 9 October 2026 | **Failed.** −7.88 bps a day against the rule, t −2.92: worse in all five years. The network −0.9% a year (Sharpe −0.08), the rule +19.0% (1.56) |
 
 ## Settings tried on the development years (2018-2021)
 
@@ -27,3 +27,22 @@ development mean a day goes to the holdout (fixed in the pre-registration).
 network of 16 hidden units blind to the rule, trained for 600 generations (+1.85 bps a day
 against the rule on 2018-2021). Settings 4 and 5 were both run before either was recorded;
 the rule that picks the holdout's setting was fixed before any of them ran.
+
+## G1's holdout (run once, 17 October 2026, commit a8ef197)
+
+`results/02_G1_holdout.json` (the lock is `data/gpu_sim/holdout_G1.json`; a second run is
+refused). Setting 4, retrained from scratch for each year on all 16 ETFs' years before it:
+
+| | 2022 | 2023 | 2024 | 2025 | 2026 | All |
+|---|---|---|---|---|---|---|
+| Network less rule, bps a day | −8.48 | −11.62 | −9.32 | −1.23 | −8.97 | −7.88 (t −2.92) |
+| Network's Sharpe ratio | −0.14 | 0.04 | 0.34 | 0.22 | −1.00 | −0.08 |
+| Rule's Sharpe ratio | 1.52 | 2.63 | 2.23 | 0.39 | 1.18 | 1.56 |
+
+**G1 failed, clearly: the network is worse than the rule in every holdout year.** It does
+not lean on QQQ's own move (its beta to QQQ's day is −0.04 to +0.23), so this is not a bad
+market for a long-biased model: it simply has no edge. What it found in 2020 and 2021 on
+development, with two seeds alike, was particular to those years. Its training Sharpe
+stayed high (1.5-2.2 at the end of each year's training), so the gap between what it
+learned on 16 ETFs' past and what holds on QQQ's future is the overfitting the research
+warned of, now at GPU scale.
