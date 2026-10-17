@@ -379,12 +379,14 @@ profit; this phase asks whether the system works correctly.
       replay of each day from the stored minutes.
 - [ ] Always-on server for the engine, alerts, and the `live_trading` lock.
 - [ ] Alpaca paper account and its API: orders by REST, fills by WebSocket.
+      The REST side is done (`live/alpaca_broker.py`): a send or a cancel
+      whose answer is lost is never repeated, only asked about.
 - [ ] Live data: Alpaca's free IEX feed, its 1-minute bars by WebSocket, and
       compared with the consolidated tape every day (decision 0008). The rule
       decides as well on IEX's minutes (decision 0021, `research/phase3`).
-- [ ] Order state machine: new → submitted → accepted → partly filled →
+- [x] Order state machine: new → submitted → accepted → partly filled →
       filled / cancelled / rejected / expired; a unique client order id per
-      order. Efe writes the transitions (decision 0021).
+      order. Efe wrote the transitions (decision 0021, #44).
 - [ ] Guard live: every rule, halt and kill switch. The View's price times
       come from the feed and its last close value from the broker's equity;
       Efe decides whether the daily loss limit halts the engine until he
