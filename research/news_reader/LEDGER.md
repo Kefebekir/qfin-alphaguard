@@ -40,9 +40,14 @@ At most 10 for each test. Each row is written before the next variant is run.
 **N1's choice for the holdout, fixed 2026-10-17 12:43:56 UTC before variants 4-6 were run:** the variant
 with the highest mean a day on the development years goes to the holdout, whatever it is.
 Variants 4-6 are Efe's choice of 1, 2 and 8 components (penalty 10.0), the last of N1.
+By that rule, variant 5 (2 components, +0.98 bps a day) goes to the holdout; its gain is
+2018's, and 2020 and 2021 were down, as with the count alone.
 
 | # | Test | Run (UTC) | Settings (`efe_model.make`) | Mean a day | t | 2018 / 2019 / 2020 / 2021, bps a day | Note |
 |---|---|---|---|---|---|---|---|
 | 1 | N1 | 2026-10-17 | components 16, penalty 10.0 | −0.18 bps | −0.22 | +1.74 / −1.13 / +0.09 / −1.42 | No better than the count alone (−0.16); signs mixed across years |
 | 2 | N1 | 2026-10-17 | components 4, penalty 1000.0 | −0.25 bps | −0.31 | +3.45 / +1.57 / −3.60 / −2.38 | The count's pattern, stronger: up in 2018-2019, down in 2020-2021. Before it, on training data only: the penalty barely changes which days are sized (rank correlation 0.97-0.998 from 100 to 100,000), the number of components does (0.48 for 4) |
 | 3 | N1 | 2026-10-17 | components 64, penalty 1000.0 | −1.11 bps | −1.20 | −2.11 / +0.49 / −0.87 / −1.98 | The worst: more detail, more noise learned; down in three of four years |
+| 4 | N1 | 2026-10-17 | components 1, penalty 10.0 | −0.63 bps | −0.60 | +2.19 / +0.14 / −3.31 / −1.52 | The dominant topic axis alone: the count's pattern |
+| 5 | N1 | 2026-10-17 | components 2, penalty 10.0 | +0.98 bps | +0.88 | +7.65 / +1.23 / −3.23 / −1.69 | The count's pattern again: up in 2018-2019, down in 2020-2021 |
+| 6 | N1 | 2026-10-17 | components 8, penalty 10.0 | −2.13 bps | −2.12 | −4.01 / +0.68 / −2.89 / −2.33 | Down in three of four years |
