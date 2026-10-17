@@ -35,4 +35,8 @@ than that before costs.
 
 ## Variants tried on the development years (2018-2021)
 
-At most 10 for each test. None yet.
+At most 10 for each test. Each row is written before the next variant is run.
+
+| # | Test | Run (UTC) | Settings (`efe_model.make`) | Mean a day | t | 2018 / 2019 / 2020 / 2021, bps a day | Note |
+|---|---|---|---|---|---|---|---|
+| 1 | N1 | 2026-10-17 | components 16, penalty 10.0 | −0.18 bps | −0.22 | +1.74 / −1.13 / +0.09 / −1.42 | No better than the count alone (−0.16); signs mixed across years |
