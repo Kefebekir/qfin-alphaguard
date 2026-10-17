@@ -1,0 +1,1 @@
+{"network": {"hidden": 16, "see_rule": false}, "settings": {"generations": 600, "population": 256, "sigma": 0.05, "lr": 0.02, "seed": 0}, "setting": 4, "rule": "the highest development mean, fixed in the pre-registration"}
