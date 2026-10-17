@@ -96,8 +96,12 @@ class OutcomeUnknown(Exception):
 
 def _time(text: str) -> datetime:
     # Alpaca writes nanoseconds and, in places, New York's offset; Python keeps
-    # microseconds.
-    return datetime.fromisoformat(text).astimezone(UTC)
+    # microseconds. A time without a zone is refused: astimezone would read it as the
+    # machine's local time.
+    moment = datetime.fromisoformat(text)
+    if moment.tzinfo is None:
+        raise ValueError(f"a time without a zone: {text!r}")
+    return moment.astimezone(UTC)
 
 
 def _shares(text: str | None, name: str) -> float:
@@ -206,7 +210,10 @@ def trade_update_events(update: dict) -> list[OrderEvent]:
         raise BrokerError(f"a {kind} trade update without its order")
     order = AlpacaOrder.parse(update["order"])
     stamp = update.get("timestamp")
-    at = _time(stamp) if stamp else order.updated_at
+    try:
+        at = _time(stamp) if stamp else order.updated_at
+    except (TypeError, ValueError) as error:
+        raise BrokerError(f"a trade update's time cannot be read: {stamp!r}") from error
     events = order.events(at)
     if kind == "order_cancel_rejected":
         events.append(CancelRefused(order.client_order_id, at, "cancel rejected"))

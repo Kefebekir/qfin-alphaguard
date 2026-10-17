@@ -319,6 +319,7 @@ def test_fills_without_a_price_stop_the_engine():
         {"qty": None, "notional": "500"},  # an order for dollars, not shares
         {"side": "sell_short"},
         {"updated_at": "yesterday"},
+        {"updated_at": "2026-10-19T14:00:01"},  # no zone
         {"filled_qty": "lots"},
     ],
 )
@@ -396,6 +397,12 @@ def test_an_update_without_a_time_takes_the_order_s():
 def test_an_update_the_engine_does_not_expect_stops_it(event):
     with pytest.raises(BrokerError):
         trade_update_events(update(event, alpaca_order()))
+
+
+@pytest.mark.parametrize("timestamp", ["2026-10-19T14:00:02", "soon", 5])
+def test_an_update_whose_time_cannot_be_read_stops_the_engine(timestamp):
+    with pytest.raises(BrokerError, match="time"):
+        trade_update_events(update("new", alpaca_order("new"), timestamp=timestamp))
 
 
 def test_an_update_without_its_order_stops_the_engine():
