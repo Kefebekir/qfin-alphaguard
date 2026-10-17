@@ -389,6 +389,9 @@ profit; this phase asks whether the system works correctly.
 - [x] Order state machine: new → submitted → accepted → partly filled →
       filled / cancelled / rejected / expired; a unique client order id per
       order. Efe wrote the transitions (decision 0021, #44).
+- [x] Journal: every bar, order and order event on disk before the engine
+      acts on it; a restart replays it through the same rules. One engine at
+      a time holds a day's journal (`live/journal.py`).
 - [ ] Guard live: every rule, halt and kill switch. The View's price times
       come from the feed and its last close value from the broker's equity;
       Efe decides whether the daily loss limit halts the engine until he
