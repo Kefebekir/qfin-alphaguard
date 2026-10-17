@@ -80,7 +80,9 @@ Both ruff commands must pass before a commit.
   rules; `alpaca_broker.py`, orders out and their status back; `streams.py`,
   the trade updates and the minute bars as they arrive; `journal.py`, every
   input on disk before the engine acts, replayed after a restart;
-  `reconcile.py`, the engine's orders and positions against Alpaca's
+  `reconcile.py`, the engine's orders and positions against Alpaca's;
+  `engine.py`, the core that decides, with no input or output, and replays a
+  day from its journal
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them

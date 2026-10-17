@@ -1,10 +1,12 @@
 """The live engine's journal: every input written to disk before the engine acts on it.
 
-Decision 0021. The engine writes each bar it receives, each order Guard approved and each
-event about an order, one JSON line at a time, and forces it to disk before acting: Sent is
-on disk before the order goes out, so a crash can leave an order to ask about, never one
-the engine does not know it sent. A restart reads the day's journal and replays it through
-the same rules (orders.apply), which rebuilds the engine's orders exactly as they were.
+Decision 0021. The engine writes what it is told (the session's start, each bar, the
+clock, each event about an order) and what it answers (decisions, Guard's events, orders,
+fills), one JSON line at a time, and forces each to disk before acting: Sent is on disk
+before the order goes out, so a crash can leave an order to ask about, never one the
+engine does not know it sent. Each line keeps the moment the engine saw it. A restart
+replays the day through the same rules (engine.replay_day, orders.apply), which rebuilds
+the engine exactly as it was.
 
 The file is plain text, one record a line, with a sequence number and the time it was
 written. A crash in the middle of a write leaves a last line cut short: that write was not
@@ -17,14 +19,25 @@ engine has open: two engines trading the same account would send every order twi
 import fcntl
 import json
 import os
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields, is_dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Self, get_type_hints
+from typing import NamedTuple, Self, get_type_hints
 
-from qfin_alphaguard.events import Bar, Order, OrderIntent, Side, round_shares
+from qfin_alphaguard.events import (
+    Bar,
+    Cancellation,
+    DecisionNote,
+    Fill,
+    Order,
+    OrderIntent,
+    RiskEvent,
+    Side,
+    round_shares,
+)
+from qfin_alphaguard.live.engine import Flatten, SessionStart, Stop, Tick
 from qfin_alphaguard.live.orders import (
     Accepted,
     Cancelled,
@@ -43,8 +56,17 @@ from qfin_alphaguard.live.orders import (
 RECORDS = {
     cls.__name__: cls
     for cls in (
+        SessionStart,
         Bar,
+        Tick,
+        Stop,
+        Flatten,
+        DecisionNote,
+        Cancellation,
+        OrderIntent,
+        RiskEvent,
         Order,
+        Fill,
         Sent,
         Accepted,
         Rejected,
@@ -62,12 +84,14 @@ class JournalError(Exception):
 
 
 def _encode(value):
-    if isinstance(value, datetime):
+    if isinstance(value, date):  # a datetime too
         return value.isoformat()
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
         return {f.name: _encode(getattr(value, f.name)) for f in fields(value)}
+    if isinstance(value, Mapping):
+        return {key: _encode(item) for key, item in value.items()}
     return value
 
 
@@ -83,8 +107,10 @@ def _decode(cls: type, data: dict):
 def _convert(hint, value):
     if hint is datetime:
         return datetime.fromisoformat(value)
-    if hint is Side:
-        return Side(value)
+    if hint is date:
+        return date.fromisoformat(value)
+    if isinstance(hint, type) and issubclass(hint, Enum):
+        return hint(value)
     if hint is OrderIntent:
         return _decode(OrderIntent, value)
     return value
@@ -110,11 +136,16 @@ def decode(data: dict):
         raise JournalError(f"a {cls.__name__} that cannot be read: {error}") from error
 
 
+class Entry(NamedTuple):
+    at: datetime  # when the engine saw it
+    record: object
+
+
 class Journal:
     """One session's journal, opened to read what it holds and to add to it.
 
-    `records` holds what was written before, oldest first; `dropped` is the line cut short
-    by a crash, if there was one.
+    `entries` holds what was written before, oldest first, each with the moment the
+    engine saw it; `dropped` is the line cut short by a crash, if there was one.
     """
 
     def __init__(self, path: Path, now=lambda: datetime.now(UTC)) -> None:
@@ -129,20 +160,26 @@ class Journal:
             self._file.close()
             raise JournalError(f"{path} is open in another engine") from None
         try:
-            self.records, self.dropped = _read(path)
+            self.entries, self.dropped = _read(path)
         except BaseException:
             self._file.close()
             raise
-        self._seq = len(self.records)
+        self._seq = len(self.entries)
 
-    def write(self, record) -> None:
-        """Add `record` and force it to disk; only then may the engine act on it."""
-        line = {"seq": self._seq + 1, "at": self._now().isoformat(), **encode(record)}
+    @property
+    def records(self) -> list:
+        return [entry.record for entry in self.entries]
+
+    def write(self, record, at: datetime | None = None) -> None:
+        """Add `record`, seen at `at` (now if not given), and force it to disk; only then
+        may the engine act on it."""
+        at = self._now() if at is None else at
+        line = {"seq": self._seq + 1, "at": at.isoformat(), **encode(record)}
         self._file.write(json.dumps(line, separators=(",", ":")) + "\n")
         self._file.flush()
         os.fsync(self._file.fileno())
         self._seq += 1
-        self.records.append(record)
+        self.entries.append(Entry(at, record))
 
     def close(self) -> None:
         self._file.close()
@@ -154,8 +191,8 @@ class Journal:
         self.close()
 
 
-def _read(path: Path) -> tuple[list, str | None]:
-    """The records in `path`, and the last line if a crash cut it short.
+def _read(path: Path) -> tuple[list[Entry], str | None]:
+    """The entries in `path`, and the last line if a crash cut it short.
 
     A cut line is removed from the file, so the next record starts on a line of its own.
     """
@@ -167,7 +204,7 @@ def _read(path: Path) -> tuple[list, str | None]:
     # one empty string. Anything after the last newline is a write cut short.
     *whole, tail = lines
     dropped = tail or None
-    records = []
+    entries = []
     for number, line in enumerate(whole, start=1):
         try:
             data = json.loads(line)
@@ -177,12 +214,15 @@ def _read(path: Path) -> tuple[list, str | None]:
             ) from error
         if not isinstance(data, dict) or data.pop("seq", None) != number:
             raise JournalError(f"{path}, line {number}, is out of sequence")
-        data.pop("at", None)
-        records.append(decode(data))
+        try:
+            at = datetime.fromisoformat(data.pop("at"))
+        except (KeyError, TypeError, ValueError) as error:
+            raise JournalError(f"{path}, line {number}, has no time") from error
+        entries.append(Entry(at, decode(data)))
     if dropped is not None:
         with path.open("r+", encoding="utf-8") as file:
             file.truncate(len(text.encode("utf-8")) - len(tail.encode("utf-8")))
-    return records, dropped
+    return entries, dropped
 
 
 @dataclass(frozen=True)
@@ -216,8 +256,9 @@ def rebuild(records: Iterable) -> Rebuilt:
                     "an order the engine did not make"
                 )
             orders[record.client_order_id] = apply(order, record)
-        else:
+        elif RECORDS.get(type(record).__name__) is not type(record):
             raise JournalError(f"a journal cannot hold a {type(record).__name__}")
+        # The rest (decisions, Guard's events, fills, the clock) changes no order.
     return Rebuilt(orders, bars)
 
 

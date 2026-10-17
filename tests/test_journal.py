@@ -1,4 +1,5 @@
 import json
+import math
 import random
 import subprocess
 import sys
@@ -7,7 +8,18 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from qfin_alphaguard.events import Bar, Order, OrderIntent, Side
+from qfin_alphaguard.events import (
+    Bar,
+    Cancellation,
+    DecisionNote,
+    Fill,
+    Order,
+    OrderIntent,
+    RiskAction,
+    RiskEvent,
+    Side,
+)
+from qfin_alphaguard.live.engine import Flatten, SessionStart, Stop, Tick
 from qfin_alphaguard.live.journal import (
     Journal,
     JournalError,
@@ -64,6 +76,58 @@ EVERY_KIND = [
     Rejected(ID, at(5), "insufficient buying power"),
     make_order("qqq-2026-10-19-2", Side.SELL, 0.5),
 ]
+
+
+THE_ENGINE_S = [
+    SessionStart(OPEN.date(), OPEN, 29_400.0, 30_000.0, {"QQQ": 1.0}, {"QQQ": 600.0}),
+    Tick(at(10)),
+    DecisionNote(
+        "QQQ", at(0), "long", "above the band: buy", {"price": 600.0, "vwap": 599.5}
+    ),
+    Cancellation(ID, at(1), "a new decision"),
+    OrderIntent("QQQ", Side.SELL, 2.5, 597.0, at(1), "decision"),
+    RiskEvent(at(1), "max_order_usd", RiskAction.REDUCE, "cut to 2.5", "QQQ"),
+    RiskEvent(at(2), "halt", RiskAction.HALT, "stop"),
+    Fill(ID, "QQQ", Side.BUY, 0.5, 600.01, 0.0, at(3)),
+    Stop(at(4), "reconciliation differs"),
+    Flatten(at(5), {"QQQ": 70.0, "SPY": -1.0}),
+]
+
+
+def test_the_engine_s_records_read_back_as_written(tmp_path):
+    path = tmp_path / "day.jsonl"
+    with journal(path) as j:
+        for record in THE_ENGINE_S:
+            j.write(record)
+    with journal(path) as j:
+        assert j.records == THE_ENGINE_S
+
+
+def test_a_note_with_a_value_it_lacked_reads_back():
+    note = DecisionNote("QQQ", at(0), "flat", "no noise band", {"lower": float("nan")})
+    again = decode(json.loads(json.dumps(encode(note))))
+    assert math.isnan(again.seen["lower"]) and again.reason == note.reason
+
+
+def test_each_entry_keeps_when_the_engine_saw_it(tmp_path):
+    path = tmp_path / "day.jsonl"
+    seen = datetime(2026, 10, 19, 14, 1, 0, 200000, tzinfo=UTC)
+    with journal(path) as j:
+        j.write(bar(30), at=seen)
+        j.write(Sent(ID, at(0)))  # no time given: the journal's clock
+        assert j.entries[0].at == seen
+    with journal(path) as j:
+        assert [entry.at for entry in j.entries] == [seen, WRITTEN]
+        assert j.records == [bar(30), Sent(ID, at(0))]
+
+
+def test_a_line_without_its_time_stops_the_engine(tmp_path):
+    path = tmp_path / "day.jsonl"
+    path.write_text(
+        '{"seq":1,"type":"Sent","client_order_id":"a","time":"2026-10-19T14:00:00+00:00"}\n'
+    )
+    with pytest.raises(JournalError, match="no time"):
+        Journal(path)
 
 
 def journal(path, now=WRITTEN):
@@ -157,26 +221,29 @@ def test_a_line_cut_short_by_a_crash_is_dropped(tmp_path):
         assert j.records == [bar(0), bar(1)] and j.dropped is None
 
 
+SENT = '"at":"2026-10-19T14:00:00.2+00:00","type":"Sent","client_order_id":"a",' + (
+    '"time":"2026-10-19T14:00:00+00:00"}'
+)
+
+
 @pytest.mark.parametrize(
-    "lines",
+    ("lines", "match"),
     [
-        ['{"seq":1,"type":"Ba', '{"seq":2,"type":"Sent"}'],  # broken before the last
-        [
-            '{"seq":2,"type":"Sent","client_order_id":"a","time":"2026-10-19T14:00:00+00:00"}'
-        ],
-        [
-            '{"seq":1,"type":"Sent","client_order_id":"a","time":"2026-10-19T14:00:00+00:00"}',
-            '{"seq":1,"type":"Sent","client_order_id":"a","time":"2026-10-19T14:00:00+00:00"}',
-        ],
-        ['{"type":"Sent","client_order_id":"a","time":"2026-10-19T14:00:00+00:00"}'],
-        ["[1, 2]"],
-        [""],  # an empty line
+        (
+            ['{"seq":1,"type":"Ba', '{"seq":2,' + SENT],
+            "broken",
+        ),  # broken before the last
+        (['{"seq":2,' + SENT], "sequence"),
+        (['{"seq":1,' + SENT, '{"seq":1,' + SENT], "sequence"),
+        (["{" + SENT], "sequence"),
+        (["[1, 2]"], "sequence"),
+        ([""], "broken"),  # an empty line
     ],
 )
-def test_a_damaged_journal_stops_the_engine(tmp_path, lines):
+def test_a_damaged_journal_stops_the_engine(tmp_path, lines, match):
     path = tmp_path / "day.jsonl"
     path.write_text("\n".join(lines) + "\n")
-    with pytest.raises(JournalError):
+    with pytest.raises(JournalError, match=match):
         Journal(path)
 
 
@@ -292,6 +359,22 @@ def test_a_journal_s_fills_add_up_to_positions():
         ]
     )
     assert filled_positions(flat.orders.values()) == {}
+
+
+def test_the_engine_s_other_records_change_no_order():
+    rebuilt = rebuild(
+        [
+            THE_ENGINE_S[0],  # the session's start
+            bar(0),
+            *THE_ENGINE_S[1:],  # decisions, Guard's events, a fill, a stop...
+            make_order(),
+            Sent(ID, at(0)),
+        ]
+    )
+    assert rebuilt.bars == [bar(0)]
+    assert (
+        list(rebuilt.orders) == [ID] and rebuilt.orders[ID].status.value == "submitted"
+    )
 
 
 def test_an_event_for_an_order_the_engine_did_not_make_stops_it():
