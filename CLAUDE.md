@@ -75,6 +75,9 @@ Both ruff commands must pass before a commit.
 - `src/qfin_alphaguard/challengers.py`, `evidence.py`, `challengers/`: the
   shadow record's frozen challenger cards and the betting test that judges
   them against the rule (decision 0020)
+- `src/qfin_alphaguard/live/`: the live engine on Alpaca's paper account
+  (decision 0021); `orders.py`, each order's status at the broker, by Efe's
+  rules
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
