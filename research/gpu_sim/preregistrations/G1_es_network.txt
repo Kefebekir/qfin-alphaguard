@@ -1,0 +1,48 @@
+PRE-REGISTRATION G1
+Written 2026-10-17 15:12:02 UTC; approved by Efe before any result of a network on real data was computed.
+
+Does a small neural network, trained by evolution strategies on 16 ETFs, beat the QQQ rule?
+
+HYPOTHESIS
+A policy network that sees, at each of the rule's decisions, ten numbers known at the minute
+before (where the price is against the noise band and VWAP, the moves since the open and in
+the last half hour, the gap, the time, the volatility, the rule's own position and what it
+holds) and chooses an exposure in [-2, 2], trained on the sessions of 16 ETFs from earlier
+years only, earns more on QQQ than the rule at the same risk. What is new against step 5's
+26 learned policies: sixteen ETFs to learn from, and evolution strategies on the GPU at a
+scale the CPU did not allow (256 networks over 43,000 sessions in about 0.4 seconds).
+
+DATA AND ENVIRONMENT
+- research/gpu_sim/gym.py, as committed with this file: the 16 ETFs' stored minutes, every
+  clean session (no split or missing session in what its observations read), the rule's
+  decisions every 30 minutes from the open, fills at the next minute's open, everything
+  closed at the session's last price, 0.4 bps of cost for each unit of exposure traded. The
+  rule as a policy reproduces qqq_momentum.py exactly (test_gym.py).
+- Training sessions for test year Y: all 16 ETFs, 2016 to Y - 1. Test sessions: QQQ in Y.
+
+MODEL (Efe's; the protocol fixed here)
+- research/gpu_sim/efe_net.py: one hidden layer of tanh units, the output 2 tanh(...).
+  Efe chooses the hidden width (at most 64), and whether the network sees the rule's
+  position (observation 8): a network blind to the rule gets 0 there, so that it can only
+  find a strategy of its own. The rule stays the benchmark either way.
+- Training: es.evolve, OpenAI-style evolution strategies, fitness the annual Sharpe ratio of
+  the training sessions' returns after costs. Efe chooses the generations (at most 2,000),
+  population (at most 256), sigma, learning rate and seed.
+- At most 10 settings (each a choice of all the above) tried on development, each recorded
+  in LEDGER.md with its result before the next is run.
+
+SPLITS
+- Development: test years 2018-2021 (es.walk_forward, es.DEVELOPMENT), as often as Efe likes
+  within the 10 settings.
+- Holdout: QQQ 2022 to 9 October 2026, each year trained from scratch on all years before
+  it, run once (es.run_holdout) with the chosen settings committed in
+  variants/G1_chosen.json; chosen by the highest development mean a day, a rule fixed here.
+
+TEST
+- The daily difference between the network on QQQ at the rule's risk (scaled by the ratio
+  of the two's volatility on QQQ's training sessions) and the rule, over the holdout:
+  one-sided t >= 2.0.
+- Reported, not part of the pass: each year; the network's own Sharpe ratio; the rule's.
+- If it passes, the network is frozen on a challenger card and judged forward in the shadow
+  record (decision 0020); it trades only after a promotion there and Efe's decision. If it
+  fails, it is recorded as failed.

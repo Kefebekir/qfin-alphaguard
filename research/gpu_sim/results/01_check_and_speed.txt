@@ -1,0 +1,6 @@
+correctness: 2693 sessions against qqq_momentum.py; largest difference in a day's return 0.00e+00; days differing by more than 1e-9: 0; turnover equal on 2693 days
+     1 variants x 2693 sessions: 0.006 s, 418,623 sessions a second, peak memory 0.3 GB
+   100 variants x 2693 sessions: 0.007 s, 40,330,032 sessions a second, peak memory 0.3 GB
+  1000 variants x 2693 sessions: 0.041 s, 65,012,974 sessions a second, peak memory 0.4 GB
+ 10000 variants x 2693 sessions: 0.514 s, 52,410,879 sessions a second, peak memory 3.9 GB
+CPU (session_rule.py with momentum.py's functions, Python): 1 variant x 2693 sessions in 0.34 s, 7,982 sessions a second, so about 6,500 times slower than the GPU at 10,000 variants (about 0.9 hours for 10,000 variants). At 50,000 variants the GPU's 8 GB is exceeded (19.7 GB asked for) and the run spills into system memory: batches of 10,000 are the size for this GPU.
