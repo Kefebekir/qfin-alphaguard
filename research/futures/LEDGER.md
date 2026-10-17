@@ -11,6 +11,12 @@ committed).
 |---|---|---|---|---|---|---|
 | F1 | 2026-10-17 13:18:46 | `F1_nikkei_rule.txt` | `bf23a37ef7ebd0805b655c8de0f0123d8c225c4b6bdbdbb2d2a00bb2aa6f6fb5` | The QQQ rule, unchanged, earns on CME Nikkei 225 futures (NIY) over the Tokyo session after one tick a fill | one-sided t ≥ 2.0 on 3 January 2017 – 9 October 2026 | pending |
 
+## Notes
+
+| # | Written (UTC) | File | SHA-256 | Note |
+|---|---|---|---|---|
+| 1 | 2026-10-17 13:19:23 | `F1_note_1.txt` | `a9f8aaddf7d412185e118f919892e287e7826059e6e54cb3fb8e351091da57c3` | The rule is momentum.py's next_position: VWAP is its stop, not part of its entry; F1's summary line simplified it |
+
 ## Data bought
 
 | Date | Data | Cost |

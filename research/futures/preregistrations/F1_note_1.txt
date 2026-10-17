@@ -1,0 +1,10 @@
+NOTE 1 TO F1
+Written 2026-10-17 13:19:23 UTC, before any Nikkei result was computed.
+
+F1's summary of the rule says "long above the band and VWAP, short below both, flat
+otherwise". The rule F1 tests is momentum.py's, unchanged, as the file says: next_position
+enters long above the band (short below it) and stops a long when the price falls below the
+tighter of the band's top and VWAP (a short, above the looser of the band's bottom and VWAP),
+turning short at once if the price is also below the band. The research code calls
+momentum.py's noise_band, daily_volatility and next_position themselves, so that the rule on
+Nikkei is the rule on QQQ.
