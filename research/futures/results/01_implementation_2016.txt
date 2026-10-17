@@ -1,0 +1,7 @@
+2016: 245 Tokyo sessions; minutes with a bar: 89%; sessions with no bar: 2; with two contracts: 0
+session lengths (minutes): [360]
+decision minutes: [30, 60, 90, 120, 210, 240, 270, 300, 330]
+2016 from its 16th session: {'days': 228, 'traded_days': 127, 'annual': 0.05557856373957608, 'sharpe': 0.3317271518816854, 't': 0.3155354604338443, 'mean_bps': 2.2054985610942888}
+rolls not traded in 2016: 4
+sizes: 0.60 to 2.00; prices 15080 to 19520
+Tokyo sessions without a CME bar, 2016-2026: 18, all Good Fridays and Christmas days (CME closed, Tokyo open); they are left out.
