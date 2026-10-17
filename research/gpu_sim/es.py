@@ -91,12 +91,17 @@ def walk_forward(
     years: tuple[int, ...],
     settings: dict,
     npz_dir: str = "data/gpu_sim",
+    record: str | None = None,
 ) -> dict:
-    """Train on the 16 ETFs before each year, score on QQQ that year against the rule."""
+    """Train on the 16 ETFs before each year, score on QQQ that year against the rule.
+
+    With `record`, a JSON file of the run's details for report.py: each year's mean fitness
+    at every generation, and its test days with the network's and the rule's daily returns.
+    """
     market = gym.load(npz_dir, TICKERS)
     year = np.array([int(d[:4]) for d in market.day])
     qqq = market.ticker == "QQQ"
-    per_year, diffs = {}, []
+    per_year, diffs, details = {}, [], {}
     for test_year in years:
         train = market.select((year < test_year) & (year >= 2016))
         test = market.select(qqq & (year == test_year) & (market.day <= LAST_DAY))
@@ -116,6 +121,12 @@ def walk_forward(
         rule = gym.rollout(test, gym.rule_policy, one, cost)[0]
         diff = (model - rule).cpu().numpy()
         diffs.append(diff)
+        details[test_year] = {
+            "fitness": history,
+            "days": list(test.day),
+            "model": model.cpu().numpy().tolist(),
+            "rule": rule.cpu().numpy().tolist(),
+        }
         per_year[test_year] = {
             "days": len(diff),
             "mean_bps": float(diff.mean() * 1e4),
@@ -127,7 +138,7 @@ def walk_forward(
         }
     d = np.concatenate(diffs)
     t = float(d.mean() / d.std(ddof=1) * math.sqrt(len(d)))
-    return {
+    result = {
         "days": len(d),
         "mean_bps": float(d.mean() * 1e4),
         "t": t,
@@ -135,6 +146,10 @@ def walk_forward(
         "years": per_year,
         "settings": settings,
     }
+    if record is not None:
+        Path(record).parent.mkdir(parents=True, exist_ok=True)
+        Path(record).write_text(json.dumps(result | {"details": details}))
+    return result
 
 
 def run_holdout(
