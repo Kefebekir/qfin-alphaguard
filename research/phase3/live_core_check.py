@@ -21,7 +21,11 @@ cancels and replaces them, and the live core must wait for each cancel. The chec
 2. each session's journal, written as JSON and read back, replayed through a fresh core
    (engine.replay_day), gives the same session: the same orders and the same books.
 
-Usage: live_core_check.py ROOT FIRST LAST GUARD_QQQ_YAML [PARTICIPATION]
+MORNING ("morning" as the sixth argument) builds the strategy afresh each session and warms
+it on the 20 sessions before, from the same minutes, as the live engine does each morning
+(live/warmup.py); otherwise one strategy runs through all sessions, as the backtest's does.
+
+Usage: live_core_check.py ROOT FIRST LAST GUARD_QQQ_YAML [PARTICIPATION [morning]]
 """
 
 import copy
@@ -57,6 +61,7 @@ from qfin_alphaguard.live.engine import (
 )
 from qfin_alphaguard.live.journal import decode, encode
 from qfin_alphaguard.live.orders import Accepted, Cancelled, Expired, FillReport
+from qfin_alphaguard.live.warmup import sessions_before, warm_up
 from qfin_alphaguard.momentum import NoiseAreaMomentum
 from qfin_alphaguard.sessions import sessions
 
@@ -64,6 +69,7 @@ ROOT = Path(sys.argv[1])
 FIRST, LAST = date.fromisoformat(sys.argv[2]), date.fromisoformat(sys.argv[3])
 LIMITS = load_guard_config(sys.argv[4])
 PARTICIPATION = float(sys.argv[5]) if len(sys.argv) > 5 else 0.1
+MORNING = len(sys.argv) > 6 and sys.argv[6] == "morning"
 CASH = 30_000.0
 DELAY = timedelta(milliseconds=200)  # a bar reaches the engine this long after it ends
 FREE = CostModel(sec_fee_rate=0, cat_per_share=0, half_spread_bps=0)
@@ -92,7 +98,12 @@ bars = [
 ]
 print(
     f"{len(bars):,} IEX minutes of QQQ, {FIRST} to {LAST}; an order takes at most "
-    f"{PARTICIPATION:.1%} of a bar's volume"
+    f"{PARTICIPATION:.1%} of a bar's volume; "
+    + (
+        "the strategy warmed afresh each morning"
+        if MORNING
+        else "one strategy throughout"
+    )
 )
 
 # 1. The backtest.
@@ -209,6 +220,7 @@ def replayed(entries, before):
 
 clock = time.monotonic()
 strategy = NoiseAreaMomentum()
+by_day = {d: list(b) for d, b in groupby(bars, key=lambda b: b.start.date())}
 guard = Guard(LIMITS)
 outputs: list = []
 cash, value, held, prices = CASH, CASH, {}, {}
@@ -224,6 +236,10 @@ for day, day_bars in groupby(bars, key=lambda b: b.start.date()):
         held,
         {t: prices[t] for t in held},
     )
+    if MORNING:
+        strategy = NoiseAreaMomentum()
+        past = sessions_before(day)
+        warm_up(strategy, [(s, by_day.get(s.day, [])) for s in past], cash)
     before = copy.deepcopy(strategy)
     core = LiveEngine(strategy, guard, start, collar_bps=LIMITS.price_collar_bps)
     alpaca = Alpaca(core, start)
