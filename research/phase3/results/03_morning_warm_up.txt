@@ -1,0 +1,24 @@
+research/phase3/live_core_check.py in its morning mode, run on 18 October 2026.
+The strategy is built afresh each session and warmed on the 20 sessions before (live/warmup.py),
+as the live engine does each morning; the backtest runs one strategy through all sessions.
+
+$ live_core_check.py data/raw 2021-01-04 2026-10-09 guard_qqq.yaml 0.1 morning
+520,318 IEX minutes of QQQ, 2021-01-04 to 2026-10-09; an order takes at most 10.0% of a bar's volume; the strategy warmed afresh each morning
+1449 sessions in the calendar, 1448 with bars, each replayed from its journal: same orders and books
+decision notes: 18,557 live, 18,557 backtest: all the same
+orders: 2,985 live, 2,985 backtest: all the same (largest difference in shares 0.0e+00); fills reported in part 2,352 times; cancels 0
+Guard events: 707 live, 707 backtest: all the same
+books at each close, live against backtest: cash within 5.8e-11 USD, positions within 0.0e+00 shares; at the end 71,992.57 USD
+
+$ live_core_check.py data/raw 2021-01-04 2026-10-09 guard_qqq.yaml 0.002 morning
+520,318 IEX minutes of QQQ, 2021-01-04 to 2026-10-09; an order takes at most 0.2% of a bar's volume; the strategy warmed afresh each morning
+1449 sessions in the calendar, 1448 with bars, each replayed from its journal: same orders and books
+decision notes: 18,557 live, 18,557 backtest: all the same
+orders: 5,178 live, 5,178 backtest: all the same (largest difference in shares 0.0e+00); fills reported in part 101,881 times; cancels 2,817
+Guard events: 736 live, 736 backtest: all the same
+books at each close, live against backtest: cash within 2.8e-10 USD, positions within 0.0e+00 shares; at the end 72,111.69 USD
+
+Alpaca's history through live/warmup.history, on 18 October 2026:
+20 sessions before 12 Oct: 20 with bars, 7,586 minutes fetched, 7,586 stored; identical: True
+for Monday 19 Oct: 2026-09-21 to 2026-10-16, 7,575 minutes; fetched in 0.9 s, played in 0.04 s
+ready: 15 closes and 14 sessions of moves; last close 709.82; daily volatility 1.05%, so Monday's size is 1.90x the account

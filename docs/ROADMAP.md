@@ -404,6 +404,9 @@ profit; this phase asks whether the system works correctly.
       choice). On 2021 – October 2026 it makes the backtest's every decision,
       order and Guard event, and each day replays from its journal
       (`research/phase3/results/02_live_core_check.txt`).
+- [x] The morning's warm-up (`live/warmup.py`): the strategy relearns the
+      20 sessions before today from IEX's history; warmed afresh each
+      morning of 2021 – October 2026 it decides exactly as the backtest's.
 - [ ] The runner: the streams, Alpaca, the journal and reconciliation around
       the core; the stop that closes by Alpaca's positions (Efe's choice).
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
