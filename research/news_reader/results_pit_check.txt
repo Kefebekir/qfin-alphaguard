@@ -1,0 +1,14 @@
+pit_check.py on PIT-4B-201511 (commit 93c8f9a5), headlines of 2016; 18 October 2026, RTX 5070 Laptop, torch 2.11.0+cu128.
+
+1. The weights
+   122 tensors; missing [], extra []
+   output layer equal to the embedding table: True
+2. Against the float32 reference, 12 headlines of 2016
+   bf16: cosine with the reference, last token min 0.99996 mean 0.99997; mean of tokens min 0.99998
+   ours: cosine with the reference, last token min 0.99998 mean 0.99999; mean of tokens min 0.99999
+3. Language
+   loss on written sentences: 2.56 nats a token (knowing nothing: 10.83)
+   loss on 256 headlines of 2016: 3.81 nats a token
+   'The capital of France is' -> ' Paris.\nThe capital of the United'
+   'Apple Inc. is a company that makes' -> ' a lot of money. It is a'
+   'The Federal Reserve raised interest rates, and stocks' -> ' fell.\nThe Dow Jones industrial average'
