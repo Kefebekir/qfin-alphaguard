@@ -399,6 +399,13 @@ profit; this phase asks whether the system works correctly.
 - [ ] Reconciliation at open and close: broker positions equal engine positions.
       The check is done (`live/reconcile.py`): open orders both ways and
       positions, asked again for Alpaca's lag; the live loop will call it.
+- [x] The live engine's core (`live/engine.py`): the backtest's loop for a
+      broker that answers late. A replacement waits for its cancel (Efe's
+      choice). On 2021 – October 2026 it makes the backtest's every decision,
+      order and Guard event, and each day replays from its journal
+      (`research/phase3/results/02_live_core_check.txt`).
+- [ ] The runner: the streams, Alpaca, the journal and reconciliation around
+      the core; the stop that closes by Alpaca's positions (Efe's choice).
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
 - [ ] Daily report: PnL, slippage, deviation from backtest, share of winning days.

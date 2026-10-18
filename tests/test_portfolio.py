@@ -134,3 +134,17 @@ def test_a_dividend_is_paid_per_share_held_and_charged_to_a_short():
     portfolio.dividend("A", 0.25)
     portfolio.dividend("B", 0.50)
     assert portfolio.cash == pytest.approx(-1_000.0 + 200.0 + 2.5 - 2.0)
+
+
+def test_books_can_start_from_an_account_already_holding_shares():
+    portfolio = Portfolio(29_000.0, {"QQQ": 2.5, "SPY": -1.0, "AAPL": 0.0})
+    assert dict(portfolio.positions) == {"QQQ": 2.5, "SPY": -1.0}
+    portfolio.apply(fill(Side.SELL, 2.5, 600.0, ticker="QQQ"))
+    assert dict(portfolio.positions) == {"SPY": -1.0}
+    assert portfolio.cash == 30_500.0
+
+
+@pytest.mark.parametrize("shares", [float("nan"), float("inf"), 0.1234567891])
+def test_a_starting_position_must_be_shares(shares):
+    with pytest.raises(ValueError):
+        Portfolio(1000.0, {"QQQ": shares})
