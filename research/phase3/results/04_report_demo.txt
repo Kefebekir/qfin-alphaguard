@@ -1,0 +1,12 @@
+research/phase3/report_demo.py, then qfin live-report, run on 18 October 2026.
+The session of Friday 16 October 2026 played through the live engine's core from Alpaca's IEX history
+(each order filled in full at the next minute's open), and its evening report against backtests
+of the same session on IEX's history and on SIP:
+
+Session 2026-10-16: +884.37 USD (+2.95%) on 30,000.00 USD
+Replayed from its journal: the same
+Decisions: 13; the position, New York time: 10:00 short, 15:59 flat
+Orders: 2, 2 filled; slippage median -2.01 bps, mean -2.01 bps against the price decided on
+Backtest on IEX's history: 13 of 13 decisions the same (100%, meets the 95% gate); its result +879.55 USD, 2 orders
+Backtest on SIP: 13 of 13 decisions the same (100%, meets the 95% gate); its result +877.48 USD, 2 orders
+Bars: 389 from the stream, 389 kept by Alpaca; 389 the same, 0 different, 0 only live, 0 only kept
