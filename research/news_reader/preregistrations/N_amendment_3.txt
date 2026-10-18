@@ -1,0 +1,7 @@
+AMENDMENT 3 TO N2
+Written 2026-10-18 17:07 UTC, with N3, before any model of N2 or N3 was fitted or scored.
+
+N3 joins the news tests. N1 and N2 shared the tests' one-sided 2.5% (Bonferroni, 1.25% each,
+t >= 2.24). N1 has used its half; N2 and N3 now share the other half, 0.625% each. So N2
+passes at one-sided t >= 2.50, as N3 does. The threshold only rises: the change makes N2
+harder to pass, never easier. Everything else in N2 is as amended.

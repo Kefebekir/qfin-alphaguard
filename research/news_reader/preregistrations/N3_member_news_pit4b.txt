@@ -1,0 +1,62 @@
+PRE-REGISTRATION N3
+Written 2026-10-18 17:07 UTC; approved by Efe before any result of this test was computed,
+and before N2's holdout runs.
+
+Does a larger point-in-time language model read members' news better? N2, with a
+4-billion-parameter model in place of ChronoBERT.
+
+HYPOTHESIS
+As N2: among S&P 500 members with news since the last close, those whose headlines lead a
+model, trained only on earlier years, to forecast a better next day earn more from today's
+close to tomorrow's close than those it forecasts worst. And: a larger model reads them
+better. Among point-in-time models, the 4-billion-parameter PIT-4B did best on next-day
+returns from headlines in DatedGPT's comparison (Yan et al., 2026: Sharpe 3.37 for PIT-4B,
+3.20 for DatedGPT, 0.86 for PIT-4B-FT, 0.59 for ChronoGPT-Instruct), and Kelly, Malamud,
+Schwab and Xu (NeurIPS 2026) find its news embeddings, fine-tuned or not, ahead of
+ChronoGPT's on monthly returns (Sharpe 1.53 and 1.02 against 0.67).
+
+DATA
+As N2 (the articles, the window from 16:00 on the session before to 15:30, the members, the
+returns against the mean of members with news), with N2's costs after amendment 2: 1 bp a
+round trip on each side.
+
+FEATURES (fixed here)
+- The models: PIT-4B, base and fine-tuned (PIT-4B-FT), Apache-2.0, published under
+  huggingface.co/Diamegs and huggingface.co/anonymneurips2027 with the same files; each
+  checkpoint is pinned by the SHA-256 of its model.safetensors, written in the ledger before
+  it is used. Year Y's headlines are read by the checkpoint of December Y-1; 2016's by
+  November 2015 (201511), the earliest before it; 2025's and 2026's by December 2024
+  (202412), the latest published. Each checkpoint's month is the one its config.json states.
+- A headline's two embeddings, from one pass through each model: the last layer's hidden
+  state after the final RMS norm at the headline's last token (Kelly et al.'s choice), and
+  the mean of that state over the headline's tokens. Computed in bfloat16 by the project's
+  own copy of the published architecture, so no code from the models' repositories runs.
+- A member-day's features: the mean of its window's headline embeddings, and log(1 + their
+  number), as N2.
+- Four feature sets follow (base or fine-tuned, last token or mean). Which one a variant
+  uses is part of the variant.
+
+MODEL (trained by Efe; the protocol fixed here)
+- Target, family and policy as N2: principal components and ridge, at most 10 variants on
+  development in all, across the four feature sets, each in the ledger before the next is
+  run. A variant may add, as inputs, the member's return that day, its 20-day volatility and
+  its momentum from 12 months to 1 month before.
+- The variant with the highest mean a day on the development years goes to the holdout,
+  whatever it is.
+
+SPLITS
+- Development: test years 2018-2021, fitted on the years from 2016 before each.
+- Holdout: 2022 to 9 October 2026, each year fitted on all years before it, run once after
+  this file and the chosen variant are committed.
+
+TEST
+- The long-short's mean daily return after costs over the holdout: one-sided t >= 2.50.
+  N1 used half of the news tests' 2.5%; N2 and N3 share the other half (Bonferroni, 0.625%
+  each), so N2's threshold rises to the same 2.50 (amendment 3).
+- Reported, not part of the pass:
+  - before costs;
+  - the long side and the short side apart;
+  - each year;
+  - N3 less N2, day by day, with its t.
+- If it passes, the model is frozen on a card and judged forward in the shadow record; if it
+  fails, it is recorded as failed.

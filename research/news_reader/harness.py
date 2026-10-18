@@ -1,6 +1,7 @@
 """The news reader's harness: each test year's data, the policies, the scores, the holdout lock.
 
-Pre-registrations N1 and N2 (and amendment 1) fix everything here; Efe's part is the model.
+Pre-registrations N1, N2 and N3 (and amendments 1-3) fix everything here; Efe's part is the
+model.
 A model is anything with fit(X, y) and predict(X), as in scikit-learn; `make` builds a fresh
 one for each test year.
 
@@ -21,7 +22,10 @@ the rule.
 N2 (members' next day): X likewise for a member's headlines to 15:30; y is the return from
 the day's close to the next session's close less the mean of the members with news that day.
 Each test day with at least 20 such members: equal weights long the top tenth of forecasts,
-short the bottom tenth, less 10 bps a round trip on each side.
+short the bottom tenth, less 1 bp a round trip on each side (amendment 2; it was 10 bps).
+
+The holdout passes at one-sided t >= 2.24 for N1, which has run, and 2.50 for N2 and N3, which
+share the half of the tests' 2.5% that N1 did not use (amendment 3).
 """
 
 import json
@@ -48,8 +52,9 @@ FIRST_TRAIN = 2016
 DEVELOPMENT = (2018, 2019, 2020, 2021)
 HOLDOUT = (2022, 2023, 2024, 2025, 2026)
 LAST_DAY = date(2026, 10, 9)
-THRESHOLD = 2.24  # one-sided, Bonferroni over N1 and N2
-COST = 0.0010  # a round trip, each side (N2)
+# One-sided; N1 had half of the news tests' 2.5%, N2 and N3 share the other half.
+THRESHOLDS = {"N1": 2.24, "N2": 2.50, "N3": 2.50}
+COST = 0.0001  # a round trip, each side (N2, amendment 2; it was 0.0010)
 MIN_MEMBERS = 20
 
 
@@ -217,7 +222,7 @@ def run(
         "mean_bps": float(scores.mean() * 1e4),
         "annual": float(scores.mean() * 252),
         "t": t_stat(scores),
-        "passes": bool(t_stat(scores) >= THRESHOLD),
+        "passes": bool(t_stat(scores) >= THRESHOLDS[test]),
         "years": per_year,
     }
 
