@@ -110,10 +110,11 @@ of features serves every test year. Three things differ from N2:
 - **The embedding has 4,096 numbers**, not 768. In your `make`, the embedding is the first
   4,096 columns and the count the column after them: `embedding = list(range(4096))`,
   `count = [4096]`.
-- **Four feature sets**, and which one a variant uses is part of the variant: `base-last`
-  and `base-mean` (PIT-4B: the state at the headline's last token, or the mean over its
-  tokens), `ft-last` and `ft-mean` (the fine-tuned PIT-4B-FT). At most 10 variants across
-  the four, each in the ledger with its feature set.
+- **Two feature sets**, and which one a variant uses is part of the variant: `base-last`
+  and `base-mean` (the state at the headline's last token, or the mean over its tokens). At
+  most 10 variants across the two, each in the ledger with its feature set. (The fine-tuned
+  PIT-4B-FT was dropped before any result, amendment 4: its fine-tuning data was written in
+  2024.)
 - **The run names the set:**
 
   ```bash

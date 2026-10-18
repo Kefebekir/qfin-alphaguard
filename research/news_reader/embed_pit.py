@@ -1,4 +1,4 @@
-"""N3's embeddings: each member headline read by PIT-4B and PIT-4B-FT of the year before.
+"""N3's embeddings: each member headline read by PIT-4B of the year before.
 
 Pre-registration N3: an article known in year Y (New York's calendar) is read by the
 checkpoint of December Y-1, an article of 2016 by November 2015, and articles of 2025 and 2026
@@ -39,7 +39,7 @@ from members import checkpoint, member_articles
 from pit import SHAPE, HiddenStates, batches, check, embeddings, load
 
 NEWS, EMB, PRICES, PIT, OUT = (Path(a) for a in sys.argv[1:6])
-MODELS = ("PIT-4B", "PIT-4B-FT")
+MODELS = ("PIT-4B",)  # amendment 4 dropped PIT-4B-FT
 MAX_TOKENS = 64
 BATCH_TOKENS = 16_384  # tokens a batch, padding included
 

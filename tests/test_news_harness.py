@@ -159,7 +159,7 @@ def n3_files(tmp_path, monkeypatch):
     )
     rows.write_parquet(tmp_path / "n3_rows.parquet")
     embedding = np.arange(10, dtype=np.float16).reshape(5, 2)  # row r is [2r, 2r + 1]
-    np.save(tmp_path / "n3_ft-mean.npy", embedding)
+    np.save(tmp_path / "n3_base-mean.npy", embedding)
     monkeypatch.setattr(harness, "PIT_EMB", tmp_path)
     returns = rows.select(
         "day", "ticker", next_return=pl.Series([0.01, 0.02, 0.03, 0.04, 0.05])
@@ -171,7 +171,7 @@ def test_n3_reads_its_feature_set_and_the_count_up_to_the_test_year(
     tmp_path, monkeypatch
 ):
     returns = n3_files(tmp_path, monkeypatch)
-    data = harness.n3_year(2018, returns, "ft-mean")
+    data = harness.n3_year(2018, returns, "base-mean")
     # Trained on 2016-2017 (not 2015); tested on 2018; 2019 is not read.
     assert data.train_x.tolist() == [
         [2.0, 3.0, pytest.approx(math.log(4))],
@@ -189,7 +189,7 @@ def test_n3_needs_a_feature_set_and_the_others_take_none():
     with pytest.raises(ValueError, match="N3's features"):
         harness.run("N3", object)
     with pytest.raises(ValueError, match="N3's features"):
-        harness.run("N3", object, features="mean")
+        harness.run("N3", object, features="ft-mean")  # dropped by amendment 4
     with pytest.raises(ValueError, match="one feature set"):
         harness.run("N2", object, features="base-last")
 

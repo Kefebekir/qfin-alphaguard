@@ -12,7 +12,7 @@ tried on them is listed here before its holdout run.
 |---|---|---|---|---|---|---|
 | N1 | 2026-10-16 13:43:43 | `N1_morning_news_qqq.txt` | `857208114180ee6af8dd2dadfd784e925f9595bc8c481dbc783e5448720ef481` | The morning's news (16:00 to 09:55), read by ChronoBERT of the year before, tells the QQQ rule's day; the rule sized ×1.5 / ×1 / ×0.5 by the forecast's third beats the rule at equal risk | one-sided t ≥ 2.24 on 2022 – 9 October 2026 | **Failed.** Variant 5 (2 components): −1.52 bps a day, t −1.75, over 1,197 days; −3.24 / −4.69 / +1.80 / −1.68 / +0.71 in 2022-2026. The count alone: −3.35, t −3.29 |
 | N2 | 2026-10-16 13:43:43 | `N2_member_news_next_day.txt` | `ea92212a00d072e7bc294aeb4e6cb607aee3fedfab4a6c3c86fe8e2ac698190a` | A member's news to 15:30 tells its next close-to-close return against the other members with news; long the top tenth, short the bottom tenth | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (amendments 2 and 3; it was t ≥ 2.24 after 10 bps) | pending |
-| N3 | 2026-10-18 17:07 | `N3_member_news_pit4b.txt` | `1e3cd2b547670b44218ab1eec68ddb9a69eb0015ab974d05635883f11e79264c` | N2 read by PIT-4B, a 4-billion-parameter point-in-time model, base or fine-tuned, its last token's state or its mean | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 | pending |
+| N3 | 2026-10-18 17:07 | `N3_member_news_pit4b.txt` | `1e3cd2b547670b44218ab1eec68ddb9a69eb0015ab974d05635883f11e79264c` | N2 read by PIT-4B, a 4-billion-parameter point-in-time model, its last token's state or its mean (amendment 4: the base model only) | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 | pending |
 
 ## Amendments
 
@@ -21,6 +21,7 @@ tried on them is listed here before its holdout run.
 | 1 | 2026-10-16 13:44:34 | `N_amendment_1.txt` | `11cb20b829668176c245947081e80c967cc8cee97e5c5bce5722e8076d25f196` | No ChronoBERT vintage for 2025 is published: test year 2026 uses vintage 2024, which knows less |
 | 2 | 2026-10-18 17:07 | `N_amendment_2.txt` | `5f2e4fa602cf251208e609c8d6c0c851fd6c78d9018c539c3e8d63b74cbd3a16` | N2's cost, from a placeholder of 10 bps a round trip a side to 1 bp: an order on the close fills at the official close, and Alpaca's paper account took a whole-share one on 18 October 2026. Only the count-only development check had been computed |
 | 3 | 2026-10-18 17:07 | `N_amendment_3.txt` | `fc469e8f37780caafb8866dd7d233935b2cdc403d61e86d13af563d6048acd08` | N3 joins: N2 and N3 share the half of the news tests' 2.5% that N1 did not use, so N2 passes at t ≥ 2.50, not 2.24 |
+| 4 | 2026-10-18 22:40 | `N_amendment_4.txt` | `10402a55ace2155dd4bda24ba0bd0e26a5b2b03a5d24949877dde4620e853d86` | N3 drops PIT-4B-FT before any headline was read with it: its fine-tuning data (Tulu 3, and instructions Qwen2.5-72B wrote) dates from 2024, filtered of time-specific rows by a classifier, so it is not point-in-time. Two feature sets remain, base-last and base-mean |
 
 ## N3's checkpoints
 
@@ -31,6 +32,8 @@ file under Diamegs and anonymneurips2027 for all twenty (17,754,502,408 bytes ea
 it again, and the config against `pit.py`'s copy of the architecture, before reading a
 headline with it. PIT-4B-201511's embeddings had started a few minutes before these rows were
 written; its file was the one pinned here.
+
+Amendment 4 dropped PIT-4B-FT: its ten rows are not used.
 
 | Model | Checkpoint | Reads the headlines of | Commit | SHA-256 of model.safetensors |
 |---|---|---|---|---|

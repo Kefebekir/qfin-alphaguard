@@ -26,8 +26,8 @@ short the bottom tenth, less 1 bp a round trip on each side (amendment 2; it was
 
 N3 (N2 read by PIT-4B): N2's rows, target and score, with X from features_n3.py. Each article
 was read by the checkpoint of the year before its own, so every test year reads the same
-features; which of the four sets (base-last, base-mean, ft-last, ft-mean) is part of the
-variant: run("N3", make, features="base-last").
+features; which of the two sets (base-last, base-mean; PIT-4B-FT was dropped by amendment 4)
+is part of the variant: run("N3", make, features="base-last").
 
 The holdout passes at one-sided t >= 2.24 for N1, which has run, and 2.50 for N2 and N3, which
 share the half of the tests' 2.5% that N1 did not use (amendment 3).
@@ -50,7 +50,7 @@ from qfin_alphaguard.sessions import sessions
 
 EMB = Path("data/news_reader/emb")
 PIT_EMB = Path("data/news_reader/pit_emb")
-N3_FEATURES = ("base-last", "base-mean", "ft-last", "ft-mean")
+N3_FEATURES = ("base-last", "base-mean")  # amendment 4: PIT-4B only
 RULE_DAYS = Path("data/news_reader/rule_days.parquet")
 PRICES = Path("data/raw/prices.parquet")
 VARIANTS = Path("research/news_reader/variants")

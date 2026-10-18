@@ -1,12 +1,12 @@
-"""N3's features: each member-day's mean headline embedding, in each of the four feature sets.
+"""N3's features: each member-day's mean headline embedding, in each of its feature sets.
 
 As N2 (features.py): a member-day's articles are those members.py finds for it, and its
 features the mean of their embeddings and log(1 + their number), the log added by the harness.
 Here an article's embedding is the one embed_pit.py wrote, by the checkpoint of the year
 before the article's (pre-registration N3), so one set of features serves every test year.
 
-The four sets: base-last and base-mean (PIT-4B, the state at the last token or the mean over
-the tokens), ft-last and ft-mean (PIT-4B-FT). Sums are float32, as features.py's.
+The sets: base-last and base-mean (PIT-4B, the state at the last token or the mean over the
+tokens); amendment 4 dropped PIT-4B-FT's two. Sums are float32, as features.py's.
 
 Output, under PIT_EMB: n3_rows.parquet (ticker, day, count), one row a member-day, sorted by
 day and ticker, in the order of n3_<set>.npy (float16 [member-days, 4096]).
@@ -27,8 +27,6 @@ from members import member_articles
 SETS = {
     "base-last": ("PIT-4B", "last"),
     "base-mean": ("PIT-4B", "mean"),
-    "ft-last": ("PIT-4B-FT", "last"),
-    "ft-mean": ("PIT-4B-FT", "mean"),
 }
 COLUMNS = 512  # columns averaged at a time, to bound the memory
 

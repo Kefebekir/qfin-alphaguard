@@ -27,10 +27,10 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | The QQQ rule's every session in the engine, and QQQ's 14-day volatility | `rule_days.py` | `news_reader/rule_days.parquet` |
 | Each headline's embedding by every vintage a test year needs, on the GPU | `embed.py` | `news_reader/emb/index.parquet`, `v<vintage>.npy` |
 | N1's features a session, N2's a member and session | `features.py` | `news_reader/emb/n1_v<vintage>.*`, `n2_v<vintage>.*` |
-| N3: the PIT-4B and PIT-4B-FT checkpoints, each pinned by its SHA-256 | `pit_download.py` | `news_reader/pit/<model>-<checkpoint>/`, `manifest.json` |
+| N3: the PIT-4B checkpoints, each pinned by its SHA-256 | `pit_download.py` | `news_reader/pit/<model>-<checkpoint>/`, `manifest.json` |
 | N3: the model, rewritten (`pit.py`), checked against a float32 reference and on language | `pit_check.py` | printed |
 | N3: each member headline by the checkpoint of the year before, on the GPU | `embed_pit.py` | `news_reader/pit_emb/<model>/<checkpoint>.*` |
-| N3's features a member and session, in four sets | `features_n3.py` | `news_reader/pit_emb/n3_rows.parquet`, `n3_<set>.npy` |
+| N3's features a member and session, in two sets | `features_n3.py` | `news_reader/pit_emb/n3_rows.parquet`, `n3_<set>.npy` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 
 Details the scripts handle:

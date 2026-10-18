@@ -1,14 +1,14 @@
 """N3's models: the PIT-4B checkpoints, each pinned and checked (pre-registration N3).
 
 Year Y's headlines are read by the checkpoint of December Y-1, 2016's by November 2015, and
-2025's and 2026's by December 2024, the latest published. For each checkpoint of PIT-4B and
-PIT-4B-FT this downloads, at the repository's current commit, the weights, the config and the
-tokenizer, and checks the weights' SHA-256 against the one Hugging Face records. The
+2025's and 2026's by December 2024, the latest published. For each checkpoint of PIT-4B
+(amendment 4 dropped PIT-4B-FT) this downloads, at the repository's current commit, the
+weights, the config and the tokenizer, and checks the weights' SHA-256 against the one Hugging Face records. The
 repository's own code (modeling_pit.py) is not downloaded: embed_pit.py has its own copy of
 the architecture. Each checkpoint's repository, commit, SHA-256 and month go to
 OUT/manifest.json, for the ledger; a checkpoint already there and whole is not fetched again.
 
-The weights are about 17.75 GB a checkpoint, 355 GB for all twenty.
+The weights are about 17.75 GB a checkpoint, 178 GB for all ten.
 
 Usage: data/llmenv/bin/python pit_download.py OUT   (OUT: data/news_reader/pit)
 """
@@ -24,7 +24,7 @@ from huggingface_hub import HfApi, hf_hub_download
 OWNER = (
     "Diamegs"  # the same files as anonymneurips2027, the NeurIPS submission's account
 )
-MODELS = ("PIT-4B", "PIT-4B-FT")
+MODELS = ("PIT-4B",)  # amendment 4 dropped PIT-4B-FT
 CHECKPOINTS = (
     "201511",
     "201612",
