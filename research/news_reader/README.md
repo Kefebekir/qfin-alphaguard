@@ -3,12 +3,14 @@
 After step 5 found that nothing built on prices beats the QQQ rule, and research/frontier
 measured why (prices tell how much the market will move, not which way), Efe chose to give
 the system a new sense: the news, read by a language model that knows nothing of the future.
-Two pre-registered tests (`preregistrations/`, `LEDGER.md`):
+Three pre-registered tests (`preregistrations/`, `LEDGER.md`):
 
 - **N1:** does the morning's news tell the QQQ rule's day? The rule sized ×1.5 / ×1 / ×0.5 by
   a forecast from the headlines known by 09:55.
 - **N2:** does a member's news tell its next day? Long the tenth of S&P 500 members with news
   that a model forecasts best, short the worst tenth, close to close.
+- **N3:** N2 read by PIT-4B, a 4-billion-parameter point-in-time model (Kelly, Malamud,
+  Schwab and Xu), each headline by the checkpoint of the year before its own.
 
 The language model is **ChronoBERT** (He, Lv, Manela and Wu, "Chronologically Consistent
 Large Language Models"): a ModernBERT encoder retrained every year on text from before that
@@ -25,6 +27,10 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | The QQQ rule's every session in the engine, and QQQ's 14-day volatility | `rule_days.py` | `news_reader/rule_days.parquet` |
 | Each headline's embedding by every vintage a test year needs, on the GPU | `embed.py` | `news_reader/emb/index.parquet`, `v<vintage>.npy` |
 | N1's features a session, N2's a member and session | `features.py` | `news_reader/emb/n1_v<vintage>.*`, `n2_v<vintage>.*` |
+| N3: the PIT-4B and PIT-4B-FT checkpoints, each pinned by its SHA-256 | `pit_download.py` | `news_reader/pit/<model>-<checkpoint>/`, `manifest.json` |
+| N3: the model, rewritten (`pit.py`), checked against a float32 reference and on language | `pit_check.py` | printed |
+| N3: each member headline by the checkpoint of the year before, on the GPU | `embed_pit.py` | `news_reader/pit_emb/<model>/<checkpoint>.*` |
+| N3's features a member and session, in four sets | `features_n3.py` | `news_reader/pit_emb/n3_rows.parquet`, `n3_<set>.npy` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 
 Details the scripts handle:
@@ -35,6 +41,9 @@ Details the scripts handle:
 - **Tickers.** Benzinga writes BRK/B, BRK.B and BRK-B for one stock; a ticker reused by a
   later company is our `<ticker>_old`. A symbol goes to whichever stock was in the S&P 500
   that day, and is left out if two fit or none.
+- **N3 runs no code from the models' repositories.** `pit.py` is the published architecture
+  written again; it reads only the weights and the config, and refuses a config that differs.
+  `test_pit.py` (beside it, as it needs PyTorch) checks it against a plain float64 copy.
 - **The holdout runs once.** `harness.run_holdout` needs the chosen variant committed in
   `variants/<test>_chosen.json` and writes a lock with the result and the commit.
 

@@ -141,3 +141,64 @@ def test_the_holdout_needs_a_chosen_variant_and_runs_once(tmp_path, monkeypatch)
 def test_a_split_other_than_development_or_holdout_is_refused():
     with pytest.raises(ValueError, match="split"):
         harness.run("N1", object, split="test")
+
+
+def n3_files(tmp_path, monkeypatch):
+    rows = pl.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "AAA", "BBB", "AAA"],
+            "day": [
+                date(2015, 12, 31),
+                date(2016, 3, 1),
+                date(2017, 3, 1),
+                date(2018, 3, 1),
+                date(2019, 3, 1),
+            ],
+            "count": [1, 3, 1, 2, 7],
+        }
+    )
+    rows.write_parquet(tmp_path / "n3_rows.parquet")
+    embedding = np.arange(10, dtype=np.float16).reshape(5, 2)  # row r is [2r, 2r + 1]
+    np.save(tmp_path / "n3_ft-mean.npy", embedding)
+    monkeypatch.setattr(harness, "PIT_EMB", tmp_path)
+    returns = rows.select(
+        "day", "ticker", next_return=pl.Series([0.01, 0.02, 0.03, 0.04, 0.05])
+    )
+    return returns
+
+
+def test_n3_reads_its_feature_set_and_the_count_up_to_the_test_year(
+    tmp_path, monkeypatch
+):
+    returns = n3_files(tmp_path, monkeypatch)
+    data = harness.n3_year(2018, returns, "ft-mean")
+    # Trained on 2016-2017 (not 2015); tested on 2018; 2019 is not read.
+    assert data.train_x.tolist() == [
+        [2.0, 3.0, pytest.approx(math.log(4))],
+        [4.0, 5.0, pytest.approx(math.log(2))],
+    ]
+    assert data.test_x.tolist() == [[6.0, 7.0, pytest.approx(math.log(3))]]
+    assert data.train_y.tolist() == [0.0, 0.0]  # one member a day: none beats the mean
+    counted = harness.n3_year(2018, returns, None, count_only=True)
+    assert counted.test_x.tolist() == [[pytest.approx(math.log(3))]]
+    with pytest.raises(ValueError, match="one of"):
+        harness.n3_year(2018, returns, "base-max")
+
+
+def test_n3_needs_a_feature_set_and_the_others_take_none():
+    with pytest.raises(ValueError, match="N3's features"):
+        harness.run("N3", object)
+    with pytest.raises(ValueError, match="N3's features"):
+        harness.run("N3", object, features="mean")
+    with pytest.raises(ValueError, match="one feature set"):
+        harness.run("N2", object, features="base-last")
+
+
+def test_n3_s_holdout_takes_the_feature_set_from_the_chosen_variant(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(harness, "VARIANTS", tmp_path)
+    monkeypatch.setattr(harness, "LOCKS", tmp_path)
+    (tmp_path / "N3_chosen.json").write_text('{"components": 4, "penalty": 10.0}')
+    with pytest.raises(RuntimeError, match="feature set"):
+        harness.run_holdout("N3", object)

@@ -22,6 +22,51 @@ tried on them is listed here before its holdout run.
 | 2 | 2026-10-18 17:07 | `N_amendment_2.txt` | `5f2e4fa602cf251208e609c8d6c0c851fd6c78d9018c539c3e8d63b74cbd3a16` | N2's cost, from a placeholder of 10 bps a round trip a side to 1 bp: an order on the close fills at the official close, and Alpaca's paper account took a whole-share one on 18 October 2026. Only the count-only development check had been computed |
 | 3 | 2026-10-18 17:07 | `N_amendment_3.txt` | `fc469e8f37780caafb8866dd7d233935b2cdc403d61e86d13af563d6048acd08` | N3 joins: N2 and N3 share the half of the news tests' 2.5% that N1 did not use, so N2 passes at t ≥ 2.50, not 2.24 |
 
+## N3's checkpoints
+
+Pinned on 2026-10-18 at 17:42 UTC, before any N3 result was computed: each checkpoint's
+model.safetensors by the SHA-256 Hugging Face records for it at the commit shown, the same
+file under Diamegs and anonymneurips2027 for all twenty (17,754,502,408 bytes each).
+`pit_download.py` fetches each at that commit and checks the SHA-256; `embed_pit.py` checks
+it again, and the config against `pit.py`'s copy of the architecture, before reading a
+headline with it. PIT-4B-201511's embeddings had started a few minutes before these rows were
+written; its file was the one pinned here.
+
+| Model | Checkpoint | Reads the headlines of | Commit | SHA-256 of model.safetensors |
+|---|---|---|---|---|
+| PIT-4B | 201511 | 2016 | `93c8f9a581c4` | `5a4f8a684ce2475835c1ce20634fccf7bdfe96fd9e3cd1de79efeb3b96c14deb` |
+| PIT-4B | 201612 | 2017 | `c15a07ff8754` | `0c334768a1d8f4a9de4aae4352d1a862e63a78c6b15e1a5be8c8506f84aa0aef` |
+| PIT-4B | 201712 | 2018 | `2d7488301496` | `a078bf244d5c7c4d28b8051481514ed2b3b9127916e1c85c9539e07c62ea85ae` |
+| PIT-4B | 201812 | 2019 | `9bba5a6507f6` | `7800b00e863397206ffb326a81d69d75f19ffbff58e34f6940fc28aaaaa4fd62` |
+| PIT-4B | 201912 | 2020 | `2fa4c167939f` | `45e100b618bafeac7ebebad90bd78d91058054c3d433ff9db41e2fbf33ab8c4a` |
+| PIT-4B | 202012 | 2021 | `7d733359a9f9` | `332d7d186a4eec0c9a0a2f5fd00aaa6670fe306f07e4fd916ebde4d576068067` |
+| PIT-4B | 202112 | 2022 | `4d3ed330c349` | `1c3614973394a234fac3ab146d96a2419a162116753ce37095ca75a35a816408` |
+| PIT-4B | 202212 | 2023 | `360b0fcffa36` | `932b14a41afcb723368785cf6189adcb37ee13938e6f75ed4c8acc2c5146ae34` |
+| PIT-4B | 202312 | 2024 | `572c0dd6c26d` | `dcb0baccbd5329e6d8c5616cc125860fbc843ef14066c48e11bb605ce71318dd` |
+| PIT-4B | 202412 | 2025, 2026 | `71fe135d8e93` | `38072fc6b67258ff7e58edd951508106b5b89c1daf7700c80ebd030c03c7451e` |
+| PIT-4B-FT | 201511 | 2016 | `32bd64b647eb` | `4dcc064e968bcc325fb748c32e37147c2e990291fd996bcc87232da131f8be06` |
+| PIT-4B-FT | 201612 | 2017 | `2c65885f4a85` | `5546907b4ecc523a39d6bb71593d8cdf855834971f6eacf81a21463ae0985521` |
+| PIT-4B-FT | 201712 | 2018 | `b03125e27592` | `ef401d069c80479b324e97d148681cd71ccdfb6fceef3c8b9bd68bbd6915e2f8` |
+| PIT-4B-FT | 201812 | 2019 | `a93820f680b7` | `2b89f956ea1c8becbbf862a5a8ffb46b26bdd5fe8211a9465e0b185204b2273b` |
+| PIT-4B-FT | 201912 | 2020 | `dd482b6a647f` | `d971e83fc3b22af7280809ecc7321f57c14d0e2ab65e8903424bd997cde83f9d` |
+| PIT-4B-FT | 202012 | 2021 | `faa015fb0354` | `8d1bce70dfb4650c3422817f961214b8805de10b5a6713a8ecba006177c2a13a` |
+| PIT-4B-FT | 202112 | 2022 | `efe304f98759` | `7e36705b27e1cc68ce1e7ed511948c3fe922e16e4d7179811e80cebaf4d6cf64` |
+| PIT-4B-FT | 202212 | 2023 | `fc4eaefde502` | `9b946256c09c129e1c42a211c5ab9048ed0e5652df5a41de257d7560d996dac2` |
+| PIT-4B-FT | 202312 | 2024 | `bf786611e285` | `4c7cf18f8ff29038650fac16e0bfe1cf134e670e53ea815e8e7de6c301c93856` |
+| PIT-4B-FT | 202412 | 2025, 2026 | `c82f0c11e583` | `673ed853950105f974110f41cf24e02b06fef62a68bd14d9aaf90bdccaf44dfa` |
+
+How the embeddings are computed, fixed here before any N3 result (the pre-registration says
+"in bfloat16 by the project's own copy"):
+
+- The precision is the models' training: float32 weights under bfloat16 autocast, so the
+  products, the per-head norms and attention in bfloat16, the residual stream and its norms
+  in float32. On 12 headlines of 2016 read by PIT-4B-201511, the copy's states have cosine
+  ≥ 0.99998 with a float32 reference written apart from it (`pit_check.py`); a model run
+  wholly in bfloat16, as the repository's example loads it, ≥ 0.99996.
+- Every norm's epsilon is the config's, 2^-23.
+- A headline is its tokens alone, at most 64, with no token before them, as the model card
+  reads text; the mean is over those tokens.
+
 ## The pre-registered comparison on the development years
 
 `harness.run(test, None, count_only=True)`: a linear regression on log(1 + the number of
@@ -32,9 +77,13 @@ variant should clear; it is not one of the variants.
 |---|---|---|---|---|
 | N1 | 1,008 | −0.16 bps | −0.15 | +1.76 / +1.79 / −2.93 / −1.24 |
 | N2 | 998 | −25.06 bps | −6.26 | −30.43 / −20.65 / −28.73 / −20.53 |
+| N2 and N3, at 1 bp a round trip a side (amendment 2), run 18 October 2026 | 998 | −7.06 bps | −1.76 | −12.43 / −2.65 / −10.73 / −2.53 |
 
-N2's costs are 20 bps a day (its positions turn over daily), so a variant must earn more
-than that before costs.
+N2's first row is at the placeholder's 20 bps a day (10 bps a round trip on each side; its
+positions turn over daily). At amendment 2's 1 bp the costs are 2 bps a day, and the count
+alone loses 5.06 bps a day before them in both rows. N3 reads N2's member-days
+(`features_n3.py` reproduces N2's 260,186 rows and their counts exactly), so its comparison
+is N2's, to the last digit.
 
 ## Variants tried on the development years (2018-2021)
 

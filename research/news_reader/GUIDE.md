@@ -1,6 +1,6 @@
 # Training the news reader: Efe's guide
 
-This is the model part of pre-registrations N1 and N2. Everything around it is fixed and
+This is the model part of pre-registrations N1, N2 and N3. Everything around it is fixed and
 tested: the data, the ChronoBERT vintages, the policies, the scores and the holdout lock
 (`harness.py`, tested by `tests/test_news_harness.py`). What you build is one small model, and
 the choices you make with it are counted.
@@ -100,6 +100,40 @@ each test year, so no year's model has seen that year.
    decide so.
 
 N2 is the same with `'N2'` in place of `'N1'`.
+
+## N3: N2 read by PIT-4B
+
+N3 is N2 with a larger reader: PIT-4B, a 4-billion-parameter point-in-time model. Each
+headline was read by the checkpoint of the year before its own (`embed_pit.py`), so one set
+of features serves every test year. Three things differ from N2:
+
+- **The embedding has 4,096 numbers**, not 768. In your `make`, the embedding is the first
+  4,096 columns and the count the column after them: `embedding = list(range(4096))`,
+  `count = [4096]`.
+- **Four feature sets**, and which one a variant uses is part of the variant: `base-last`
+  and `base-mean` (PIT-4B: the state at the headline's last token, or the mean over its
+  tokens), `ft-last` and `ft-mean` (the fine-tuned PIT-4B-FT). At most 10 variants across
+  the four, each in the ledger with its feature set.
+- **The run names the set:**
+
+  ```bash
+  uv run python -c "
+  import sys; sys.path.insert(0, 'research/news_reader')
+  import harness, efe_model, json
+  print(json.dumps(harness.run('N3', efe_model.make(16, 10.0), features='base-last'), indent=2))
+  "
+  ```
+
+  and `variants/N3_chosen.json` names it too, for example
+  `{"components": 16, "penalty": 10.0, "features": "base-last"}`; the holdout refuses a
+  choice without one. The comparison with counting is N2's: `harness.run('N3', None,
+  count_only=True)` reads the same member-days.
+
+A year of N3 holds up to 240,000 rows of 4,097 numbers (about 4 GB in float32), so run it
+when the embedding job is not using the computer's memory.
+
+The pre-registration also lets a variant add the member's return that day, its 20-day
+volatility and its momentum from 12 months to 1 month; the harness does not supply them yet.
 
 ## What to expect
 
