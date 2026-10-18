@@ -312,3 +312,18 @@ def test_plan_for_a_day_in_the_past_uses_only_the_bars_before_it(
     assert plan_from_json(out.read_text(encoding="utf-8")).trading_date.isoformat() == (
         "2024-06-03"
     )
+
+
+def test_live_takes_a_day_and_the_qqq_account_s_limits():
+    args = build_parser().parse_args(["live", "--day", "2026-10-19"])
+    assert (args.day, args.guard, args.root) == (
+        date(2026, 10, 19),
+        "guard_qqq.yaml",
+        "data/live",
+    )
+
+
+def test_live_on_a_day_without_a_session_does_nothing(capsys, tmp_path):
+    assert main(["live", "--day", "2026-10-18", "--root", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == "no session on 2026-10-18\n"
+    assert list(tmp_path.iterdir()) == []

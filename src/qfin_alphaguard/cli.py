@@ -6,13 +6,16 @@
     qfin plan         build a day's plan: the portfolio to hold, from the bars before it
     qfin backtest     replay the nightly plan on the stored minutes, against SPY and
                       the same stocks at equal weight
+    qfin live         run a session of the QQQ strategy on Alpaca's paper account
 
 The nightly AWS job runs the command in infra/aws/task-definition.template.json;
 a test checks that this CLI still accepts it.
 """
 
 import argparse
+import asyncio
 import json
+import logging
 import sys
 import time
 from collections import Counter
@@ -40,7 +43,7 @@ from qfin_alphaguard.data.universe import sp500, trading_universes
 from qfin_alphaguard.data.validate import validate_prices
 from qfin_alphaguard.guard.config import load_guard_config
 from qfin_alphaguard.plan import build_plan, plan_to_json
-from qfin_alphaguard.sessions import session_days
+from qfin_alphaguard.sessions import session_days, sessions
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -153,6 +156,21 @@ def build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--guard", default="guard.yaml", help="the risk limits file")
     backtest.add_argument("--out", help="where to write the report's JSON")
     backtest.set_defaults(run=_backtest)
+
+    live = commands.add_parser(
+        "live",
+        help="run a session of the QQQ strategy on Alpaca's paper account",
+    )
+    live.add_argument(
+        "--day",
+        type=date.fromisoformat,
+        help="the session (YYYY-MM-DD); defaults to today in New York",
+    )
+    live.add_argument("--guard", default="guard_qqq.yaml", help="the risk limits file")
+    live.add_argument(
+        "--root", default="data/live", help="where each day's journal and alerts go"
+    )
+    live.set_defaults(run=_live)
 
     return parser
 
@@ -367,3 +385,25 @@ def _backtest(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _live(args: argparse.Namespace) -> int:
+    from zoneinfo import ZoneInfo
+
+    from qfin_alphaguard.live.runner import DayFiles, run_session
+
+    day = args.day or datetime.now(ZoneInfo("America/New_York")).date()
+    if not sessions(day, day):
+        print(f"no session on {day}")
+        return 0
+    folder = DayFiles(Path(args.root), day).folder
+    folder.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[logging.StreamHandler(), logging.FileHandler(folder / "engine.log")],
+    )
+    limits = load_guard_config(args.guard)
+    outcome = asyncio.run(run_session(day, Path(args.root), limits, api_keys()))
+    print(f"session {day}: {outcome}")
+    return 0 if outcome == "closed" else 1

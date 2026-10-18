@@ -407,8 +407,10 @@ profit; this phase asks whether the system works correctly.
 - [x] The morning's warm-up (`live/warmup.py`): the strategy relearns the
       20 sessions before today from IEX's history; warmed afresh each
       morning of 2021 – October 2026 it decides exactly as the backtest's.
-- [ ] The runner: the streams, Alpaca, the journal and reconciliation around
-      the core; the stop that closes by Alpaca's positions (Efe's choice).
+- [x] The runner (`live/runner.py`, `qfin live`): the streams, Alpaca, the
+      journal and reconciliation around the core, one input at a time; a
+      restart replays the day; the stop closes by Alpaca's positions (Efe's
+      choice). Started on the paper account on 18 October 2026.
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
 - [ ] Daily report: PnL, slippage, deviation from backtest, share of winning days.
