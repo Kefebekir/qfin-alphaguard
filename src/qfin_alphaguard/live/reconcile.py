@@ -6,9 +6,9 @@ cancel whose answer was lost. Three checks:
    says is taken through the order rules: fills and ends missed while the connection was
    down are caught up. An order the engine sent that Alpaca never got was not placed;
 2. each order Alpaca holds open must be one the engine made, and open there too;
-3. the positions at Alpaca must equal what the engine's fills add up to. The engine starts
-   each session flat (the QQQ strategy holds nothing overnight), so its positions are the
-   day's fills.
+3. the positions at Alpaca must equal what the engine held at the session's start and
+   what its fills since add up to. The QQQ strategy holds nothing overnight, so the start
+   is flat unless a close failed.
 
 Alpaca's answers can lag its trade updates by a moment: on 17 October 2026 an order the
 stream had already reported cancelled was still listed as open. So a difference is asked
@@ -22,6 +22,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from qfin_alphaguard.events import round_shares
 from qfin_alphaguard.live.alpaca_broker import AlpacaBroker
 from qfin_alphaguard.live.journal import filled_positions
 from qfin_alphaguard.live.orders import (
@@ -57,12 +58,14 @@ class Reconciliation:
 def reconcile(
     orders: Mapping[str, LiveOrder],
     broker: AlpacaBroker,
+    start_positions: Mapping[str, float] | None = None,
     attempts: int = ATTEMPTS,
     pause: float = PAUSE,
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> Reconciliation:
-    """Compare `orders`, the engine's, with Alpaca's orders and positions.
+    """Compare `orders`, the engine's, and `start_positions`, what it held when the session
+    started, with Alpaca's orders and positions.
 
     Raises orders.InvalidTransition if Alpaca reports what the order rules refuse, and
     alpaca_broker.BrokerError if an answer cannot be read: the engine stops either way.
@@ -117,7 +120,10 @@ def reconcile(
                     f"{cid} is open at Alpaca and {order.status.value} here"
                 )
         # 3. The positions.
-        mine = filled_positions(current.values())
+        mine = dict(start_positions or {})
+        for ticker, shares in filled_positions(current.values()).items():
+            mine[ticker] = round_shares(mine.get(ticker, 0.0) + shares)
+        mine = {ticker: shares for ticker, shares in mine.items() if shares}
         theirs = broker.positions()
         for ticker in sorted(set(mine) | set(theirs)):
             if mine.get(ticker, 0.0) != theirs.get(ticker, 0.0):

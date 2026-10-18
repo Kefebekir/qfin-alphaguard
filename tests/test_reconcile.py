@@ -168,6 +168,24 @@ def test_positions_that_differ_are_a_difference(mine, theirs, difference):
     assert result.differences == (difference,)
 
 
+def test_a_position_held_from_an_earlier_session_is_counted():
+    # Yesterday's close did not fill: 50 shares started the day; 20 were sold since.
+    sold = LiveOrder(make_order(ID, Side.SELL, 20.0), Status.FILLED, 20.0, 600.0)
+    broker = FakeBroker(positions=[{"QQQ": 30.0}])
+    result = reconcile({ID: sold}, broker, {"QQQ": 50.0}, sleep=lambda s: None)
+    assert result.agrees
+    flat = reconcile(
+        {ID: sold}, FakeBroker(positions=[{"QQQ": 30.0}]), sleep=lambda s: None
+    )
+    assert flat.differences == ("QQQ: -20.0 shares here, 30.0 at Alpaca",)
+
+
+def test_a_start_and_fills_that_cancel_out_are_flat():
+    sold = LiveOrder(make_order(ID, Side.SELL, 50.0), Status.FILLED, 50.0, 600.0)
+    result = reconcile({ID: sold}, FakeBroker(), {"QQQ": 50.0}, sleep=lambda s: None)
+    assert result.agrees
+
+
 def test_a_short_position_agrees_with_alpaca_s():
     short = engine(Status.FILLED, 100.0, side=Side.SELL)
     result, _ = run([short], FakeBroker(positions=[{"QQQ": -100.0}]))

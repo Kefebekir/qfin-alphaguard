@@ -133,6 +133,50 @@ def test_trade_updates_authenticate_listen_and_yield_events():
     ]
 
 
+def test_each_stream_says_when_it_is_connected():
+    told = []
+    socket = FakeSocket(AUTHORIZED, LISTENING, trade_update("new", "new"))
+
+    async def listen():
+        async for events in trade_updates(
+            KEY_ID, SECRET, connect=socket, on_connected=lambda: told.append("trades")
+        ):
+            told.append(events)
+
+    asyncio.run(listen())
+    assert told == ["trades", [Accepted(ID, AT)]]
+    told.clear()
+    socket = FakeSocket(CONNECTED, AUTHENTICATED, SUBSCRIBED, [bar_message(58)])
+
+    async def watch():
+        async for got in minute_bars(
+            KEY_ID,
+            SECRET,
+            ["QQQ"],
+            connect=socket,
+            on_connected=lambda: told.append("bars"),
+        ):
+            told.append(got)
+
+    asyncio.run(watch())
+    assert told == ["bars", bar(58)]
+
+
+def test_a_refused_stream_is_never_said_to_be_connected():
+    told = []
+    reply = {"stream": "authorization", "data": {"status": "unauthorized"}}
+    with pytest.raises(StreamError):
+        collect(
+            trade_updates(
+                KEY_ID,
+                SECRET,
+                connect=FakeSocket(reply),
+                on_connected=lambda: told.append(1),
+            )
+        )
+    assert told == []
+
+
 def test_trade_updates_read_text_frames_too():
     socket = FakeSocket(
         AUTHORIZED.decode(), LISTENING.decode(), trade_update("new", "new").decode()

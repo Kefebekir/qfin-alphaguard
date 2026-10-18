@@ -52,9 +52,15 @@ def _object(raw: str | bytes) -> dict:
 
 
 async def trade_updates(
-    key_id: str, secret: str, connect: Callable = websocket_connect
+    key_id: str,
+    secret: str,
+    connect: Callable = websocket_connect,
+    on_connected: Callable[[], None] = lambda: None,
 ) -> AsyncIterator[list[OrderEvent]]:
-    """The events of each trade update on the paper account, as they arrive."""
+    """The events of each trade update on the paper account, as they arrive.
+
+    `on_connected` is called once the stream listens: what came before is not sent.
+    """
     async with connect(TRADING_STREAM) as socket:
         async with asyncio.timeout(HANDSHAKE_SECONDS):
             await socket.send(
@@ -73,6 +79,7 @@ async def trade_updates(
                 reply.get("data", {}).get("streams") or []
             ):
                 raise StreamError(f"trade updates refused to listen: {reply}")
+        on_connected()
         async for raw in socket:
             message = _object(raw)
             if message.get("stream") != "trade_updates":
@@ -86,8 +93,12 @@ async def minute_bars(
     symbols: Iterable[str],
     feed: str = "iex",
     connect: Callable = websocket_connect,
+    on_connected: Callable[[], None] = lambda: None,
 ) -> AsyncIterator[Bar]:
-    """Each completed minute bar of `symbols` on `feed`, as it arrives."""
+    """Each completed minute bar of `symbols` on `feed`, as it arrives.
+
+    `on_connected` is called once the subscription is confirmed.
+    """
     if feed not in FEEDS:
         raise ValueError(f"feed must be one of {FEEDS}, got {feed!r}")
     wanted = sorted(set(symbols))
@@ -108,6 +119,7 @@ async def minute_bars(
                 raise StreamError(
                     f"subscribed to bars of {reply[0].get('bars')}, not {wanted}"
                 )
+        on_connected()
         async for raw in socket:
             for message in _list(_json(raw)):
                 kind = message.get("T")
