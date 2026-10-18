@@ -82,7 +82,8 @@ Both ruff commands must pass before a commit.
   input on disk before the engine acts, replayed after a restart;
   `reconcile.py`, the engine's orders and positions against Alpaca's;
   `engine.py`, the core that decides, with no input or output, and replays a
-  day from its journal
+  day from its journal; `warmup.py`, the strategy relearning the sessions
+  before today each morning
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
