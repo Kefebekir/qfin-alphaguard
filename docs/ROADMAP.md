@@ -416,6 +416,10 @@ profit; this phase asks whether the system works correctly.
 - [ ] Chaos tests: lost connection, stale data, rejected orders; the system
       stops safely.
 - [ ] Daily report: PnL, slippage, deviation from backtest, share of winning days.
+      Each session's is done (`live/report.py`, `qfin live-report`, at 16:30 New
+      York on AWS, e-mailed): the replay, backtests on IEX's history and on SIP
+      against the 95% gate, slippage, the stream's bars against Alpaca's. The
+      share of winning days waits for the sessions.
 - [ ] At least 8 weeks of uninterrupted running (April–May).
 
 **Gate M3:** replaying the same days reproduces at least 95% of paper

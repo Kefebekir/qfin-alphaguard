@@ -157,15 +157,23 @@ def past_sessions(
     return [(by_day[d], bars) for d, bars in sorted(out.items()) if d in by_day]
 
 
+def warmed_strategy(
+    limits: GuardConfig, past: Sequence[tuple[Session, Sequence[Bar]]], cash: float
+) -> NoiseAreaMomentum:
+    """The QQQ strategy, with Guard's collar, warmed on `past`."""
+    settings = MomentumSettings(ticker=TICKER, collar_bps=limits.price_collar_bps)
+    strategy = NoiseAreaMomentum(settings)
+    warm_up(strategy, past, cash)
+    return strategy
+
+
 def make_engine_for(
     limits: GuardConfig, past: Sequence[tuple[Session, Sequence[Bar]]]
 ) -> Callable[[SessionStart], LiveEngine]:
     """What builds the day's core: a strategy warmed on `past`, behind Guard."""
 
     def make(start: SessionStart) -> LiveEngine:
-        settings = MomentumSettings(ticker=TICKER, collar_bps=limits.price_collar_bps)
-        strategy = NoiseAreaMomentum(settings)
-        warm_up(strategy, past, start.cash)
+        strategy = warmed_strategy(limits, past, start.cash)
         return LiveEngine(strategy, Guard(limits), start, limits.price_collar_bps)
 
     return make
@@ -550,7 +558,13 @@ class Backup:
     that fails is logged and tried again a minute later: trading goes on.
     """
 
-    NAMES = ("journal.jsonl", "warm_up.parquet", "ALERT.txt")
+    NAMES = (
+        "journal.jsonl",
+        "warm_up.parquet",
+        "ALERT.txt",
+        "report.txt",
+        "report.html",
+    )
 
     def __init__(self, files: DayFiles, bucket: str, s3=None) -> None:
         self.files = files

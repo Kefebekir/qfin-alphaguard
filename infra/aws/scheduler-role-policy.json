@@ -6,7 +6,8 @@
       "Action": "ecs:RunTask",
       "Resource": [
         "arn:aws:ecs:eu-north-1:*:task-definition/qfin-alphaguard:*",
-        "arn:aws:ecs:eu-north-1:*:task-definition/qfin-live:*"
+        "arn:aws:ecs:eu-north-1:*:task-definition/qfin-live:*",
+        "arn:aws:ecs:eu-north-1:*:task-definition/qfin-live-report:*"
       ]
     },
     {
@@ -17,7 +18,9 @@
         "arn:aws:iam::*:role/qfin-task-role"
       ],
       "Condition": {
-        "StringLike": { "iam:PassedToService": "ecs-tasks.amazonaws.com" }
+        "StringLike": {
+          "iam:PassedToService": "ecs-tasks.amazonaws.com"
+        }
       }
     }
   ]

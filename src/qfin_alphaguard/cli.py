@@ -7,6 +7,7 @@
     qfin backtest     replay the nightly plan on the stored minutes, against SPY and
                       the same stocks at equal weight
     qfin live         run a session of the QQQ strategy on Alpaca's paper account
+    qfin live-report  a paper session's report, against backtests of the same session
 
 The nightly AWS job runs the command in infra/aws/task-definition.template.json;
 a test checks that this CLI still accepts it.
@@ -178,6 +179,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="the morning, a reconciliation and both streams, then out; nothing traded",
     )
     live.set_defaults(run=_live)
+
+    report = commands.add_parser(
+        "live-report",
+        help="a paper session's report: what the engine did, and whether a backtest agrees",
+    )
+    report.add_argument(
+        "--day",
+        type=date.fromisoformat,
+        help="the session (YYYY-MM-DD); defaults to today in New York",
+    )
+    report.add_argument(
+        "--guard", default="guard_qqq.yaml", help="the risk limits file"
+    )
+    report.add_argument(
+        "--root", default="data/live", help="where each day's folder is"
+    )
+    report.add_argument(
+        "--s3-bucket",
+        help="fetch the day's folder from this bucket first, and keep the report there",
+    )
+    report.add_argument(
+        "--alert-topic", help="an SNS topic's ARN to e-mail the summary to"
+    )
+    report.set_defaults(run=_live_report)
 
     return parser
 
@@ -426,3 +451,61 @@ def _live(args: argparse.Namespace) -> int:
     )
     print(f"session {day}: {outcome}")
     return 0 if outcome == "closed" else 1
+
+
+def _live_report(args: argparse.Namespace) -> int:
+    from zoneinfo import ZoneInfo
+
+    from qfin_alphaguard.data.intraday import regular_session
+    from qfin_alphaguard.events import Bar
+    from qfin_alphaguard.live.journal import read_journal
+    from qfin_alphaguard.live.report import (
+        bars_of,
+        chart_series,
+        day_report,
+        render_html,
+    )
+    from qfin_alphaguard.live.runner import TICKER, Backup, DayFiles, past_sessions
+
+    new_york = ZoneInfo("America/New_York")
+    day = args.day or datetime.now(new_york).date()
+    files = DayFiles(Path(args.root), day)
+    backup = Backup(files, args.s3_bucket) if args.s3_bucket else None
+    if backup:
+        backup.pull()
+    if not files.journal.exists():
+        print(f"no journal for {day} in {files.folder}")
+        return 0 if not sessions(day, day) else 1
+    entries = read_journal(files.journal)
+    client = AlpacaClient(*api_keys())
+    past = past_sessions(client, day, files.warm_up)
+    feeds = {}
+    for name, feed in (("IEX's history", "iex"), ("SIP", "sip")):
+        try:
+            frame = regular_session(client.minute_bars(TICKER, day, day, feed=feed))
+        except RuntimeError as error:  # SIP's last 15 minutes are not served yet
+            print(f"{name} left out: {error}")
+            continue
+        feeds[name] = bars_of(frame, TICKER)
+    alerts = files.alert.read_text().splitlines() if files.alert.exists() else []
+    limits = load_guard_config(args.guard)
+    report = day_report(entries, past, limits, feeds, alerts)
+    live_bars = [e.record for e in entries if isinstance(e.record, Bar)]
+    session = sessions(day, day)[0]
+    points = chart_series(report, live_bars, past, limits, session)
+    (files.folder / "report.txt").write_text(report.summary() + "\n", encoding="utf-8")
+    page = render_html(report, points, lambda t: t.astimezone(new_york))
+    (files.folder / "report.html").write_text(page, encoding="utf-8")
+    print(report.summary())
+    print(f"page: {files.folder / 'report.html'}")
+    if backup:
+        backup.push()
+    if args.alert_topic:
+        import boto3
+
+        boto3.client("sns").publish(
+            TopicArn=args.alert_topic,
+            Subject=f"qfin live {day}: report",
+            Message=report.summary(),
+        )
+    return 0

@@ -11,6 +11,7 @@ job: same cluster, image, roles and log group.
 | Size | 0.25 vCPU, 1 GB: about 2 USD a month |
 | Journal | the task's disk lasts as long as the task, so the day's folder goes to `s3://qfin-alphaguard-kefebekir/data/live/<day>/` every minute and at the end; a task started again that day fetches it first and replays it |
 | Alerts | the SNS topic `qfin-alerts`, e-mailed to Efe; a summary when a session closes |
+| Report | `qfin-live-report`, each weekday at 16:30 New York time, once the consolidated tape serves the day's last minutes: the session against backtests of it (`qfin live-report`), its summary e-mailed, `report.txt` and `report.html` kept in the day's folder |
 | Keys | Alpaca's paper keys in SSM, `/qfin/alpaca-key-id` and `/qfin/alpaca-secret-key` |
 
 Do not run `qfin live --check` while a session runs: Alpaca's free plan allows one market
@@ -41,17 +42,19 @@ number.
 4. **The image**, from `main`, with Docker Desktop open: build, then push as `:latest`
    and `:<short commit>`, as for the nightly job. The nightly job runs `:latest` too.
 
-5. **The task**: `sed s/ACCOUNT_ID/<number>/g infra/aws/live-task-definition.template.json`
-   into `aws ecs register-task-definition --cli-input-json file://...`.
+5. **The tasks**: `sed s/ACCOUNT_ID/<number>/g` on `live-task-definition.template.json` and
+   `live-report-task-definition.template.json`, each into
+   `aws ecs register-task-definition --cli-input-json file://...`.
 
 6. **A check**: `aws ecs run-task --cluster qfin --task-definition qfin-live --launch-type FARGATE`,
    with the nightly schedule's network configuration and the command overridden to
    `["live", "--check"]`; its log is in `/ecs/qfin-alphaguard`, stream `live/qfin-live/<task>`.
 
-7. **The schedule**: `aws scheduler create-schedule --name qfin-live`
+7. **The schedules**: `aws scheduler create-schedule --name qfin-live`
    with `cron(15 9 ? * MON-FRI *)` in `America/New_York`, a flexible window of `OFF`, and as
    its target `qfin-live`'s task definition, with the nightly schedule's role and network
-   configuration.
+   configuration; and `qfin-live-report` the same way, with `cron(30 16 ? * MON-FRI *)` and
+   `qfin-live-report`'s task definition.
 
 A change to `qfin live`'s command line needs a new revision of `qfin-live` and the
 schedule pointed at it, as for the nightly job.
