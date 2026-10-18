@@ -36,7 +36,9 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import boto3
 import polars as pl
+from botocore.exceptions import BotoCoreError, ClientError
 from websockets.exceptions import WebSocketException
 
 from qfin_alphaguard.data.alpaca import AlpacaClient
@@ -540,14 +542,83 @@ async def keep_time(
         await sleep(max(wait, 0.01))
 
 
-def alert_to(path: Path) -> Callable[[str], None]:
-    """An alert: logged, and added to the day's ALERT.txt for a person to read."""
+class Backup:
+    """The day's folder kept in S3 as well: a server's disk does not outlive its task.
+
+    `pull` fetches what the folder lacks before the day starts, so a task started again
+    finds its journal; `push` sends the folder up, every minute and at the end. A push
+    that fails is logged and tried again a minute later: trading goes on.
+    """
+
+    NAMES = ("journal.jsonl", "warm_up.parquet", "ALERT.txt")
+
+    def __init__(self, files: DayFiles, bucket: str, s3=None) -> None:
+        self.files = files
+        self.bucket = bucket
+        self.s3 = s3 or boto3.client("s3")
+
+    def key(self, name: str) -> str:
+        return f"data/live/{self.files.day.isoformat()}/{name}"
+
+    def pull(self) -> list[str]:
+        pulled = []
+        for name in self.NAMES:
+            local = self.files.folder / name
+            if local.exists():
+                continue
+            local.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self.s3.download_file(self.bucket, self.key(name), str(local))
+            except ClientError as error:
+                if error.response.get("Error", {}).get("Code") not in (
+                    "404",
+                    "NoSuchKey",
+                ):
+                    raise
+                continue
+            pulled.append(name)
+        return pulled
+
+    def push(self) -> None:
+        for name in self.NAMES:
+            local = self.files.folder / name
+            if not local.exists():
+                continue
+            try:
+                self.s3.upload_file(str(local), self.bucket, self.key(name))
+            except (ClientError, BotoCoreError, OSError) as error:
+                log.warning("backup of %s failed: %s", name, error)
+
+
+async def back_up(
+    backup: Backup,
+    every: float = 60.0,
+    sleep: Callable[[float], object] = asyncio.sleep,
+) -> None:
+    while True:
+        await sleep(every)
+        await asyncio.to_thread(backup.push)
+
+
+def alert_to(path: Path, topic: str | None = None, sns=None) -> Callable[[str], None]:
+    """An alert: logged, added to the day's ALERT.txt, and e-mailed through SNS's `topic`."""
+    if topic and sns is None:
+        sns = boto3.client("sns")
 
     def alert(message: str) -> None:
         log.error("ALERT: %s", message)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as file:
             file.write(f"{datetime.now(UTC).isoformat()} {message}\n")
+        if topic:
+            try:
+                sns.publish(
+                    TopicArn=topic,
+                    Subject=f"qfin live {path.parent.name}: alert",
+                    Message=message,
+                )
+            except (ClientError, BotoCoreError) as error:
+                log.error("the alert could not be e-mailed: %s", error)
 
     return alert
 
@@ -557,13 +628,24 @@ async def run_session(
     root: Path,
     limits: GuardConfig,
     keys: tuple[str, str],
+    bucket: str | None = None,
+    topic: str | None = None,
 ) -> str:
     """One session of the paper account, from the morning to the close."""
     files = DayFiles(root, day)
+    backup = Backup(files, bucket) if bucket else None
+    if backup:
+        pulled = backup.pull()
+        if pulled:
+            log.warning("started again: %s fetched from S3", ", ".join(pulled))
     broker = AlpacaBroker(*keys)
     data = AlpacaClient(*keys)
-    core, start, journal = prepare(day, files, limits, broker, data)
-    alert = alert_to(files.alert)
+    alert = alert_to(files.alert, topic)
+    try:
+        core, start, journal = prepare(day, files, limits, broker, data)
+    except Exception as error:
+        alert(f"the session could not start, {type(error).__name__}: {error}")
+        raise
     queue: asyncio.Queue = asyncio.Queue()
 
     def now() -> datetime:
@@ -574,10 +656,97 @@ async def run_session(
         asyncio.create_task(feed_trades(queue, keys, now)),
         asyncio.create_task(keep_time(queue, core.session, now)),
     ]
+    if backup:
+        tasks.append(asyncio.create_task(back_up(backup)))
     try:
-        return await Runner(core, start, journal, broker, alert).run(queue)
+        outcome = await Runner(core, start, journal, broker, alert).run(queue)
+        if topic and outcome == "closed":
+            held = await asyncio.to_thread(broker.positions)
+            filled = sum(o.filled_quantity > 0 for o in core.orders.values())
+            sns = boto3.client("sns")
+            sns.publish(
+                TopicArn=topic,
+                Subject=f"qfin live {day}: closed",
+                Message=(
+                    f"The session of {day} closed: {len(core.orders)} orders, "
+                    f"{filled} filled; held now: {held or 'nothing'}."
+                ),
+            )
+        return outcome
     finally:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        journal.close()
+        if backup:
+            await asyncio.to_thread(backup.push)
+
+
+async def check_session(
+    day: date,
+    root: Path,
+    limits: GuardConfig,
+    keys: tuple[str, str],
+    seconds: float = 30.0,
+    broker=None,
+    data=None,
+    bars=minute_bars,
+    trades=trade_updates,
+) -> str:
+    """The morning, a reconciliation and both streams, then out: nothing is traded.
+
+    The check keeps its own folder, `root`/check/, away from the day's journal. Alpaca's
+    free plan allows one market data connection, so do not check during a session.
+    """
+    files = DayFiles(root / "check", day)
+    broker = broker or AlpacaBroker(*keys)
+    data = data or AlpacaClient(*keys)
+    core, start, journal = prepare(day, files, limits, broker, data)
+    try:
+        result = await asyncio.to_thread(
+            reconcile, dict(core.orders), broker, start.positions
+        )
+        if not result.agrees:
+            raise RunnerError("reconciliation: " + "; ".join(result.differences))
+        connected: set[str] = set()
+
+        async def listen(name: str, stream) -> None:
+            async for _ in stream:
+                pass
+
+        tasks = [
+            asyncio.create_task(
+                listen(
+                    "bars",
+                    bars(
+                        *keys,
+                        [TICKER],
+                        feed="iex",
+                        on_connected=lambda: connected.add("bars"),
+                    ),
+                )
+            ),
+            asyncio.create_task(
+                listen(
+                    "trades",
+                    trades(*keys, on_connected=lambda: connected.add("trades")),
+                )
+            ),
+        ]
+        waited = 0.0
+        while connected != {"bars", "trades"} and waited < seconds:
+            await asyncio.sleep(0.1)
+            waited += 0.1
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        missing = {"bars", "trades"} - connected
+        if missing:
+            raise RunnerError(f"not connected in {seconds:g} s: {sorted(missing)}")
+        held = dict(start.positions) or "nothing"
+        return (
+            f"checked: account {start.cash:,.2f} USD, held {held}; strategy warmed on "
+            f"{len(core.strategy.closes)} closes; reconciled; both streams connected"
+        )
+    finally:
         journal.close()

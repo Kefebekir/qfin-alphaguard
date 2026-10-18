@@ -34,6 +34,7 @@ from qfin_alphaguard.live.orders import (
 )
 from qfin_alphaguard.live.runner import (
     STREAM_GRACE,
+    Backup,
     Bars,
     Clock,
     DayFiles,
@@ -42,6 +43,8 @@ from qfin_alphaguard.live.runner import (
     Runner,
     RunnerError,
     StreamState,
+    alert_to,
+    check_session,
     feed_bars,
     feed_trades,
     keep_time,
@@ -794,3 +797,165 @@ def test_the_clock_ticks_the_last_minute_once_then_closes():
         < CLOSE + timedelta(minutes=2, seconds=6)
     )
     assert sum(g.closed for g in got) == 1
+
+
+# On the server: the day's folder in S3, alerts e-mailed, and the check.
+
+
+class FakeS3:
+    def __init__(self):
+        self.objects = {}  # (bucket, key) -> bytes
+        self.fail_uploads = False
+
+    def download_file(self, bucket, key, filename):
+        from botocore.exceptions import ClientError
+
+        if (bucket, key) not in self.objects:
+            raise ClientError(
+                {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
+            )
+        Path(filename).write_bytes(self.objects[(bucket, key)])
+
+    def upload_file(self, filename, bucket, key):
+        from botocore.exceptions import EndpointConnectionError
+
+        if self.fail_uploads:
+            raise EndpointConnectionError(
+                endpoint_url="https://s3.eu-north-1.amazonaws.com"
+            )
+        self.objects[(bucket, key)] = Path(filename).read_bytes()
+
+
+def test_the_day_s_folder_goes_to_s3_and_comes_back(tmp_path):
+    s3 = FakeS3()
+    files = DayFiles(tmp_path / "server-1", DAY)
+    files.folder.mkdir(parents=True)
+    files.journal.write_text('{"seq":1}\n')
+    files.warm_up.write_bytes(b"parquet")
+    Backup(files, "bucket", s3).push()
+    assert set(s3.objects) == {
+        ("bucket", "data/live/2026-10-19/journal.jsonl"),
+        ("bucket", "data/live/2026-10-19/warm_up.parquet"),
+    }
+    # A new task, on a new disk, finds the day where the first left it.
+    again = DayFiles(tmp_path / "server-2", DAY)
+    assert Backup(again, "bucket", s3).pull() == ["journal.jsonl", "warm_up.parquet"]
+    assert again.journal.read_text() == '{"seq":1}\n'
+
+
+def test_a_pull_never_overwrites_what_the_disk_has(tmp_path):
+    s3 = FakeS3()
+    s3.objects[("bucket", "data/live/2026-10-19/journal.jsonl")] = b"older\n"
+    files = DayFiles(tmp_path, DAY)
+    files.folder.mkdir(parents=True)
+    files.journal.write_text("newer\n")
+    assert Backup(files, "bucket", s3).pull() == []
+    assert files.journal.read_text() == "newer\n"
+
+
+def test_a_failed_backup_does_not_stop_the_day(tmp_path, caplog):
+    s3 = FakeS3()
+    s3.fail_uploads = True
+    files = DayFiles(tmp_path, DAY)
+    files.folder.mkdir(parents=True)
+    files.journal.write_text("x\n")
+    Backup(files, "bucket", s3).push()  # does not raise
+    assert "backup of journal.jsonl failed" in caplog.text
+
+
+class FakeSNS:
+    def __init__(self, fail=False):
+        self.sent = []
+        self.fail = fail
+
+    def publish(self, **message):
+        from botocore.exceptions import ClientError
+
+        if self.fail:
+            raise ClientError({"Error": {"Code": "AuthorizationError"}}, "Publish")
+        self.sent.append(message)
+
+
+def test_an_alert_is_written_and_e_mailed(tmp_path):
+    sns = FakeSNS()
+    files = DayFiles(tmp_path, DAY)
+    alert = alert_to(files.alert, "arn:aws:sns:eu-north-1:1:qfin-alerts", sns)
+    alert("stopping: lost data")
+    assert files.alert.read_text().endswith(" stopping: lost data\n")
+    assert sns.sent == [
+        {
+            "TopicArn": "arn:aws:sns:eu-north-1:1:qfin-alerts",
+            "Subject": "qfin live 2026-10-19: alert",
+            "Message": "stopping: lost data",
+        }
+    ]
+
+
+def test_an_alert_that_cannot_be_e_mailed_is_still_written(tmp_path, caplog):
+    files = DayFiles(tmp_path, DAY)
+    alert_to(files.alert, "arn:aws:sns:eu-north-1:1:qfin-alerts", FakeSNS(fail=True))(
+        "x"
+    )
+    assert files.alert.exists() and "could not be e-mailed" in caplog.text
+
+
+def connecting(*names_that_fail):
+    """Streams that connect at once and then wait, or never connect."""
+
+    def bars(key, secret, symbols, feed, on_connected):
+        async def stream():
+            if "bars" not in names_that_fail:
+                on_connected()
+            await asyncio.sleep(3600)
+            yield
+
+        return stream()
+
+    def trades(key, secret, on_connected):
+        async def stream():
+            if "trades" not in names_that_fail:
+                on_connected()
+            await asyncio.sleep(3600)
+            yield
+
+        return stream()
+
+    return bars, trades
+
+
+def check(tmp_path, alpaca, *failing, seconds=0.5):
+    bars, trades = connecting(*failing)
+    return asyncio.run(
+        check_session(
+            DAY,
+            tmp_path,
+            QQQ_GUARD,
+            ("k", "s"),
+            seconds=seconds,
+            broker=alpaca,
+            data=FakeData(),
+            bars=bars,
+            trades=trades,
+        )
+    )
+
+
+def test_the_check_reads_reconciles_and_connects_without_trading(tmp_path):
+    alpaca = FakeAlpaca(FakeClock(OPEN - timedelta(hours=1)))
+    said = check(tmp_path, alpaca)
+    assert said.startswith("checked: account 30,000.00 USD, held nothing")
+    assert "15 closes" in said and "both streams connected" in said
+    assert alpaca.orders == {}
+    assert (tmp_path / "check" / DAY.isoformat() / "journal.jsonl").exists()
+    assert not DayFiles(tmp_path, DAY).journal.exists()  # the day's own is untouched
+
+
+def test_the_check_fails_on_a_difference_or_a_stream_that_does_not_connect(tmp_path):
+    alpaca = FakeAlpaca(FakeClock(OPEN))
+    answers = iter([{"QQQ": 1.0}])
+    # 1 share in the morning, 2 when reconciled: someone traded in between.
+    alpaca.positions = lambda: next(answers, {"QQQ": 2.0})
+    with pytest.raises(RunnerError, match="reconciliation"):
+        check(tmp_path / "a", alpaca)
+    with pytest.raises(RunnerError, match="trades"):
+        check(tmp_path / "b", FakeAlpaca(FakeClock(OPEN)), "trades")

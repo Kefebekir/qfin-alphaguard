@@ -4,7 +4,10 @@
     {
       "Effect": "Allow",
       "Action": "ecs:RunTask",
-      "Resource": "arn:aws:ecs:eu-north-1:*:task-definition/qfin-alphaguard:*"
+      "Resource": [
+        "arn:aws:ecs:eu-north-1:*:task-definition/qfin-alphaguard:*",
+        "arn:aws:ecs:eu-north-1:*:task-definition/qfin-live:*"
+      ]
     },
     {
       "Effect": "Allow",

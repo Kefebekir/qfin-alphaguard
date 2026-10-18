@@ -93,7 +93,8 @@ Both ruff commands must pass before a commit.
   S&P 500 membership by date, splits and dividends, Parquet and DuckDB
 - `src/qfin_alphaguard/features/`, `estimation/`, `optimize/`: returns,
   covariance and the optimiser
-- `infra/aws/`: the nightly ECS Fargate job that runs `qfin`
+- `infra/aws/`: the nightly ECS Fargate job that runs `qfin`, and the live
+  engine's weekday task (`LIVE.md`)
 - `tests/`: one test module per source module
 
 ## Rules the code must keep
