@@ -74,10 +74,18 @@ def test_the_long_short_takes_the_tenths_less_costs_and_skips_thin_days():
         pl.DataFrame({"day": days, "next_return": returns}),
     )
     scores = harness.n2_score(data, forecasts)
-    # 20 members: long the top 2 (0.018, 0.019), short the bottom 2 (0, 0.001), less 20 bps
+    # 20 members: long the top 2 (0.018, 0.019), short the bottom 2 (0, 0.001), less 2 bps,
+    # 1 bp a round trip on each side (amendment 2)
     assert scores.tolist() == pytest.approx(
-        [0.0185 - 0.0005 - 0.002]
+        [0.0185 - 0.0005 - 0.0002]
     )  # the 19 are skipped
+
+
+def test_each_test_passes_at_its_own_threshold():
+    # N1 had half of the news tests' 2.5% (Bonferroni over N1 and N2); N2 and N3 share the
+    # other half (amendment 3).
+    assert harness.THRESHOLDS == {"N1": 2.24, "N2": 2.50, "N3": 2.50}
+    assert harness.COST == 0.0001
 
 
 def test_the_t_statistic():

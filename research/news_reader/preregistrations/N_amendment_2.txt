@@ -1,0 +1,32 @@
+AMENDMENT 2 TO N2
+Written 2026-10-18 17:07 UTC, before any model of N2 was fitted or scored.
+
+WHAT HAD BEEN COMPUTED
+Only the pre-registered comparison on the development years: a regression on log(1 + the
+number of headlines) alone, run on 16 October 2026 to check the pipeline end to end. It lost
+25.06 bps a day after costs, of which 20 bps were the costs. No variant has been run, and
+nothing on the holdout years.
+
+THE CHANGE: COSTS
+N2 buys and sells at the day's close and closes at the next close. An order on the close
+(Alpaca's time in force `cls`, whole shares, sent by 15:50 New York time) fills at the
+official closing price: no spread is paid, and an account of 30,000 USD moves no closing
+auction. It pays the regulatory fees on sales, about 0.2 bps of the value sold (the SEC fee
+in the project's cost model), and a short pays a borrow fee of a fraction of a basis point a
+day for S&P 500 members.
+
+On 18 October 2026 Alpaca's paper account accepted a whole-share market-on-close order for
+SPY (status "accepted"; cancelled at once) and refused a fractional one ("fractional orders
+must be DAY orders").
+
+So N2's cost becomes 1 bp a round trip on each side, 2 bps a day, rounded up from the fees
+and the borrow, in place of 10 bps a round trip on each side, 20 bps a day, which was a
+placeholder. Positions are whole shares; their rounding is tracking error, not a cost, and
+is not modelled.
+
+The change follows from the measurement above, not from the count-only result. Everything
+else in N2 is unchanged.
+
+TO SETTLE BEFORE REAL MONEY, NOT FOR THIS TEST
+Alpaca's documentation marks orders on the close "contact the sales team": a live account
+may need its agreement.
