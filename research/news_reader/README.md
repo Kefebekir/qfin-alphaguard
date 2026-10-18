@@ -73,3 +73,11 @@ uv run python research/news_reader/features.py data/news_reader/emb data/raw/pri
 ```
 
 Then `GUIDE.md`.
+
+Before N2, `architecture_checks.py` measured what news tells in the development years only
+(`results_architecture_checks.txt`), for the note on news and the FPGA's network
+(`docs/research/news-to-the-fpga-network.md`):
+
+```bash
+uv run python research/news_reader/architecture_checks.py
+```
