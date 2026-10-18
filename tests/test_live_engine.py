@@ -20,6 +20,7 @@ from qfin_alphaguard.guard.config import load_guard_config
 from qfin_alphaguard.guard.rules import Guard
 from qfin_alphaguard.live.engine import (
     Cancel,
+    CancelAll,
     EngineError,
     Flatten,
     LiveEngine,
@@ -556,6 +557,24 @@ def test_flatten_waits_for_open_orders_to_end():
     assert step.actions == ()  # the buy's cancel is not confirmed
     core.on_order_event(Cancelled(ID1, seen(31, 2)), seen(31, 2))
     assert len(core.flatten(Flatten(seen(31, 3), {"QQQ": 40.0})).actions) == 1
+
+
+def test_a_close_that_did_not_fill_is_cancelled_after_a_stop():
+    core, _ = sent_and_accepted(once(lambda v: [buy(100, v)]))
+    core.on_order_event(FillReport(ID1, seen(30, 1), 100.0, 600.0), seen(30, 1))
+    core.stop(Stop(seen(31), "lost data"))
+    step = core.flatten(Flatten(seen(31, 1), {"QQQ": 100.0}))
+    core.on_order_event(Accepted(ID2, seen(31, 2)), seen(31, 2))
+    cancel = CancelAll(seen(32), "the close did not fill")
+    step = core.cancel_all(cancel)
+    assert step.records == (cancel, CancelRequested(ID2, seen(32)))
+    assert step.actions == (Cancel(ID2),)
+
+
+def test_cancel_all_only_after_a_stop():
+    core, _ = engine()
+    with pytest.raises(EngineError):
+        core.cancel_all(CancelAll(seen(31), "why"))
 
 
 def test_flatten_only_after_a_stop():
