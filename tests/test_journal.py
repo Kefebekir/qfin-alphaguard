@@ -26,6 +26,7 @@ from qfin_alphaguard.live.journal import (
     decode,
     encode,
     filled_positions,
+    read_journal,
     rebuild,
 )
 from qfin_alphaguard.live.orders import (
@@ -204,6 +205,17 @@ def test_a_reopened_journal_carries_on_its_sequence(tmp_path):
     assert [json.loads(line)["seq"] for line in path.read_text().splitlines()] == [1, 2]
     with journal(path) as j:
         assert j.records == [bar(0), bar(1)]
+
+
+def test_a_journal_can_be_read_while_an_engine_holds_it(tmp_path):
+    path = tmp_path / "day.jsonl"
+    with journal(path) as j:
+        j.write(bar(0), at=WRITTEN)
+        cut = '{"seq":2,"at":"2026-10-19T13:31:00+00:00","type":"Ba'
+        with path.open("a") as file:
+            file.write(cut)
+        assert read_journal(path) == [(WRITTEN, bar(0))]
+        assert path.read_text().endswith(cut)  # left as it was
 
 
 def test_a_line_cut_short_by_a_crash_is_dropped(tmp_path):

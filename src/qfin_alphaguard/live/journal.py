@@ -192,10 +192,19 @@ class Journal:
         self.close()
 
 
-def _read(path: Path) -> tuple[list[Entry], str | None]:
+def read_journal(path: Path) -> list[Entry]:
+    """A journal's entries, read without taking it: it may be in use by an engine.
+
+    Nothing is changed in the file; a last line cut short is left out.
+    """
+    return _read(path, mend=False)[0]
+
+
+def _read(path: Path, mend: bool = True) -> tuple[list[Entry], str | None]:
     """The entries in `path`, and the last line if a crash cut it short.
 
-    A cut line is removed from the file, so the next record starts on a line of its own.
+    With `mend`, a cut line is removed from the file, so the next record starts on a line
+    of its own.
     """
     if not path.exists():
         return [], None
@@ -220,7 +229,7 @@ def _read(path: Path) -> tuple[list[Entry], str | None]:
         except (KeyError, TypeError, ValueError) as error:
             raise JournalError(f"{path}, line {number}, has no time") from error
         entries.append(Entry(at, decode(data)))
-    if dropped is not None:
+    if dropped is not None and mend:
         with path.open("r+", encoding="utf-8") as file:
             file.truncate(len(text.encode("utf-8")) - len(tail.encode("utf-8")))
     return entries, dropped

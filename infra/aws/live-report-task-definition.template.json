@@ -1,0 +1,53 @@
+{
+  "family": "qfin-live-report",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "networkMode": "awsvpc",
+  "cpu": "256",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/qfin-execution-role",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/qfin-task-role",
+  "containerDefinitions": [
+    {
+      "name": "qfin-live-report",
+      "image": "ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/qfin-alphaguard:latest",
+      "essential": true,
+      "command": [
+        "live-report",
+        "--s3-bucket",
+        "qfin-alphaguard-kefebekir",
+        "--alert-topic",
+        "arn:aws:sns:eu-north-1:ACCOUNT_ID:qfin-alerts"
+      ],
+      "environment": [
+        {
+          "name": "AWS_REGION",
+          "value": "eu-north-1"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "ALPACA_API_KEY_ID",
+          "valueFrom": "arn:aws:ssm:eu-north-1:ACCOUNT_ID:parameter/qfin/alpaca-key-id"
+        },
+        {
+          "name": "ALPACA_API_SECRET_KEY",
+          "valueFrom": "arn:aws:ssm:eu-north-1:ACCOUNT_ID:parameter/qfin/alpaca-secret-key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/qfin-alphaguard",
+          "awslogs-region": "eu-north-1",
+          "awslogs-stream-prefix": "live-report"
+        }
+      }
+    }
+  ]
+}

@@ -49,6 +49,7 @@ uv run --env-file .env qfin etf-minutes QQQ  # QQQ's 1-minute bars from Alpaca
 uv run qfin plan                      # the next session's target portfolio, after ingest
 uv run qfin backtest                  # the plan on the stored minutes, against SPY; after intraday
 uv run --env-file .env qfin live      # today's session of the QQQ strategy on Alpaca's paper account
+uv run --env-file .env qfin live-report --s3-bucket qfin-alphaguard-kefebekir  # a session's report
 ```
 
 CI runs ruff, the tests and a Docker build on every push and pull request.
@@ -85,7 +86,8 @@ Both ruff commands must pass before a commit.
   `engine.py`, the core that decides, with no input or output, and replays a
   day from its journal; `warmup.py`, the strategy relearning the sessions
   before today each morning; `runner.py`, a session from the morning to the
-  close (`qfin live`), and the stop that closes by Alpaca's positions
+  close (`qfin live`), and the stop that closes by Alpaca's positions;
+  `report.py`, a session against backtests of it (`qfin live-report`)
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them

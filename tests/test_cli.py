@@ -357,6 +357,24 @@ def test_live_on_the_server_backs_up_and_alerts():
     assert (plain.s3_bucket, plain.alert_topic, plain.check) == (None, None, False)
 
 
+def test_the_scheduler_may_run_every_task_and_the_report_s_command_parses():
+    policy = json.loads(
+        (AWS / "scheduler-role-policy.json").read_text(encoding="utf-8")
+    )
+    (run,) = [s for s in policy["Statement"] if s["Action"] == "ecs:RunTask"]
+    families = {
+        json.loads(path.read_text(encoding="utf-8"))["family"]
+        for path in AWS.glob("*task-definition.template.json")
+    }
+    assert families == {"qfin-alphaguard", "qfin-live", "qfin-live-report"}
+    assert set(run["Resource"]) == {
+        f"arn:aws:ecs:eu-north-1:*:task-definition/{family}:*" for family in families
+    }
+    task = json.loads((AWS / "live-report-task-definition.template.json").read_text())
+    args = build_parser().parse_args(task["containerDefinitions"][0]["command"])
+    assert args.command == "live-report" and args.s3_bucket and args.alert_topic
+
+
 def test_the_live_task_s_command_is_one_this_cli_accepts():
     task = json.loads(Path("infra/aws/live-task-definition.template.json").read_text())
     (container,) = task["containerDefinitions"]
@@ -366,3 +384,29 @@ def test_the_live_task_s_command_is_one_this_cli_accepts():
         "ALPACA_API_KEY_ID",
         "ALPACA_API_SECRET_KEY",
     }
+
+
+def test_live_report_takes_the_server_s_bucket_and_topic():
+    args = build_parser().parse_args(
+        [
+            "live-report",
+            "--day",
+            "2026-10-19",
+            "--s3-bucket",
+            "b",
+            "--alert-topic",
+            "arn",
+        ]
+    )
+    assert (args.day, args.s3_bucket, args.alert_topic, args.root) == (
+        date(2026, 10, 19),
+        "b",
+        "arn",
+        "data/live",
+    )
+
+
+def test_live_report_without_a_journal_says_so(capsys, tmp_path):
+    assert main(["live-report", "--day", "2026-10-18", "--root", str(tmp_path)]) == 0
+    assert main(["live-report", "--day", "2026-10-19", "--root", str(tmp_path)]) == 1
+    assert "no journal for 2026-10-19" in capsys.readouterr().out
