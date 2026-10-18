@@ -1,0 +1,15 @@
+research/news_reader/architecture_checks.py, run on 18 October 2026, on the development years only (2016-2021).
+
+S&P 500 member-days 2016-01-01 to 2021-12-31: 758,122, 109,771 with news in N2's window
+
+1. The next day after the day's best tenth less its worst tenth, before costs
+   with news      +4.02 bps a day (t +0.83) over 1,495 days; a year +10.1%
+   without news   -6.44 bps a day (t -1.63) over 1,511 days; a year -16.2%
+
+2. The next day's absolute move: R-squared on 20-day volatility, and what news adds
+   volatility alone R2 0.171; log(1 + count) adds +0.0005
+   without news  next day moves 0.809 of its 20-day volatility (648,351 days)
+   with news     next day moves 0.858 of its 20-day volatility (109,771 days)
+
+3. QQQ: the morning's news count (to 09:55) and the day's range
+   1,510 sessions: 14-day volatility R2 0.404; the morning's count adds +0.0065
