@@ -122,6 +122,17 @@ class Stop:
 
 
 @dataclass(frozen=True)
+class CancelAll:
+    """After a stop: cancel every order still open, such as a close that did not fill."""
+
+    time: datetime
+    reason: str
+
+    def __post_init__(self) -> None:
+        _require_utc("time", self.time)
+
+
+@dataclass(frozen=True)
 class Flatten:
     """After a stop: close these positions, Alpaca's, shares by ticker."""
 
@@ -296,10 +307,23 @@ class LiveEngine:
         self.waiting.clear()
         records: list = [stop]
         actions: list[Action] = []
+        self._cancel_all(now, records, actions)
+        return Step(tuple(records), tuple(actions))
+
+    def cancel_all(self, cancel: CancelAll) -> Step:
+        """After a stop, cancel every order still open."""
+        now = self._clock(cancel.time)
+        if not self.stopped:
+            raise EngineError("cancel_all only after a stop")
+        records: list = [cancel]
+        actions: list[Action] = []
+        self._cancel_all(now, records, actions)
+        return Step(tuple(records), tuple(actions))
+
+    def _cancel_all(self, now: datetime, records: list, actions: list) -> None:
         for order in list(self.orders.values()):
             if order.is_open and order.status is not Status.PENDING_CANCEL:
                 self._cancel(order.client_order_id, now, records, actions)
-        return Step(tuple(records), tuple(actions))
 
     def flatten(self, flatten: Flatten) -> Step:
         """After a stop, orders that close what Alpaca says is held.
@@ -479,7 +503,7 @@ def _check_answer(asked: OrderIntent, answer: GuardDecision, now: datetime) -> N
 # Replaying a day.
 
 # What the core is told; everything else in a journal is what it answered.
-INPUTS = (SessionStart, Bar, Tick, Stop, Flatten)
+INPUTS = (SessionStart, Bar, Tick, Stop, CancelAll, Flatten)
 
 
 def _same(a, b) -> bool:
@@ -565,6 +589,8 @@ def replay_day(
             call(engine.on_tick(record))
         elif isinstance(record, Stop):
             call(engine.stop(record), own=record)
+        elif isinstance(record, CancelAll):
+            call(engine.cancel_all(record), own=record)
         elif isinstance(record, Flatten):
             call(engine.flatten(record), own=record)
         else:

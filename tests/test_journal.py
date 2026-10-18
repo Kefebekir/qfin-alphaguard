@@ -19,7 +19,7 @@ from qfin_alphaguard.events import (
     RiskEvent,
     Side,
 )
-from qfin_alphaguard.live.engine import Flatten, SessionStart, Stop, Tick
+from qfin_alphaguard.live.engine import CancelAll, Flatten, SessionStart, Stop, Tick
 from qfin_alphaguard.live.journal import (
     Journal,
     JournalError,
@@ -90,6 +90,7 @@ THE_ENGINE_S = [
     RiskEvent(at(2), "halt", RiskAction.HALT, "stop"),
     Fill(ID, "QQQ", Side.BUY, 0.5, 600.01, 0.0, at(3)),
     Stop(at(4), "reconciliation differs"),
+    CancelAll(at(4.5), "the close did not fill"),
     Flatten(at(5), {"QQQ": 70.0, "SPY": -1.0}),
 ]
 

@@ -37,7 +37,7 @@ from qfin_alphaguard.events import (
     Side,
     round_shares,
 )
-from qfin_alphaguard.live.engine import Flatten, SessionStart, Stop, Tick
+from qfin_alphaguard.live.engine import CancelAll, Flatten, SessionStart, Stop, Tick
 from qfin_alphaguard.live.orders import (
     Accepted,
     Cancelled,
@@ -60,6 +60,7 @@ RECORDS = {
         Bar,
         Tick,
         Stop,
+        CancelAll,
         Flatten,
         DecisionNote,
         Cancellation,
