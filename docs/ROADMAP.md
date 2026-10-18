@@ -378,6 +378,8 @@ profit; this phase asks whether the system works correctly.
       with the ML challengers in shadow, the day book every evening, and a
       replay of each day from the stored minutes.
 - [ ] Always-on server for the engine, alerts, and the `live_trading` lock.
+      A Fargate task each weekday at 09:15 New York (`infra/aws/LIVE.md`): the
+      day's folder kept in S3, alerts e-mailed by SNS, `qfin live --check`.
 - [x] Alpaca paper account and its API: orders by REST, fills by WebSocket
       (`live/alpaca_broker.py` #45, `live/streams.py`). A send or a cancel
       whose answer is lost is never repeated, only asked about. The paper

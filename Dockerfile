@@ -14,4 +14,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
+# The risk limits the commands read: the live engine's Guard and the plan's.
+COPY guard.yaml guard_qqq.yaml ./
+
 ENTRYPOINT ["qfin"]

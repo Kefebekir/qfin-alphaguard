@@ -99,19 +99,27 @@ def test_aws_task_definition_runs_a_valid_command():
     assert args.s3_bucket
 
 
-def test_aws_task_gets_the_eodhd_key_it_may_read():
-    # qfin ingest needs EODHD_API_KEY; ECS reads it from SSM with the execution
-    # role, which may read that one parameter and nothing else.
-    container = json.loads(TASK_DEFINITION.read_text(encoding="utf-8"))
-    (secret,) = container["containerDefinitions"][0]["secrets"]
+def test_aws_tasks_get_the_keys_they_may_read_and_no_other():
+    # qfin ingest needs EODHD_API_KEY, qfin live Alpaca's two keys; ECS reads them from
+    # SSM with the execution role, which may read those parameters and nothing else.
     policy = json.loads(
         (AWS / "execution-role-secrets-policy.json").read_text(encoding="utf-8")
     )
     (statement,) = policy["Statement"]
-
-    assert secret["name"] == "EODHD_API_KEY"
     assert statement["Action"] == "ssm:GetParameters"
-    assert secret["valueFrom"].replace("ACCOUNT_ID", "*") == statement["Resource"]
+    read = set()
+    for name, keys in (
+        ("task-definition.template.json", {"EODHD_API_KEY"}),
+        (
+            "live-task-definition.template.json",
+            {"ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"},
+        ),
+    ):
+        task = json.loads((AWS / name).read_text(encoding="utf-8"))
+        secrets = task["containerDefinitions"][0]["secrets"]
+        assert {s["name"] for s in secrets} == keys
+        read |= {s["valueFrom"].replace("ACCOUNT_ID", "*") for s in secrets}
+    assert read == set(statement["Resource"])
 
 
 def test_intraday_needs_the_daily_prices_first(tmp_path, monkeypatch, capsys):
@@ -327,3 +335,34 @@ def test_live_on_a_day_without_a_session_does_nothing(capsys, tmp_path):
     assert main(["live", "--day", "2026-10-18", "--root", str(tmp_path)]) == 0
     assert capsys.readouterr().out == "no session on 2026-10-18\n"
     assert list(tmp_path.iterdir()) == []
+
+
+def test_live_on_the_server_backs_up_and_alerts():
+    args = build_parser().parse_args(
+        [
+            "live",
+            "--s3-bucket",
+            "b",
+            "--alert-topic",
+            "arn:aws:sns:eu-north-1:1:qfin-alerts",
+            "--check",
+        ]
+    )
+    assert (args.s3_bucket, args.alert_topic, args.check) == (
+        "b",
+        "arn:aws:sns:eu-north-1:1:qfin-alerts",
+        True,
+    )
+    plain = build_parser().parse_args(["live"])
+    assert (plain.s3_bucket, plain.alert_topic, plain.check) == (None, None, False)
+
+
+def test_the_live_task_s_command_is_one_this_cli_accepts():
+    task = json.loads(Path("infra/aws/live-task-definition.template.json").read_text())
+    (container,) = task["containerDefinitions"]
+    args = build_parser().parse_args(container["command"])
+    assert args.command == "live" and args.s3_bucket and args.alert_topic
+    assert {s["name"] for s in container["secrets"]} == {
+        "ALPACA_API_KEY_ID",
+        "ALPACA_API_SECRET_KEY",
+    }

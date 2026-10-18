@@ -170,6 +170,13 @@ def build_parser() -> argparse.ArgumentParser:
     live.add_argument(
         "--root", default="data/live", help="where each day's journal and alerts go"
     )
+    live.add_argument("--s3-bucket", help="keep each day's folder in this bucket too")
+    live.add_argument("--alert-topic", help="an SNS topic's ARN to e-mail alerts to")
+    live.add_argument(
+        "--check",
+        action="store_true",
+        help="the morning, a reconciliation and both streams, then out; nothing traded",
+    )
     live.set_defaults(run=_live)
 
     return parser
@@ -390,7 +397,7 @@ if __name__ == "__main__":
 def _live(args: argparse.Namespace) -> int:
     from zoneinfo import ZoneInfo
 
-    from qfin_alphaguard.live.runner import DayFiles, run_session
+    from qfin_alphaguard.live.runner import DayFiles, check_session, run_session
 
     day = args.day or datetime.now(ZoneInfo("America/New_York")).date()
     if not sessions(day, day):
@@ -404,6 +411,18 @@ def _live(args: argparse.Namespace) -> int:
         handlers=[logging.StreamHandler(), logging.FileHandler(folder / "engine.log")],
     )
     limits = load_guard_config(args.guard)
-    outcome = asyncio.run(run_session(day, Path(args.root), limits, api_keys()))
+    if args.check:
+        print(asyncio.run(check_session(day, Path(args.root), limits, api_keys())))
+        return 0
+    outcome = asyncio.run(
+        run_session(
+            day,
+            Path(args.root),
+            limits,
+            api_keys(),
+            bucket=args.s3_bucket,
+            topic=args.alert_topic,
+        )
+    )
     print(f"session {day}: {outcome}")
     return 0 if outcome == "closed" else 1
