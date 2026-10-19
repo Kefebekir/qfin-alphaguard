@@ -23,8 +23,12 @@ LEDGER = """# Ledger
 """
 
 
-def result(mean, t, years):
+RULE = "ties at the edge included (amendment 5)"
+
+
+def result(mean, t, years, scoring=RULE):
     return {
+        "scoring": scoring,
         "mean_bps": mean,
         "t": t,
         "days": 998,
@@ -72,17 +76,17 @@ def test_the_row_goes_after_the_last_variant_and_before_the_next_section():
 
 def test_variants_are_numbered_and_limited_within_their_test():
     store = {"count_only": BAR, "variants": []}
-    assert (
-        dev_report.check_new(store, LEDGER, "N2", {"components": 16, "penalty": 10.0})
-        == 1
-    )
+    settings = {"components": 16, "penalty": 10.0}
+    assert dev_report.check_new(store, LEDGER, "N2", settings, RULE) == (1, False)
     full = LEDGER
     for i in range(10):
         full = dev_report.add_row(full, f"| {i + 1} | N2 | r | s | m | t | y | n |")
     assert dev_report.variants_in_ledger(full, "N2") == 10
     assert dev_report.variants_in_ledger(full, "N1") == 2
     with pytest.raises(SystemExit, match="its 10 variants"):
-        dev_report.check_new(store, full, "N2", {"components": 2, "penalty": 10.0})
+        dev_report.check_new(
+            store, full, "N2", {"components": 2, "penalty": 10.0}, RULE
+        )
 
 
 def test_settings_already_tried_are_not_run_or_counted_again():
@@ -92,7 +96,29 @@ def test_settings_already_tried_are_not_run_or_counted_again():
         "variants": [{"n": 1, "settings": settings, "result": BAR}],
     }
     with pytest.raises(SystemExit, match="variant 1 already"):
-        dev_report.check_new(store, LEDGER, "N2", dict(settings))
+        dev_report.check_new(store, LEDGER, "N2", dict(settings), RULE)
+
+
+def test_a_variant_scored_under_an_earlier_rule_is_scored_again_as_itself():
+    settings = {"components": 16, "penalty": 10.0}
+    old = result(-6.78, -1.61, [-4.25, -8.64, -7.56, -6.64], scoring=None)
+    store = {
+        "count_only": BAR,
+        "variants": [{"n": 1, "settings": settings, "result": old}],
+    }
+    assert dev_report.check_new(store, LEDGER, "N2", dict(settings), RULE) == (1, True)
+    ledger = dev_report.add_row(LEDGER, "| 1 | N2 | old row |")
+    new = result(-3.0, -0.8, [1.0, -2.0, -6.0, -5.0])
+    row = dev_report.ledger_row(1, "N2", "2026-10-19 11:00", settings, new, BAR, old)
+    assert row.endswith(
+        "; scored again, ties at the edge included (amendment 5): it was "
+        "\u22126.78 bps (t \u22121.61) |"
+    )
+    got = dev_report.replace_row(ledger, "N2", 1, row)
+    assert "old row" not in got and row in got
+    assert dev_report.variants_in_ledger(got, "N2") == 1  # still one variant
+    with pytest.raises(ValueError, match="variant 2"):
+        dev_report.replace_row(ledger, "N2", 2, row)
 
 
 def test_the_page_shows_each_variant_counting_alone_and_each_year():

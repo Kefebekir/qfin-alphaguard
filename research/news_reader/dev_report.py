@@ -8,7 +8,9 @@ Efe runs it, with the settings he chose:
 It fits and scores efe_model.make(components, penalty) on the development years
 (harness.run), then:
 - adds the variant's row to LEDGER.md, numbered within its test. It refuses an eleventh
-  variant of a test, and runs nothing for settings already tried.
+  variant of a test, and runs nothing for settings already tried, unless they were scored
+  under an earlier rule (harness.SCORING): then the same variant is scored again and its
+  row says so.
 - keeps every result in data/news_reader/dev/<test>.json, with counting alone, the
   pre-registered comparison, computed once.
 - writes data/news_reader/dev/<test>.html: each variant's mean a day after costs against
@@ -40,12 +42,23 @@ def settings_text(settings: dict) -> str:
 
 
 def ledger_row(
-    n: int, test: str, run_utc: str, settings: dict, result: dict, bar: dict
+    n: int,
+    test: str,
+    run_utc: str,
+    settings: dict,
+    result: dict,
+    bar: dict,
+    before: dict | None = None,
 ) -> str:
     years = " / ".join(signed(y["mean_bps"]) for y in result["years"].values())
     gap = result["mean_bps"] - bar["mean_bps"]
     side = "above" if gap > 0 else "below"
     note = f"{signed(gap)} bps a day {side} counting alone ({signed(bar['mean_bps'])})"
+    if before:
+        note += (
+            f"; scored again, {result['scoring']}: it was {signed(before['mean_bps'])} bps "
+            f"(t {signed(before['t'])})"
+        )
     return (
         f"| {n} | {test} | {run_utc} | {settings_text(settings)} | "
         f"{signed(result['mean_bps'])} bps | {signed(result['t'])} | {years} | {note} |"
@@ -62,6 +75,20 @@ def add_row(ledger: str, row: str) -> str:
     return "\n".join([*lines[:end], row, *lines[end:]])
 
 
+def replace_row(ledger: str, test: str, n: int, row: str) -> str:
+    """The ledger with variant n of `test` replaced by `row`."""
+    lines = ledger.split("\n")
+    start = next(i for i, line in enumerate(lines) if line.startswith(VARIANTS_HEADER))
+    for i in range(start + 2, len(lines)):
+        if not lines[i].startswith("|"):
+            break
+        cells = lines[i].split("|")
+        if cells[1].strip() == str(n) and cells[2].strip() == test:
+            lines[i] = row
+            return "\n".join(lines)
+    raise ValueError(f"no row for {test}'s variant {n}")
+
+
 def variants_in_ledger(ledger: str, test: str) -> int:
     lines = ledger.split("\n")
     start = next(i for i, line in enumerate(lines) if line.startswith(VARIANTS_HEADER))
@@ -74,20 +101,25 @@ def variants_in_ledger(ledger: str, test: str) -> int:
     return count
 
 
-def check_new(store: dict, ledger: str, test: str, settings: dict) -> int:
-    """The new variant's number within its test; refuses a repeat or an eleventh."""
+def check_new(
+    store: dict, ledger: str, test: str, settings: dict, scoring: str
+) -> tuple[int, bool]:
+    """The variant's number within its test, and whether it is scored again (settings tried
+    under an earlier rule). Refuses a repeat under the same rule, or an eleventh."""
     for v in store["variants"]:
         if v["settings"] == settings:
-            raise SystemExit(
-                f"{test}: {settings_text(settings)} is variant {v['n']} already; "
-                f"its result is on {DEV / (test + '.html')}"
-            )
+            if v["result"].get("scoring") == scoring:
+                raise SystemExit(
+                    f"{test}: {settings_text(settings)} is variant {v['n']} already; "
+                    f"its result is on {DEV / (test + '.html')}"
+                )
+            return v["n"], True
     n = variants_in_ledger(ledger, test)
     if n >= LIMIT:
         raise SystemExit(
             f"{test} has its {LIMIT} variants; the next step is the choice"
         )
-    return n + 1
+    return n + 1, False
 
 
 def _cell(value: float, scale: float) -> str:
@@ -315,22 +347,33 @@ def main(argv: list[str]) -> None:
         if store_path.exists()
         else {"count_only": None, "variants": []}
     )
-    n = check_new(store, LEDGER.read_text(), test, settings)
-    if store["count_only"] is None:
-        print("counting alone, the comparison, computed once ...", flush=True)
+    n, again = check_new(store, LEDGER.read_text(), test, settings, harness.SCORING)
+    if (
+        store["count_only"] is None
+        or store["count_only"].get("scoring") != harness.SCORING
+    ):
+        print("counting alone, the comparison, under the current rule ...", flush=True)
         store["count_only"] = harness.run(test, None, count_only=True)
-    print(f"{test} variant {n}: {settings_text(settings)} ...", flush=True)
+    again_text = " again" if again else ""
+    print(f"{test} variant {n}{again_text}: {settings_text(settings)} ...", flush=True)
     result = harness.run(
         test,
         efe_model.make(settings["components"], settings["penalty"]),
         features=settings.get("features"),
     )
     run_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
-    row = ledger_row(n, test, run_utc, settings, result, store["count_only"])
-    LEDGER.write_text(add_row(LEDGER.read_text(), row))
-    store["variants"].append(
-        {"n": n, "settings": settings, "run_utc": run_utc, "result": result}
-    )
+    entry = {"n": n, "settings": settings, "run_utc": run_utc, "result": result}
+    if again:
+        before = next(v for v in store["variants"] if v["n"] == n)
+        row = ledger_row(
+            n, test, run_utc, settings, result, store["count_only"], before["result"]
+        )
+        LEDGER.write_text(replace_row(LEDGER.read_text(), test, n, row))
+        store["variants"] = [entry if v["n"] == n else v for v in store["variants"]]
+    else:
+        row = ledger_row(n, test, run_utc, settings, result, store["count_only"])
+        LEDGER.write_text(add_row(LEDGER.read_text(), row))
+        store["variants"].append(entry)
     store_path.write_text(json.dumps(store, indent=2))
     out = DEV / f"{test}.html"
     out.write_text(page(test, store))
