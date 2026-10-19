@@ -23,6 +23,7 @@ N2 (members' next day): X likewise for a member's headlines to 15:30; y is the r
 the day's close to the next session's close less the mean of the members with news that day.
 Each test day with at least 20 such members: equal weights long the top tenth of forecasts,
 short the bottom tenth, less 1 bp a round trip on each side (amendment 2; it was 10 bps).
+Members tied at a tenth's edge are all in (amendment 5).
 
 N3 (N2 read by PIT-4B): N2's rows, target and score, with X from features_n3.py. Each article
 was read by the checkpoint of the year before its own, so every test year reads the same
@@ -62,6 +63,7 @@ LAST_DAY = date(2026, 10, 9)
 # One-sided; N1 had half of the news tests' 2.5%, N2 and N3 share the other half.
 THRESHOLDS = {"N1": 2.24, "N2": 2.50, "N3": 2.50}
 COST = 0.0001  # a round trip, each side (N2, amendment 2; it was 0.0010)
+SCORING = "ties at the edge included (amendment 5)"  # N2 and N3's long-short
 MIN_MEMBERS = 20
 
 
@@ -196,7 +198,13 @@ def n1_score(
 
 
 def n2_score(data: Year, forecasts: np.ndarray) -> np.ndarray:
-    """Each test day's long-short return after costs, on days with enough members."""
+    """Each test day's long-short return after costs, on days with enough members.
+
+    The tenth's edges are the forecasts of the n-th highest and n-th lowest member (n, a
+    tenth of the day's members); every member at or beyond an edge is in, equal weights,
+    ties included (amendment 5: the order of rows used to choose among ties). A day whose
+    edges meet, so that no forecast separates the two sides, has no trade.
+    """
     frame = data.test.select("day", "next_return").with_columns(
         forecast=pl.Series(forecasts)
     )
@@ -204,10 +212,15 @@ def n2_score(data: Year, forecasts: np.ndarray) -> np.ndarray:
     for _, day in frame.group_by("day", maintain_order=True):
         if day.height < MIN_MEMBERS:
             continue
-        ranked = day.sort("forecast")
+        forecast = day["forecast"].to_numpy()
+        returns = day["next_return"].to_numpy()
         n = day.height // 10
-        short = ranked["next_return"][:n].mean()
-        long = ranked["next_return"][-n:].mean()
+        ordered = np.sort(forecast)
+        high, low = ordered[-n], ordered[n - 1]
+        if high <= low:
+            continue
+        long = returns[forecast >= high].mean()
+        short = returns[forecast <= low].mean()
         daily.append(long - short - 2 * COST)
     return np.array(daily)
 
@@ -266,6 +279,7 @@ def run(
         "annual": float(scores.mean() * 252),
         "t": t_stat(scores),
         "passes": bool(t_stat(scores) >= THRESHOLDS[test]),
+        "scoring": SCORING if test in ("N2", "N3") else None,
         "years": per_year,
     }
 

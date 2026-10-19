@@ -22,6 +22,7 @@ tried on them is listed here before its holdout run.
 | 2 | 2026-10-18 17:07 | `N_amendment_2.txt` | `5f2e4fa602cf251208e609c8d6c0c851fd6c78d9018c539c3e8d63b74cbd3a16` | N2's cost, from a placeholder of 10 bps a round trip a side to 1 bp: an order on the close fills at the official close, and Alpaca's paper account took a whole-share one on 18 October 2026. Only the count-only development check had been computed |
 | 3 | 2026-10-18 17:07 | `N_amendment_3.txt` | `fc469e8f37780caafb8866dd7d233935b2cdc403d61e86d13af563d6048acd08` | N3 joins: N2 and N3 share the half of the news tests' 2.5% that N1 did not use, so N2 passes at t ≥ 2.50, not 2.24 |
 | 4 | 2026-10-18 22:40 | `N_amendment_4.txt` | `10402a55ace2155dd4bda24ba0bd0e26a5b2b03a5d24949877dde4620e853d86` | N3 drops PIT-4B-FT before any headline was read with it: its fine-tuning data (Tulu 3, and instructions Qwen2.5-72B wrote) dates from 2024, filtered of time-specific rows by a classifier, so it is not point-in-time. Two feature sets remain, base-last and base-mean |
+| 5 | 2026-10-19 10:22 | `N_amendment_5.txt` | `1d2dd258bc192f7be47dbfbb4e9f87fecc8a6d7b08bd0effee1f3aeb1e5e4ffb` | N2 and N3: members tied at a tenth's edge are all in (the breakpoint convention), not chosen by the order of rows, which was alphabetical: counting alone's −7.06 bps a day was the alphabet's. Efe chose this rule among four scored on counting alone; it is not changed again |
 
 ## N3's checkpoints
 
@@ -81,12 +82,18 @@ variant should clear; it is not one of the variants.
 | N1 | 1,008 | −0.16 bps | −0.15 | +1.76 / +1.79 / −2.93 / −1.24 |
 | N2 | 998 | −25.06 bps | −6.26 | −30.43 / −20.65 / −28.73 / −20.53 |
 | N2 and N3, at 1 bp a round trip a side (amendment 2), run 18 October 2026 | 998 | −7.06 bps | −1.76 | −12.43 / −2.65 / −10.73 / −2.53 |
+| N2 and N3, at 1 bp, members tied at a tenth's edge all in (amendment 5), run 19 October 2026 | 998 | −1.22 bps | −0.41 | −6.33 / −4.16 / +2.70 / +2.79 |
 
 N2's first row is at the placeholder's 20 bps a day (10 bps a round trip on each side; its
 positions turn over daily). At amendment 2's 1 bp the costs are 2 bps a day, and the count
 alone loses 5.06 bps a day before them in both rows. N3 reads N2's member-days
 (`features_n3.py` reproduces N2's 260,186 rows and their counts exactly), so its comparison
 is N2's, to the last digit.
+
+N2's two rows before the last chose among members tied at a tenth's edge by the order of
+rows, which was alphabetical (amendment 5). Counting alone gives one forecast to every member
+with a single headline, about two thirds of them, so its long side was the end of the
+alphabet. The last row is the bar a variant should clear.
 
 ## Variants tried on the development years (2018-2021)
 
@@ -106,6 +113,7 @@ By that rule, variant 5 (2 components, +0.98 bps a day) goes to the holdout; its
 | 4 | N1 | 2026-10-17 | components 1, penalty 10.0 | −0.63 bps | −0.60 | +2.19 / +0.14 / −3.31 / −1.52 | The dominant topic axis alone: the count's pattern |
 | 5 | N1 | 2026-10-17 | components 2, penalty 10.0 | +0.98 bps | +0.88 | +7.65 / +1.23 / −3.23 / −1.69 | The count's pattern again: up in 2018-2019, down in 2020-2021 |
 | 6 | N1 | 2026-10-17 | components 8, penalty 10.0 | −2.13 bps | −2.12 | −4.01 / +0.68 / −2.89 / −2.33 | Down in three of four years |
+| 1 | N2 | 2026-10-19 10:07 | components 16, penalty 10.0 | −6.78 bps | −1.61 | −4.25 / −8.64 / −7.56 / −6.64 | +0.27 bps a day above counting alone (−7.06) |
 
 ## N1's holdout (run once, 17 October 2026, commit 0893980)
 
