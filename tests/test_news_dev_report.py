@@ -148,6 +148,39 @@ def test_the_page_shows_each_variant_counting_alone_and_each_year():
     assert "var(--neg) 70%" in page and "var(--pos)" in page
 
 
+def test_a_fresh_result_and_a_stored_one_go_on_one_page():
+    # harness.run's years are numbers; the store's, read back from JSON, are strings.
+    fresh = result(2.0, 0.5, [1.0, 2.0, 3.0, 4.0])
+    fresh["years"] = {int(y): v for y, v in fresh["years"].items()}
+    store = {
+        "count_only": BAR,
+        "variants": [
+            {
+                "n": 1,
+                "settings": {"components": 64, "penalty": 10.0},
+                "result": dev_report.stored(fresh),
+            },
+        ],
+    }
+    assert list(store["variants"][0]["result"]["years"]) == [
+        "2018",
+        "2019",
+        "2020",
+        "2021",
+    ]
+    assert "+2.00" in dev_report.page("N2", store)
+
+
+def test_settings_already_tried_say_so_as_their_own_kind_of_stop():
+    settings = {"components": 16, "penalty": 10.0}
+    store = {
+        "count_only": BAR,
+        "variants": [{"n": 1, "settings": settings, "result": BAR}],
+    }
+    with pytest.raises(dev_report.AlreadyTried, match="written again"):
+        dev_report.check_new(store, LEDGER, "N2", dict(settings), RULE)
+
+
 def test_a_label_is_escaped_in_the_page():
     store = {
         "count_only": BAR,
@@ -161,3 +194,55 @@ def test_a_label_is_escaped_in_the_page():
     }
     page = dev_report.page("N3", store)
     assert "features <b>" not in page and "features &lt;b&gt;" in page
+
+
+class FakeHarness:
+    """harness.run as it answers: the years as numbers, not yet through JSON."""
+
+    SCORING = RULE
+    N3_FEATURES = ("base-last", "base-mean")
+
+    def __init__(self):
+        self.runs = []
+
+    def run(self, test, make, count_only=False, features=None):
+        self.runs.append("count" if count_only else make)
+        mean = -1.22 if count_only else float(make)
+        return {
+            "scoring": RULE,
+            "mean_bps": mean,
+            "t": mean / 4,
+            "days": 998,
+            "years": {
+                y: {"mean_bps": mean, "days": 250} for y in (2018, 2019, 2020, 2021)
+            },
+        }
+
+
+def test_runs_on_their_own_and_after_a_stored_comparison_both_write_the_page(
+    tmp_path, monkeypatch
+):
+    import sys
+    import types
+
+    fake = FakeHarness()
+    model = types.SimpleNamespace(make=lambda components, penalty: components / 10)
+    monkeypatch.setitem(sys.modules, "harness", fake)
+    monkeypatch.setitem(sys.modules, "efe_model", model)
+    monkeypatch.setattr(dev_report, "DEV", tmp_path)
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text(LEDGER)
+    monkeypatch.setattr(dev_report, "LEDGER", ledger)
+
+    dev_report.main(["N2", "16", "10.0"])  # the comparison and variant 1, both fresh
+    dev_report.main(["N2", "64", "10.0"])  # the comparison read back from JSON
+    page = (tmp_path / "N2.html").read_text()
+    assert "Variants tried: <b>2 of 10</b>" in page and "+6.40" in page
+    assert fake.runs == ["count", 1.6, 6.4]  # the comparison once
+    assert dev_report.variants_in_ledger(ledger.read_text(), "N2") == 2
+
+    (tmp_path / "N2.html").unlink()
+    with pytest.raises(dev_report.AlreadyTried):
+        dev_report.main(["N2", "64", "10.0"])
+    assert (tmp_path / "N2.html").exists()  # written again, nothing run
+    assert fake.runs == ["count", 1.6, 6.4]

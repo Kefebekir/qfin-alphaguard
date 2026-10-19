@@ -101,6 +101,15 @@ def variants_in_ledger(ledger: str, test: str) -> int:
     return count
 
 
+class AlreadyTried(SystemExit):
+    """These settings were run under the current rule: nothing is run again."""
+
+
+def stored(result: dict) -> dict:
+    """A result as the store keeps it: through JSON, whose keys are strings (the years)."""
+    return json.loads(json.dumps(result))
+
+
 def check_new(
     store: dict, ledger: str, test: str, settings: dict, scoring: str
 ) -> tuple[int, bool]:
@@ -109,9 +118,9 @@ def check_new(
     for v in store["variants"]:
         if v["settings"] == settings:
             if v["result"].get("scoring") == scoring:
-                raise SystemExit(
+                raise AlreadyTried(
                     f"{test}: {settings_text(settings)} is variant {v['n']} already; "
-                    f"its result is on {DEV / (test + '.html')}"
+                    f"its result is on {DEV / (test + '.html')}, written again"
                 )
             return v["n"], True
     n = variants_in_ledger(ledger, test)
@@ -347,19 +356,26 @@ def main(argv: list[str]) -> None:
         if store_path.exists()
         else {"count_only": None, "variants": []}
     )
-    n, again = check_new(store, LEDGER.read_text(), test, settings, harness.SCORING)
+    out = DEV / f"{test}.html"
+    try:
+        n, again = check_new(store, LEDGER.read_text(), test, settings, harness.SCORING)
+    except AlreadyTried:
+        out.write_text(page(test, store))
+        raise
     if (
         store["count_only"] is None
         or store["count_only"].get("scoring") != harness.SCORING
     ):
         print("counting alone, the comparison, under the current rule ...", flush=True)
-        store["count_only"] = harness.run(test, None, count_only=True)
+        store["count_only"] = stored(harness.run(test, None, count_only=True))
     again_text = " again" if again else ""
     print(f"{test} variant {n}{again_text}: {settings_text(settings)} ...", flush=True)
-    result = harness.run(
-        test,
-        efe_model.make(settings["components"], settings["penalty"]),
-        features=settings.get("features"),
+    result = stored(
+        harness.run(
+            test,
+            efe_model.make(settings["components"], settings["penalty"]),
+            features=settings.get("features"),
+        )
     )
     run_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
     entry = {"n": n, "settings": settings, "run_utc": run_utc, "result": result}
@@ -375,7 +391,6 @@ def main(argv: list[str]) -> None:
         LEDGER.write_text(add_row(LEDGER.read_text(), row))
         store["variants"].append(entry)
     store_path.write_text(json.dumps(store, indent=2))
-    out = DEV / f"{test}.html"
     out.write_text(page(test, store))
     print(row)
     print(f"the page: {out}")
