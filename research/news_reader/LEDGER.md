@@ -114,6 +114,7 @@ By that rule, variant 5 (2 components, +0.98 bps a day) goes to the holdout; its
 | 5 | N1 | 2026-10-17 | components 2, penalty 10.0 | +0.98 bps | +0.88 | +7.65 / +1.23 / −3.23 / −1.69 | The count's pattern again: up in 2018-2019, down in 2020-2021 |
 | 6 | N1 | 2026-10-17 | components 8, penalty 10.0 | −2.13 bps | −2.12 | −4.01 / +0.68 / −2.89 / −2.33 | Down in three of four years |
 | 1 | N2 | 2026-10-19 10:25 | components 16, penalty 10.0 | −6.96 bps | −1.65 | −4.79 / −8.42 / −7.78 / −6.82 | −5.74 bps a day below counting alone (−1.22); scored again, ties at the edge included (amendment 5): it was −6.78 bps (t −1.61) |
+| 2 | N2 | 2026-10-19 10:26 | components 64, penalty 10.0 | +4.03 bps | +0.93 | +6.02 / +12.69 / −2.60 / +0.09 | +5.25 bps a day above counting alone (−1.22) |
 
 ## N1's holdout (run once, 17 October 2026, commit 0893980)
 
