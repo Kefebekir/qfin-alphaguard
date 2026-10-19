@@ -24,6 +24,11 @@ the day's close to the next session's close less the mean of the members with ne
 Each test day with at least 20 such members: equal weights long the top tenth of forecasts,
 short the bottom tenth, less 1 bp a round trip on each side (amendment 2; it was 10 bps).
 
+N3 (N2 read by PIT-4B): N2's rows, target and score, with X from features_n3.py. Each article
+was read by the checkpoint of the year before its own, so every test year reads the same
+features; which of the two sets (base-last, base-mean; PIT-4B-FT was dropped by amendment 4)
+is part of the variant: run("N3", make, features="base-last").
+
 The holdout passes at one-sided t >= 2.24 for N1, which has run, and 2.50 for N2 and N3, which
 share the half of the tests' 2.5% that N1 did not use (amendment 3).
 """
@@ -44,6 +49,8 @@ from sklearn.linear_model import LinearRegression
 from qfin_alphaguard.sessions import sessions
 
 EMB = Path("data/news_reader/emb")
+PIT_EMB = Path("data/news_reader/pit_emb")
+N3_FEATURES = ("base-last", "base-mean")  # amendment 4: PIT-4B only
 RULE_DAYS = Path("data/news_reader/rule_days.parquet")
 PRICES = Path("data/raw/prices.parquet")
 VARIANTS = Path("research/news_reader/variants")
@@ -143,6 +150,31 @@ def n2_year(year: int, returns: pl.DataFrame, count_only: bool = False) -> Year:
     return _split(joined, x, year)
 
 
+def n3_year(
+    year: int, returns: pl.DataFrame, feature_set: str | None, count_only: bool = False
+) -> Year:
+    """N2's rows and target, with X the member-day's mean embedding in `feature_set`
+    (features_n3.py) and log(1 + count). Only the rows up to `year` are read."""
+    rows = pl.read_parquet(PIT_EMB / "n3_rows.parquet")
+    joined = (
+        rows.with_row_index("row")
+        .join(returns, on=["ticker", "day"], how="inner")
+        .with_columns(
+            y=pl.col("next_return") - pl.col("next_return").mean().over("day")
+        )
+        .filter(pl.col("day").dt.year().is_between(FIRST_TRAIN, year))
+        .sort("day", "ticker")
+    )
+    count = np.log1p(joined["count"].to_numpy()).astype(np.float32)[:, None]
+    if count_only:
+        return _split(joined, count, year)
+    if feature_set not in N3_FEATURES:
+        raise ValueError(f"N3's features are one of {N3_FEATURES}, got {feature_set!r}")
+    embedding = np.load(PIT_EMB / f"n3_{feature_set}.npy", mmap_mode="r")
+    x = np.hstack([embedding[joined["row"].to_numpy()].astype(np.float32), count])
+    return _split(joined, x, year)
+
+
 def t_stat(values: np.ndarray) -> float:
     v = np.asarray(values, dtype=float)
     return float(v.mean() / v.std(ddof=1) * math.sqrt(len(v)))
@@ -181,26 +213,36 @@ def n2_score(data: Year, forecasts: np.ndarray) -> np.ndarray:
 
 
 def run(
-    test: str, make: Callable, split: str = "development", count_only: bool = False
+    test: str,
+    make: Callable,
+    split: str = "development",
+    count_only: bool = False,
+    features: str | None = None,
 ) -> dict:
     """Fit a fresh model for each test year of `split` and score it.
 
     With count_only the features are log(1 + count) alone and the model a linear regression
     (the pre-registrations' comparison: does reading the headlines add to counting them?).
+    `features` names N3's feature set; N1 and N2 have one set each and take none.
     """
     if count_only:
         make = LinearRegression
     if split not in ("development", "holdout"):
         raise ValueError(f"split must be development or holdout, got {split!r}")
+    if test == "N3" and not count_only and features not in N3_FEATURES:
+        raise ValueError(f"N3's features are one of {N3_FEATURES}, got {features!r}")
+    if test != "N3" and features is not None:
+        raise ValueError(f"{test} has one feature set; features is for N3")
     years = DEVELOPMENT if split == "development" else HOLDOUT
-    returns = next_day_returns() if test == "N2" else None
+    returns = next_day_returns() if test in ("N2", "N3") else None
     per_year, all_scores = {}, []
     for year in years:
-        data = (
-            n1_year(year, count_only)
-            if test == "N1"
-            else n2_year(year, returns, count_only)
-        )
+        if test == "N1":
+            data = n1_year(year, count_only)
+        elif test == "N2":
+            data = n2_year(year, returns, count_only)
+        else:
+            data = n3_year(year, returns, features, count_only)
         model = make().fit(data.train_x, data.train_y)
         forecasts = model.predict(data.test_x)
         if test == "N1":
@@ -218,6 +260,7 @@ def run(
         "test": test,
         "split": split,
         "count_only": count_only,
+        "features": None if count_only else features,
         "days": len(scores),
         "mean_bps": float(scores.mean() * 1e4),
         "annual": float(scores.mean() * 252),
@@ -235,6 +278,10 @@ def run_holdout(test: str, make: Callable) -> dict:
         raise RuntimeError(f"{test}'s holdout has been run: {lock}")
     if not chosen.exists():
         raise RuntimeError(f"write and commit {chosen} with the chosen variant first")
+    variant = json.loads(chosen.read_text())
+    features = variant.get("features") if test == "N3" else None
+    if test == "N3" and features not in N3_FEATURES:
+        raise RuntimeError(f"{chosen} must name N3's feature set, one of {N3_FEATURES}")
     status = subprocess.run(
         ["git", "status", "--porcelain", "--", str(chosen), "research/news_reader"],
         capture_output=True,
@@ -253,10 +300,10 @@ def run_holdout(test: str, make: Callable) -> dict:
     commit = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
     ).stdout.strip()
-    result = run(test, make, "holdout") | {
+    result = run(test, make, "holdout", features=features) | {
         "count_only": run(test, make, "holdout", count_only=True),
         "commit": commit,
-        "variant": json.loads(chosen.read_text()),
+        "variant": variant,
     }
     lock.write_text(json.dumps(result, indent=2))
     return result

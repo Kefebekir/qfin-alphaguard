@@ -1,0 +1,24 @@
+AMENDMENT 4 TO N3
+Written 2026-10-18 22:40 UTC, before any headline was read by PIT-4B-FT and before any N3
+model was fitted or scored. Efe asked for the choice between keeping and dropping PIT-4B-FT
+to be made on the evidence; this records the choice, and he reviews it with the pull request
+that carries it.
+
+N3 reads headlines with PIT-4B only, not PIT-4B-FT.
+
+Why. PIT-4B's checkpoints are point-in-time by construction: each is trained only on web text
+up to its month. PIT-4B-FT's are not. Its model card says each was fine-tuned (LoRA adapters,
+merged into the weights) on five subsets of the Tulu 3 SFT mixture and on
+argilla/ifeval-like-data, which Qwen2.5-72B-Instruct generated: text written in 2024, after
+every checkpoint's month. Rows referring to time-specific facts were removed by a
+language-model classifier, "so that fine-tuning adds as little time-specific knowledge as
+possible": little, not none. The project's first rule is no look-ahead. And N3 reads
+embeddings, not instructions, so the fine-tuning is not what N3 needs; in DatedGPT's
+comparison the fine-tuned model did worse than the base (Sharpe 0.86 against 3.37). Its
+config also sets a different norm epsilon (2^-7, against the base's 2^-23).
+
+What changes. N3's feature sets are two: base-last and base-mean (PIT-4B, the state at the
+headline's last token, or the mean over its tokens). At most 10 variants, the data, the
+splits, the test and its threshold (t >= 2.50) are as before. PIT-4B-FT-201511 had been
+downloaded and its SHA-256 checked; no headline was read with it, and no other PIT-4B-FT
+checkpoint was downloaded.
