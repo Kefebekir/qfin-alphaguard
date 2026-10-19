@@ -122,6 +122,11 @@ By that rule, variant 5 (2 components, +0.98 bps a day) goes to the holdout; its
 | 4 | N3 | 2026-10-19 10:43 | components 32, penalty 10.0, features base-last | +5.49 bps | +1.28 | −0.96 / +12.47 / +12.38 / −1.97 | +6.71 bps a day above counting alone (−1.22) |
 | 5 | N3 | 2026-10-19 10:43 | components 64, penalty 1000.0, features base-last | +6.23 bps | +1.41 | +6.38 / +11.95 / +5.55 / +1.07 | +7.45 bps a day above counting alone (−1.22) |
 
+**N2's choice for the holdout, fixed 2026-10-19 10:46 UTC by Efe after three variants:**
+variant 2 (components 64, penalty 10.0; `variants/N2_chosen.json`), the highest mean a day on
+the development years (+4.03 bps after costs, t +0.93), as the pre-registration says. No more
+N2 variant is run.
+
 ## N1's holdout (run once, 17 October 2026, commit 0893980)
 
 `data/news_reader/holdout_N1.json`; a second run is refused.
