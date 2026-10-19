@@ -246,3 +246,16 @@ def test_runs_on_their_own_and_after_a_stored_comparison_both_write_the_page(
         dev_report.main(["N2", "64", "10.0"])
     assert (tmp_path / "N2.html").exists()  # written again, nothing run
     assert fake.runs == ["count", 1.6, 6.4]
+
+
+def test_a_long_label_gets_room_on_the_left():
+    def svg_for(features):
+        settings = {"components": 64, "penalty": 10.0, "features": features}
+        label = f"1 · {dev_report.settings_text(settings)}"
+        return label, dev_report._bars([(label, result(6.3, 1.4, [7, 12, 5, 1]))], BAR)
+
+    label, svg = svg_for("base-last")
+    x = float(svg.split('class="label"')[0].rsplit('<text x="', 1)[1].split('"')[0])
+    assert x >= 6.6 * len(
+        label
+    )  # the label, right-aligned at x, starts inside the chart

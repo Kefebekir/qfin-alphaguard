@@ -143,7 +143,9 @@ def _cell(value: float, scale: float) -> str:
 def _bars(rows: list[tuple[str, dict]], bar: dict) -> str:
     """A horizontal bar a variant: its mean a day after costs, from zero; counting alone
     dashed. Labels and values sit outside the plot, so nothing overlaps."""
-    width, left, right, values_x, row_h, top = 1000, 230, 790, 805, 34, 30
+    width, right, values_x, row_h, top = 1000, 790, 805, 34, 30
+    # Room on the left for the longest label (12px text, about 6.6 units a character).
+    left = max(230, min(460, round(14 + 6.6 * max(len(label) for label, _ in rows))))
     height = top + row_h * len(rows) + 30
     means = [r["mean_bps"] for _, r in rows] + [bar["mean_bps"], 0.0]
     lo, hi = min(means), max(means)
