@@ -19,7 +19,7 @@ the choices you make with it are counted.
 
 ## The model the pre-registrations allow
 
-Principal components of the 768 embedding numbers, fitted on the training years, then a ridge
+Principal components of the embedding numbers (768 for N1 and N2, 4,096 for N3), fitted on the training years, then a ridge
 regression on them and the log count. Your two choices: the number of components and the
 ridge penalty. In scikit-learn:
 
@@ -33,8 +33,8 @@ from sklearn.preprocessing import StandardScaler
 
 def make(components=16, penalty=10.0):
     """A fresh, untrained model: PCA on the embedding, the count as it is, then ridge."""
-    embedding = list(range(768))  # the first 768 columns
-    count = [768]  # the last column, log(1 + count)
+    embedding = slice(0, -1)  # every column but the last: the embedding (768 or 4,096)
+    count = slice(-1, None)  # the last column, log(1 + count)
     return lambda: Pipeline(
         [
             (
@@ -107,9 +107,11 @@ N3 is N2 with a larger reader: PIT-4B, a 4-billion-parameter point-in-time model
 headline was read by the checkpoint of the year before its own (`embed_pit.py`), so one set
 of features serves every test year. Three things differ from N2:
 
-- **The embedding has 4,096 numbers**, not 768. In your `make`, the embedding is the first
-  4,096 columns and the count the column after them: `embedding = list(range(4096))`,
-  `count = [4096]`.
+- **The embedding has 4,096 numbers**, not 768. Pick the columns from the end, as the `make`
+  above does: every column but the last is the embedding, the last is the count. Then one
+  `make` serves N1, N2 and N3, and a forgotten width cannot silently mix the count into the
+  embedding. (Against picking them by a list of numbers, it moves forecasts only by float32
+  rounding, about 1e-6.)
 - **Two feature sets**, and which one a variant uses is part of the variant: `base-last`
   and `base-mean` (the state at the headline's last token, or the mean over its tokens). At
   most 10 variants across the two, each in the ledger with its feature set. (The fine-tuned
