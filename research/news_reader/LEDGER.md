@@ -121,6 +121,8 @@ By that rule, variant 5 (2 components, +0.98 bps a day) goes to the holdout; its
 | 3 | N3 | 2026-10-19 10:40 | components 128, penalty 10.0, features base-last | +3.48 bps | +0.78 | −2.49 / −1.00 / +13.60 / +3.72 | +4.70 bps a day above counting alone (−1.22) |
 | 4 | N3 | 2026-10-19 10:43 | components 32, penalty 10.0, features base-last | +5.49 bps | +1.28 | −0.96 / +12.47 / +12.38 / −1.97 | +6.71 bps a day above counting alone (−1.22) |
 | 5 | N3 | 2026-10-19 10:43 | components 64, penalty 1000.0, features base-last | +6.23 bps | +1.41 | +6.38 / +11.95 / +5.55 / +1.07 | +7.45 bps a day above counting alone (−1.22) |
+| 6 | N3 | 2026-10-19 10:47 | components 128, penalty 1000.0, features base-last | +3.23 bps | +0.73 | −2.48 / −1.14 / +12.49 / +3.94 | +4.45 bps a day above counting alone (−1.22) |
+| 7 | N3 | 2026-10-19 10:48 | components 32, penalty 1000.0, features base-last | +5.84 bps | +1.36 | −0.32 / +12.57 / +12.75 / −1.67 | +7.06 bps a day above counting alone (−1.22) |
 
 **N2's choice for the holdout, fixed 2026-10-19 10:46 UTC by Efe after three variants:**
 variant 2 (components 64, penalty 10.0; `variants/N2_chosen.json`), the highest mean a day on
