@@ -15,7 +15,7 @@ the choices you make with it are counted.
 - **N2, members' next day.** One row a member and session with news. `X` likewise for that
   member's headlines up to 15:30. `y`: its next close-to-close return less the average of the
   members with news that day. The harness goes long your top tenth and short your bottom
-  tenth each day.
+  tenth each day; members tied at a tenth's edge are all in (amendment 5).
 
 ## The model the pre-registrations allow
 

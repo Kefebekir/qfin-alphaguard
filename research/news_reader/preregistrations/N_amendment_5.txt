@@ -1,0 +1,36 @@
+AMENDMENT 5 TO N2 AND N3
+Written 2026-10-19 10:22 UTC, after N2's first development variant and before any holdout.
+Chosen by Efe.
+
+Who is in a tenth when forecasts tie. N2 goes long "the top tenth of forecasts" and short
+the bottom tenth, with equal weights; N3 does the same. The harness took each tenth by
+position after sorting the forecasts. Where forecasts tied at a tenth's edge, the order of
+the rows decided who was in, and that order was the alphabetical order of the tickers. The
+comparison model, a regression on the count of headlines alone, gives one forecast to every
+member with a single headline, about two thirds of them. So on its side of one headline
+it held the end of the alphabet: in 2020 its long side was tickers from S to X. Its
+development result, -7.06 bps a day after costs (t -1.76), was the alphabet's, not counting's.
+
+The rule from now on, for N2 and N3, in development and in the holdout. A tenth's edges are
+the forecasts of the n-th highest and the n-th lowest member, n being a tenth of the day's
+members. Every member at or beyond an edge is in, with equal weights, ties included: the
+breakpoint convention of portfolio sorts. On a day with many ties a side can hold more than
+a tenth. The costs stay 1 bp a round trip on each side, 2 bps a day. A day whose edges meet,
+so that no forecast separates the long side from the short, has no trade, like a day with
+fewer than 20 members; none of the 998 development days does so for counting alone.
+
+Before Efe chose, counting alone was scored on 2018-2021 under each candidate rule:
+- by the order of rows (the old way): -7.06 bps a day (t -1.76);
+- ties included (this rule): -1.22 (t -0.41), its long side holding 53% of members on
+  average;
+- ties sharing the edge's remaining places: -1.93 (t -0.59);
+- ties in a random order, 20 seeds: from -8.01 to +1.23.
+
+No variant of Efe's was scored under the candidates. Efe's model gives a forecast of its own
+to each member unless two members have identical inputs, as when one article is a member's
+only news and names two members; 3 to 5% of member-days share a day with such a twin. So the
+rule moves the comparison far more than the variants.
+
+The rule is fixed: it is not changed again after any result. N2's variant 1 was scored by the
+order of rows (-6.78 bps a day, t -1.61). It is scored again under this rule as the same
+variant, and its row in the ledger says so.

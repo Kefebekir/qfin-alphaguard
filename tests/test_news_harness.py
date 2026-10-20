@@ -81,6 +81,44 @@ def test_the_long_short_takes_the_tenths_less_costs_and_skips_thin_days():
     )  # the 19 are skipped
 
 
+def tied_day(forecasts, returns):
+    return harness.Year(
+        2022,
+        np.zeros((0, 1)),
+        np.zeros(0),
+        np.zeros((len(forecasts), 1)),
+        pl.DataFrame(),
+        pl.DataFrame(
+            {"day": [date(2022, 1, 3)] * len(forecasts), "next_return": returns}
+        ),
+    )
+
+
+def test_members_tied_at_a_tenth_s_edge_are_all_in_whatever_their_order():
+    # 20 members, so a tenth is 2. The 2nd highest forecast is 5.0, which three share; the
+    # 2nd lowest is 1.0, which only the 2nd lowest has.
+    forecasts = np.array([9.0, 5, 5, 5, 0, 1] + [3.0] * 14)
+    returns = np.array([0.04, 0.01, 0.02, 0.03, -0.02, 0.0] + [0.0] * 14)
+    want = (0.04 + 0.01 + 0.02 + 0.03) / 4 - (-0.02 + 0.0) / 2 - 2 * harness.COST
+    data = tied_day(forecasts, returns)
+    assert harness.n2_score(data, forecasts).tolist() == pytest.approx([want])
+    order = np.array(
+        [3, 1, 2, 0, 5, 4, *range(6, 20)]
+    )  # the same members, rows shuffled
+    shuffled = tied_day(forecasts[order], returns[order])
+    assert harness.n2_score(shuffled, forecasts[order]).tolist() == pytest.approx(
+        [want]
+    )
+
+
+def test_a_day_whose_edges_meet_has_no_trade():
+    forecasts = np.array(
+        [1.0] * 19 + [2.0]
+    )  # the 2nd highest and 2nd lowest are both 1.0
+    data = tied_day(forecasts, np.linspace(-0.01, 0.01, 20))
+    assert harness.n2_score(data, forecasts).tolist() == []
+
+
 def test_each_test_passes_at_its_own_threshold():
     # N1 had half of the news tests' 2.5% (Bonferroni over N1 and N2); N2 and N3 share the
     # other half (amendment 3).
