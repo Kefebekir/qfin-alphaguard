@@ -24,6 +24,7 @@ tried on them is listed here before its holdout run.
 | 3 | 2026-10-18 17:07 | `N_amendment_3.txt` | `fc469e8f37780caafb8866dd7d233935b2cdc403d61e86d13af563d6048acd08` | N3 joins: N2 and N3 share the half of the news tests' 2.5% that N1 did not use, so N2 passes at t ≥ 2.50, not 2.24 |
 | 4 | 2026-10-18 22:40 | `N_amendment_4.txt` | `10402a55ace2155dd4bda24ba0bd0e26a5b2b03a5d24949877dde4620e853d86` | N3 drops PIT-4B-FT before any headline was read with it: its fine-tuning data (Tulu 3, and instructions Qwen2.5-72B wrote) dates from 2024, filtered of time-specific rows by a classifier, so it is not point-in-time. Two feature sets remain, base-last and base-mean |
 | 5 | 2026-10-19 10:22 | `N_amendment_5.txt` | `1d2dd258bc192f7be47dbfbb4e9f87fecc8a6d7b08bd0effee1f3aeb1e5e4ffb` | N2 and N3: members tied at a tenth's edge are all in (the breakpoint convention), not chosen by the order of rows, which was alphabetical: counting alone's −7.06 bps a day was the alphabet's. Efe chose this rule among four scored on counting alone; it is not changed again |
+| 6 | 2026-10-21 13:39 | `N_amendment_6.txt` | `1a9495bc571202c596bc6d61629f496f114cbaa7d7dcaa7c0f494d95ba38d7b6` | N4: the test unchanged (variant 2 once, t ≥ 2.50); by Efe's decision variants 6, 10 and 8 also run once on the same years, as exploration, not tests, beside the bar four tries sharing N4's 0.625% would need, t ≥ 2.96 |
 
 ## N3's checkpoints
 
@@ -124,6 +125,16 @@ By that rule, variant 5 (2 components, +0.98 bps a day) goes to the holdout; its
 | 5 | N3 | 2026-10-19 10:43 | components 64, penalty 1000.0, features base-last | +6.23 bps | +1.41 | +6.38 / +11.95 / +5.55 / +1.07 | +7.45 bps a day above counting alone (−1.22) |
 | 6 | N3 | 2026-10-19 10:47 | components 128, penalty 1000.0, features base-last | +3.23 bps | +0.73 | −2.48 / −1.14 / +12.49 / +3.94 | +4.45 bps a day above counting alone (−1.22) |
 | 7 | N3 | 2026-10-19 10:48 | components 32, penalty 1000.0, features base-last | +5.84 bps | +1.36 | −0.32 / +12.57 / +12.75 / −1.67 | +7.06 bps a day above counting alone (−1.22) |
+| 1 | N4 | 2026-10-21 13:21 | components 64, penalty 10.0, features base-last, target scaled, side fifth, weights equal, sectors none | +3.37 bps | +1.19 | +5.33 / +13.89 / −2.39 / −3.27 | +4.59 bps a day above counting alone (−1.22) |
+| 2 | N4 | 2026-10-21 13:24 | components 64, penalty 10.0, features base-last, target scaled, side tenth, weights equal, sectors none | +8.74 bps | +2.07 | +3.97 / +22.52 / −0.18 / +8.58 | +9.96 bps a day above counting alone (−1.22) |
+| 3 | N4 | 2026-10-21 13:25 | components 64, penalty 10.0, features base-last, target plain, side fifth, weights equal, sectors none | +2.09 bps | +0.68 | +3.12 / +1.73 / +2.24 / +1.28 | +3.31 bps a day above counting alone (−1.22) |
+| 4 | N4 | 2026-10-21 13:25 | components 64, penalty 10.0, features base-last, target plain, side tenth, weights inverse, sectors none | +7.43 bps | +1.79 | +6.98 / +12.78 / +10.09 / −0.09 | +8.65 bps a day above counting alone (−1.22) |
+| 5 | N4 | 2026-10-21 13:26 | components 64, penalty 10.0, features base-last, target plain, side tenth, weights equal, sectors neutral | +5.40 bps | +0.73 | +7.58 / −6.07 / +23.08 / −3.37 | +6.62 bps a day above counting alone (−1.22) |
+| 6 | N4 | 2026-10-21 13:29 | components 64, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | +8.49 bps | +2.18 | +5.17 / +21.99 / +2.53 / +4.25 | +9.71 bps a day above counting alone (−1.22) |
+| 7 | N4 | 2026-10-21 13:31 | components 32, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | +4.90 bps | +1.23 | −6.70 / +14.78 / +12.39 / −0.99 | +6.13 bps a day above counting alone (−1.22) |
+| 8 | N4 | 2026-10-21 13:32 | components 128, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | +7.79 bps | +1.89 | +2.55 / +13.05 / +16.19 / −0.66 | +9.01 bps a day above counting alone (−1.22) |
+| 9 | N4 | 2026-10-21 13:35 | components 64, penalty 10.0, features base-mean, target scaled, side tenth, weights inverse, sectors none | +0.32 bps | +0.08 | +1.63 / +7.35 / +1.40 / −9.02 | +1.54 bps a day above counting alone (−1.22) |
+| 10 | N4 | 2026-10-21 13:36 | components 96, penalty 10.0, features base-last, target scaled, side tenth, weights equal, sectors none | +8.49 bps | +1.89 | −0.68 / +16.65 / +12.58 / +5.31 | +9.72 bps a day above counting alone (−1.22) |
 
 **N2's choice for the holdout, fixed 2026-10-19 10:46 UTC by Efe after three variants:**
 variant 2 (components 64, penalty 10.0; `variants/N2_chosen.json`), the highest mean a day on
@@ -135,6 +146,12 @@ N2 variant is run.
 the development years (+6.34 bps after costs, t +1.43), as the pre-registration says. It was
 fixed after N2's holdout had failed; N3's own variants were all run before that. No more N3
 variant is run.
+
+**N4's choice for the holdout, fixed 2026-10-21 13:39 UTC after ten variants:** variant 2
+(components 64, penalty 10.0, base-last; target scaled, side tenth, weights equal, sectors
+none; `variants/N4_chosen.json`), the highest mean a day on the development years (+8.74 bps
+after costs, t +2.07), as the pre-registration says. Variants 6, 10 and 8 also run on the same
+years as exploration (amendment 6).
 
 ## N1's holdout (run once, 17 October 2026, commit 0893980)
 

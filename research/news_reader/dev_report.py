@@ -27,6 +27,14 @@ The holdout, once, after the choice is committed in variants/<test>_chosen.json:
 It runs the committed choice through harness.run_holdout, adds the result to the end of
 LEDGER.md and writes data/news_reader/dev/<test>_holdout.html. Run again, it runs nothing:
 it writes the page from the stored result.
+
+Exploration, by amendment 6, after the test's own holdout:
+
+    uv run python research/news_reader/dev_report.py N4 explore 6 10 8
+
+It runs those development variants, and only those, on the holdout years, each once, keeps
+them in data/news_reader/explore_<test>.json, records them in the ledger as exploration, not
+tests, beside the bar four tries would need, and writes <test>_explore.html.
 """
 
 import html
@@ -521,6 +529,111 @@ def parse_settings(test: str, args: list[str], harness) -> dict:
     return settings | levers
 
 
+# Variants that may run on the holdout years beside the test's own, as exploration.
+EXPLORE = {"N4": (6, 10, 8)}  # amendment 6
+FAMILY_BAR = {"N4": 2.96}  # four tries sharing N4's 0.625%, one-sided
+
+
+def explore_section(test: str, explored: dict, official: dict) -> str:
+    """The ledger's record of the exploratory runs, beside the test's own."""
+
+    def line(label: str, r: dict) -> str:
+        years = " / ".join(signed(y["mean_bps"]) for y in r["years"].values())
+        return (
+            f"| {label} | {r['days']:,} | {signed(r['mean_bps'])} bps | {signed(r['t'])} | "
+            f"{years} |"
+        )
+
+    rows = [line(f"Variant {official['variant']['variant']} (the test)", official)]
+    rows += [
+        line(f"Variant {n}: {settings_text(e['settings'])}", e["result"])
+        for n, e in explored.items()
+    ]
+    return (
+        f"\n## {test}'s exploratory runs on the holdout years (amendment 6; not tests)\n\n"
+        f"Each once, after the test's own. Four tries sharing {test}'s 0.625% would each "
+        f"need t \u2265 {FAMILY_BAR[test]:.2f}; a variant other than the test's counts only "
+        "after a forward test in the shadow record.\n\n"
+        "| | Days | Mean a day | t | 2022 / 2023 / 2024 / 2025 / 2026, bps a day |\n"
+        "|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
+    )
+
+
+def explore(test: str, numbers: list[int], harness, efe_model) -> None:
+    """Development variants on the holdout years, as exploration (amendment 6): only those
+    the amendment names, only after the test's own holdout, each once."""
+    allowed = EXPLORE.get(test, ())
+    if not numbers or any(n not in allowed for n in numbers):
+        raise SystemExit(
+            f"amendment 6 lets {test} explore variants {allowed}, no others"
+        )
+    lock = harness.LOCKS / f"holdout_{test}.json"
+    if not lock.exists():
+        raise SystemExit(
+            f"run {test}'s own holdout first: dev_report.py {test} holdout"
+        )
+    official = json.loads(lock.read_text())
+    store = json.loads((DEV / f"{test}.json").read_text())
+    path = harness.LOCKS / f"explore_{test}.json"
+    explored = json.loads(path.read_text()) if path.exists() else {}
+    for n in numbers:
+        if str(n) in explored:
+            print(f"{test}'s variant {n} has been explored; not run again")
+            continue
+        settings = next(v["settings"] for v in store["variants"] if v["n"] == n)
+        print(f"{test}'s variant {n} on the holdout years, once: ...", flush=True)
+        explored[str(n)] = {
+            "settings": settings,
+            "result": stored(
+                harness.run(
+                    test,
+                    efe_model.make(settings["components"], settings["penalty"]),
+                    "holdout",
+                    features=settings.get("features"),
+                    levers={lever: settings[lever] for lever in LEVERS},
+                )
+            ),
+        }
+        path.write_text(json.dumps(explored, indent=2))
+    ledger = LEDGER.read_text()
+    heading = f"\n## {test}'s exploratory runs on the holdout years"
+    if heading in ledger:
+        ledger = ledger[: ledger.index(heading)]
+    LEDGER.write_text(
+        ledger.rstrip("\n") + "\n" + explore_section(test, explored, official)
+    )
+    bar = official["count_only"]
+    label = f"variant {official['variant']['variant']} (the test)"
+    rows = [(label, official)] + [
+        (f"variant {n}", e["result"]) for n, e in explored.items()
+    ]
+    head, body = _table(rows, bar)
+    out = DEV / f"{test}_explore.html"
+    out.write_text(
+        PAGE.format(
+            title=f"{html.escape(test)} exploration",
+            heading=f"{html.escape(test)}: exploration on the holdout years (not tests)",
+            updated=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+            summary=(
+                f"<li>The test is {html.escape(label)}: t {signed(official['t'])}. The others "
+                f"are exploration (amendment 6): four tries would each need t &ge; "
+                f"{FAMILY_BAR[test]:.2f}, and any but the test's counts only after a forward "
+                "test.</li>"
+            ),
+            chart_title="Mean a day after costs, 2022-2026 (bps)",
+            chart=_bars(rows, bar),
+            table_title="Each holdout year (bps a day after costs)",
+            head=head,
+            rows=body,
+            note="Exploration: none of these passes or fails.",
+        )
+    )
+    for n, e in explored.items():
+        r = e["result"]
+        print(f"variant {n}: {signed(r['mean_bps'])} bps a day, t {signed(r['t'])}")
+    print(f"the page: {out}")
+
+
 def main(argv: list[str]) -> None:
     sys.path.insert(0, str(Path(__file__).parent))
     import efe_model
@@ -528,6 +641,9 @@ def main(argv: list[str]) -> None:
 
     if len(argv) == 2 and argv[1] == "holdout":
         holdout(argv[0], harness, efe_model)
+        return
+    if len(argv) >= 2 and argv[1] == "explore":
+        explore(argv[0], [int(n) for n in argv[2:]], harness, efe_model)
         return
     if len(argv) < 3:
         raise SystemExit(

@@ -1,0 +1,1 @@
+{"components": 64, "penalty": 10.0, "features": "base-last", "target": "scaled", "side": "tenth", "weights": "equal", "sectors": "none", "variant": 2, "rule": "the highest development mean of N4's ten variants, as pre-registered"}

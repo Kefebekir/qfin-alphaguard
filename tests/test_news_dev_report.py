@@ -456,3 +456,81 @@ def test_an_n4_run_hands_its_levers_to_the_harness(tmp_path, monkeypatch):
     ]
     row = next(line for line in ledger.read_text().splitlines() if "| N4 |" in line)
     assert "target scaled, side tenth, weights equal, sectors neutral" in row
+
+
+class FakeExplore:
+    """harness.run on the holdout years, as it answers: the years as numbers."""
+
+    def __init__(self, root):
+        self.LOCKS = root
+        self.calls = []
+
+    def run(self, test, make, split="development", features=None, levers=None):
+        self.calls.append((make, split, features, levers["weights"]))
+        return holdout_result(years_as=int) | {"mean_bps": float(make[0]) / 10}
+
+
+def explore_setup(tmp_path, monkeypatch):
+    fake = FakeExplore(tmp_path)
+    model = types.SimpleNamespace(
+        make=lambda components, penalty: (components, penalty)
+    )
+    monkeypatch.setattr(dev_report, "DEV", tmp_path / "dev")
+    (tmp_path / "dev").mkdir()
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text(LEDGER)
+    monkeypatch.setattr(dev_report, "LEDGER", ledger)
+    levers = {"target": "scaled", "side": "tenth", "sectors": "none"}
+    variants = [
+        {
+            "n": n,
+            "settings": {"components": c, "penalty": 10.0, "features": "base-last"}
+            | levers
+            | {"weights": w},
+        }
+        for n, c, w in (
+            (2, 64, "equal"),
+            (6, 64, "inverse"),
+            (8, 128, "inverse"),
+            (10, 96, "equal"),
+        )
+    ]
+    (tmp_path / "dev" / "N4.json").write_text(json.dumps({"variants": variants}))
+    return fake, model, ledger
+
+
+def test_exploration_runs_only_the_amendment_s_variants_after_the_test(
+    tmp_path, monkeypatch
+):
+    fake, model, _ = explore_setup(tmp_path, monkeypatch)
+    for wrong in ([3], [], [6, 7]):
+        with pytest.raises(SystemExit, match="no others"):
+            dev_report.explore("N4", wrong, fake, model)
+    with pytest.raises(SystemExit, match="own holdout first"):
+        dev_report.explore("N4", [6], fake, model)
+    assert fake.calls == []
+
+
+def test_each_explored_variant_runs_once_and_the_ledger_keeps_one_record(
+    tmp_path, monkeypatch
+):
+    fake, model, ledger = explore_setup(tmp_path, monkeypatch)
+    official = holdout_result() | {
+        "variant": {"components": 64, "penalty": 10.0, "variant": 2}
+    }
+    (tmp_path / "holdout_N4.json").write_text(json.dumps(official))
+    dev_report.explore("N4", [6, 10], fake, model)
+    assert fake.calls == [
+        ((64, 10.0), "holdout", "base-last", "inverse"),
+        ((96, 10.0), "holdout", "base-last", "equal"),
+    ]
+    dev_report.explore("N4", [6, 10, 8], fake, model)  # 6 and 10 are not run again
+    assert [c[0] for c in fake.calls] == [(64, 10.0), (96, 10.0), (128, 10.0)]
+    text = ledger.read_text()
+    assert text.count("## N4's exploratory runs") == 1
+    assert "need t ≥ 2.96" in text and "| Variant 2 (the test) |" in text
+    for n in (6, 10, 8):
+        assert f"| Variant {n}: components" in text
+    page = (tmp_path / "dev" / "N4_explore.html").read_text()
+    assert "exploration on the holdout years (not tests)" in page
+    assert "variant 8" in page and "+12.80" in page  # 128 / 10
