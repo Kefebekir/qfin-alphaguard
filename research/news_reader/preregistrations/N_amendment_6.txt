@@ -1,0 +1,19 @@
+AMENDMENT 6 TO N4
+Written 2026-10-21 13:39 UTC, after N4's ten development variants and before any N4 run on
+2022 to 9 October 2026. Efe's decision.
+
+The test is unchanged. Variant 2 (components 64, penalty 10.0, base-last; target scaled, side
+tenth, weights equal, sectors none), the highest mean a day on development (+8.74 bps after
+costs, t +2.07), runs once on 2022 to 9 October 2026 and passes at one-sided t >= 2.50.
+
+Efe also runs three more of N4's variants on the same years, after variant 2's run, each once:
+- 6: components 64, penalty 10.0, base-last; scaled, tenth, inverse, none (+8.49, t +2.18);
+- 10: components 96, penalty 10.0, base-last; scaled, tenth, equal, none (+8.49, t +1.89);
+- 8: components 128, penalty 10.0, base-last; scaled, tenth, inverse, none (+7.79, t +1.89).
+
+They are exploration, not tests: none of them passes or fails. Looking at four tries on one
+set of years makes a good result likelier by chance. If none had any signal and the four were
+independent, one of them would reach t 2.50 about one time in 40, against one in 160 for a
+single try; the four are close kin, so less. Were the four one family sharing N4's 0.625%,
+each would need t >= 2.96, and the ledger gives that bar beside them. Whatever they show, a
+variant other than 2 counts only after a forward test in the shadow record.
