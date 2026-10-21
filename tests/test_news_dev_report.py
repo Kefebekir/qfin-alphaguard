@@ -203,12 +203,27 @@ class FakeHarness:
 
     SCORING = RULE
     N3_FEATURES = ("base-last", "base-mean")
+    N4_LEVERS = {  # noqa: RUF012 - read only
+        "target": ("plain", "scaled"),
+        "side": ("tenth", "fifth", "third"),
+        "weights": ("equal", "inverse"),
+        "sectors": ("none", "neutral"),
+    }
+    N3_LEVERS = {  # noqa: RUF012 - read only
+        "target": "plain",
+        "side": "tenth",
+        "weights": "equal",
+        "sectors": "none",
+    }
 
-    def __init__(self):
+    def __init__(self, variants=Path("/nonexistent")):
         self.runs = []
+        self.levers = []
+        self.VARIANTS = variants
 
-    def run(self, test, make, count_only=False, features=None):
+    def run(self, test, make, count_only=False, features=None, levers=None):
         self.runs.append("count" if count_only else make)
+        self.levers.append(levers)
         mean = -1.22 if count_only else float(make)
         return {
             "scoring": RULE,
@@ -377,3 +392,67 @@ def test_the_holdout_runs_the_committed_choice_once_and_is_never_lost(
     assert ledger.read_text().count("## N2's holdout") == 1 and fake.runs == [
         (64, 10.0)
     ]
+
+
+def test_n4_settings_take_n3_s_levers_unless_set_and_write_all_four():
+    fake = FakeHarness()
+    got = dev_report.parse_settings(
+        "N4", ["64", "10.0", "base-last", "side=fifth"], fake
+    )
+    assert got == {
+        "components": 64,
+        "penalty": 10.0,
+        "features": "base-last",
+        "target": "plain",
+        "side": "fifth",
+        "weights": "equal",
+        "sectors": "none",
+    }
+    assert dev_report.settings_text(got).endswith(
+        "features base-last, target plain, side fifth, weights equal, sectors none"
+    )
+    assert dev_report.chart_label("3", got) == (
+        "3 · 64 comp, pen 10, base-last, plain/fifth/equal/none"
+    )
+    for wrong in (["side=half"], ["colour=red"], ["fifth"]):
+        with pytest.raises(SystemExit, match="LEVER=VALUE"):
+            dev_report.parse_settings("N4", ["64", "10.0", "base-last", *wrong], fake)
+    with pytest.raises(SystemExit, match="no levers"):
+        dev_report.parse_settings("N3", ["64", "10.0", "base-last", "side=fifth"], fake)
+    with pytest.raises(SystemExit, match="feature set"):
+        dev_report.parse_settings("N4", ["64", "10.0"], fake)
+
+
+def test_no_variant_runs_once_a_test_s_choice_is_made(tmp_path, monkeypatch):
+    fake = FakeHarness(tmp_path)
+    monkeypatch.setitem(__import__("sys").modules, "harness", fake)
+    monkeypatch.setitem(
+        __import__("sys").modules, "efe_model", types.SimpleNamespace(make=None)
+    )
+    (tmp_path / "N3_chosen.json").write_text("{}")
+    with pytest.raises(SystemExit, match="choice is made"):
+        dev_report.main(["N3", "16", "10.0", "base-last"])
+    assert fake.runs == []
+
+
+def test_an_n4_run_hands_its_levers_to_the_harness(tmp_path, monkeypatch):
+    fake = FakeHarness(tmp_path)
+    monkeypatch.setitem(__import__("sys").modules, "harness", fake)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "efe_model",
+        types.SimpleNamespace(make=lambda components, penalty: components / 10),
+    )
+    monkeypatch.setattr(dev_report, "DEV", tmp_path)
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text(LEDGER)
+    monkeypatch.setattr(dev_report, "LEDGER", ledger)
+    dev_report.main(
+        ["N4", "64", "10.0", "base-last", "target=scaled", "sectors=neutral"]
+    )
+    assert fake.levers == [
+        None,  # counting alone: the harness gives it N3's levers
+        {"target": "scaled", "side": "tenth", "weights": "equal", "sectors": "neutral"},
+    ]
+    row = next(line for line in ledger.read_text().splitlines() if "| N4 |" in line)
+    assert "target scaled, side tenth, weights equal, sectors neutral" in row

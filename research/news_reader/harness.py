@@ -52,6 +52,16 @@ from qfin_alphaguard.sessions import sessions
 EMB = Path("data/news_reader/emb")
 PIT_EMB = Path("data/news_reader/pit_emb")
 N3_FEATURES = ("base-last", "base-mean")  # amendment 4: PIT-4B only
+RISK = Path("data/news_reader/risk/risk.parquet")  # risk.py: volatilities and sectors
+# N4's levers (pre-registration N4); N3 is N4 with the first value of each.
+N4_LEVERS = {
+    "target": ("plain", "scaled"),
+    "side": ("tenth", "fifth", "third"),
+    "weights": ("equal", "inverse"),
+    "sectors": ("none", "neutral"),
+}
+N3_LEVERS = {lever: values[0] for lever, values in N4_LEVERS.items()}
+SIDES = {"tenth": 10, "fifth": 5, "third": 3}
 RULE_DAYS = Path("data/news_reader/rule_days.parquet")
 PRICES = Path("data/raw/prices.parquet")
 VARIANTS = Path("research/news_reader/variants")
@@ -61,9 +71,9 @@ DEVELOPMENT = (2018, 2019, 2020, 2021)
 HOLDOUT = (2022, 2023, 2024, 2025, 2026)
 LAST_DAY = date(2026, 10, 9)
 # One-sided; N1 had half of the news tests' 2.5%, N2 and N3 share the other half.
-THRESHOLDS = {"N1": 2.24, "N2": 2.50, "N3": 2.50}
+THRESHOLDS = {"N1": 2.24, "N2": 2.50, "N3": 2.50, "N4": 2.50}  # N4: its own 0.625%
 COST = 0.0001  # a round trip, each side (N2, amendment 2; it was 0.0010)
-SCORING = "ties at the edge included (amendment 5)"  # N2 and N3's long-short
+SCORING = "ties at the edge included (amendment 5)"  # N2, N3 and N4's long-short
 MIN_MEMBERS = 20
 
 
@@ -177,6 +187,122 @@ def n3_year(
     return _split(joined, x, year)
 
 
+def check_levers(levers: dict) -> dict:
+    """N4's four levers, each set to one of its values."""
+    if set(levers) != set(N4_LEVERS) or any(
+        levers[k] not in N4_LEVERS[k] for k in N4_LEVERS
+    ):
+        raise ValueError(f"N4's levers are one of each of {N4_LEVERS}, got {levers!r}")
+    return dict(levers)
+
+
+def n4_year(
+    year: int,
+    returns: pl.DataFrame,
+    feature_set: str | None,
+    levers: dict,
+    count_only: bool = False,
+) -> Year:
+    """N3's rows and X, each row with the member's volatility (the day's median where it is
+    missing) and sector (risk.py); with the target scaled, y is divided by the volatility."""
+    data = n3_year(year, returns, feature_set, count_only)
+    if not RISK.exists():
+        raise FileNotFoundError(f"{RISK} is missing: run research/news_reader/risk.py")
+    risk = pl.read_parquet(RISK)
+
+    def enrich(frame: pl.DataFrame) -> pl.DataFrame:
+        return frame.join(
+            risk, on=["day", "ticker"], how="left", maintain_order="left"
+        ).with_columns(
+            pl.col("vol").fill_null(pl.col("vol").median().over("day")),
+            pl.col("sector").fill_null(0),
+        )
+
+    train, test = enrich(data.train), enrich(data.test)
+    for frame in (train, test):
+        if frame["vol"].null_count():
+            raise ValueError(
+                "a day with no member's volatility: nothing to take its median of"
+            )
+    train_y = data.train_y
+    if levers["target"] == "scaled":
+        train_y = train_y / train["vol"].to_numpy()
+    return Year(year, data.train_x, train_y, data.test_x, train, test)
+
+
+def _edges(forecast: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray] | None:
+    """The members at or beyond the n-th highest and n-th lowest forecast (amendment 5);
+    None if the edges meet."""
+    ordered = np.sort(forecast)
+    high, low = ordered[-n], ordered[n - 1]
+    if high <= low:
+        return None
+    return forecast >= high, forecast <= low
+
+
+def _side(members: np.ndarray, vol: np.ndarray, weights: str) -> np.ndarray:
+    w = np.where(members, 1.0 if weights == "equal" else 1.0 / vol, 0.0)
+    return w / w.sum()
+
+
+def n4_weights(
+    forecast: np.ndarray, vol: np.ndarray, sector: np.ndarray, levers: dict
+) -> np.ndarray | None:
+    """A day's positions: long the top fraction (+1 in all), short the bottom (-1 in all);
+    None if no forecast separates the sides. Sectors neutral: each sector apart, holding on
+    each side a weight in proportion to the members it gives (its members // k)."""
+    k = SIDES[levers["side"]]
+    if levers["sectors"] == "none":
+        sides = _edges(forecast, len(forecast) // k)
+        if sides is None:
+            return None
+        long, short = sides
+        return _side(long, vol, levers["weights"]) - _side(
+            short, vol, levers["weights"]
+        )
+    picks = []
+    for group in np.unique(sector):
+        members = np.flatnonzero(sector == group)
+        n = len(members) // k
+        if n == 0:
+            continue
+        sides = _edges(forecast[members], n)
+        if sides is not None:
+            picks.append((members, n, sides))
+    given = sum(n for _, n, _ in picks)
+    if given == 0:
+        return None
+    positions = np.zeros(len(forecast))
+    for members, n, (long, short) in picks:
+        positions[members] += (n / given) * (
+            _side(long, vol[members], levers["weights"])
+            - _side(short, vol[members], levers["weights"])
+        )
+    return positions
+
+
+def n4_score(data: Year, forecasts: np.ndarray, levers: dict) -> np.ndarray:
+    """Each test day's long-short return after costs under N4's levers, on days with at
+    least 20 members; with N3's levers, N3's score."""
+    frame = data.test.select("day", "next_return", "vol", "sector").with_columns(
+        forecast=pl.Series(forecasts)
+    )
+    daily = []
+    for _, day in frame.group_by("day", maintain_order=True):
+        if day.height < MIN_MEMBERS:
+            continue
+        positions = n4_weights(
+            day["forecast"].to_numpy(),
+            day["vol"].to_numpy(),
+            day["sector"].to_numpy(),
+            levers,
+        )
+        if positions is None:
+            continue
+        daily.append(float(positions @ day["next_return"].to_numpy()) - 2 * COST)
+    return np.array(daily)
+
+
 def t_stat(values: np.ndarray) -> float:
     v = np.asarray(values, dtype=float)
     return float(v.mean() / v.std(ddof=1) * math.sqrt(len(v)))
@@ -231,35 +357,49 @@ def run(
     split: str = "development",
     count_only: bool = False,
     features: str | None = None,
+    levers: dict | None = None,
 ) -> dict:
     """Fit a fresh model for each test year of `split` and score it.
 
     With count_only the features are log(1 + count) alone and the model a linear regression
     (the pre-registrations' comparison: does reading the headlines add to counting them?).
-    `features` names N3's feature set; N1 and N2 have one set each and take none.
+    `features` names N3's or N4's feature set; N1 and N2 have one set each and take none.
+    `levers` sets N4's four; N4's count_only takes N3's.
     """
     if count_only:
         make = LinearRegression
     if split not in ("development", "holdout"):
         raise ValueError(f"split must be development or holdout, got {split!r}")
-    if test == "N3" and not count_only and features not in N3_FEATURES:
-        raise ValueError(f"N3's features are one of {N3_FEATURES}, got {features!r}")
-    if test != "N3" and features is not None:
-        raise ValueError(f"{test} has one feature set; features is for N3")
+    if test in ("N3", "N4") and not count_only and features not in N3_FEATURES:
+        raise ValueError(
+            f"{test}'s features are one of {N3_FEATURES}, got {features!r}"
+        )
+    if test not in ("N3", "N4") and features is not None:
+        raise ValueError(f"{test} has one feature set; features is for N3 and N4")
+    if test == "N4":
+        levers = check_levers(
+            N3_LEVERS if count_only and levers is None else levers or {}
+        )
+    elif levers is not None:
+        raise ValueError(f"levers are N4's; {test} has none")
     years = DEVELOPMENT if split == "development" else HOLDOUT
-    returns = next_day_returns() if test in ("N2", "N3") else None
+    returns = next_day_returns() if test in ("N2", "N3", "N4") else None
     per_year, all_scores = {}, []
     for year in years:
         if test == "N1":
             data = n1_year(year, count_only)
         elif test == "N2":
             data = n2_year(year, returns, count_only)
-        else:
+        elif test == "N3":
             data = n3_year(year, returns, features, count_only)
+        else:
+            data = n4_year(year, returns, features, levers, count_only)
         model = make().fit(data.train_x, data.train_y)
         forecasts = model.predict(data.test_x)
         if test == "N1":
             scores = n1_score(data, model.predict(data.train_x), forecasts)
+        elif test == "N4":
+            scores = n4_score(data, forecasts, levers)
         else:
             scores = n2_score(data, forecasts)
         all_scores.append(scores)
@@ -279,7 +419,8 @@ def run(
         "annual": float(scores.mean() * 252),
         "t": t_stat(scores),
         "passes": bool(t_stat(scores) >= THRESHOLDS[test]),
-        "scoring": SCORING if test in ("N2", "N3") else None,
+        "scoring": SCORING if test in ("N2", "N3", "N4") else None,
+        "levers": levers,
         "years": per_year,
     }
 
@@ -293,9 +434,17 @@ def run_holdout(test: str, make: Callable) -> dict:
     if not chosen.exists():
         raise RuntimeError(f"write and commit {chosen} with the chosen variant first")
     variant = json.loads(chosen.read_text())
-    features = variant.get("features") if test == "N3" else None
-    if test == "N3" and features not in N3_FEATURES:
-        raise RuntimeError(f"{chosen} must name N3's feature set, one of {N3_FEATURES}")
+    features = variant.get("features") if test in ("N3", "N4") else None
+    if test in ("N3", "N4") and features not in N3_FEATURES:
+        raise RuntimeError(
+            f"{chosen} must name {test}'s feature set, one of {N3_FEATURES}"
+        )
+    levers = None
+    if test == "N4":
+        try:
+            levers = check_levers({k: variant.get(k) for k in N4_LEVERS})
+        except ValueError as error:
+            raise RuntimeError(f"{chosen} must set N4's four levers: {error}") from None
     status = subprocess.run(
         ["git", "status", "--porcelain", "--", str(chosen), "research/news_reader"],
         capture_output=True,
@@ -314,7 +463,7 @@ def run_holdout(test: str, make: Callable) -> dict:
     commit = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
     ).stdout.strip()
-    result = run(test, make, "holdout", features=features) | {
+    result = run(test, make, "holdout", features=features, levers=levers) | {
         "count_only": run(test, make, "holdout", count_only=True),
         "commit": commit,
         "variant": variant,

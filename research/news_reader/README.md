@@ -3,7 +3,7 @@
 After step 5 found that nothing built on prices beats the QQQ rule, and research/frontier
 measured why (prices tell how much the market will move, not which way), Efe chose to give
 the system a new sense: the news, read by a language model that knows nothing of the future.
-Three pre-registered tests (`preregistrations/`, `LEDGER.md`):
+Four pre-registered tests (`preregistrations/`, `LEDGER.md`):
 
 - **N1:** does the morning's news tell the QQQ rule's day? The rule sized ×1.5 / ×1 / ×0.5 by
   a forecast from the headlines known by 09:55.
@@ -11,6 +11,9 @@ Three pre-registered tests (`preregistrations/`, `LEDGER.md`):
   that a model forecasts best, short the worst tenth, close to close.
 - **N3:** N2 read by PIT-4B, a 4-billion-parameter point-in-time model (Kelly, Malamud,
   Schwab and Xu), each headline by the checkpoint of the year before its own.
+- **N4:** N3 read with less noise: the target scaled by volatility, more members a side,
+  weights inverse to volatility, statistical sectors neutral; designed after N2's and N3's
+  holdouts.
 
 The language model is **ChronoBERT** (He, Lv, Manela and Wu, "Chronologically Consistent
 Large Language Models"): a ModernBERT encoder retrained every year on text from before that
@@ -31,6 +34,7 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N3: the model, rewritten (`pit.py`), checked against a float32 reference and on language | `pit_check.py` | printed |
 | N3: each member headline by the checkpoint of the year before, on the GPU | `embed_pit.py` | `news_reader/pit_emb/<model>/<checkpoint>.*` |
 | N3's features a member and session, in two sets | `features_n3.py` | `news_reader/pit_emb/n3_rows.parquet`, `n3_<set>.npy` |
+| N4: each member-day's volatility and statistical sector | `risk.py` | `news_reader/risk/risk.parquet` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 
 Details the scripts handle:
