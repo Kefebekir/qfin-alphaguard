@@ -543,6 +543,17 @@ def parse_settings(test: str, args: list[str], harness) -> dict:
     return settings | levers
 
 
+def replace_section(ledger: str, heading: str, section: str) -> str:
+    """The ledger with the section under `heading` replaced by `section`, up to the next
+    heading, what follows kept; or `section` added at the end."""
+    if heading not in ledger:
+        return ledger.rstrip("\n") + "\n" + section
+    start = ledger.index(heading)
+    end = ledger.find("\n## ", start + len(heading))
+    rest = "" if end == -1 else ledger[end:]
+    return ledger[:start].rstrip("\n") + "\n" + section + rest
+
+
 # Variants that may run on the holdout years beside the test's own, as exploration.
 EXPLORE = {"N4": (6, 10, 8)}  # amendment 6
 FAMILY_BAR = {"N4": 2.96}  # four tries sharing N4's 0.625%, one-sided
@@ -609,12 +620,12 @@ def explore(test: str, numbers: list[int], harness, efe_model) -> None:
             ),
         }
         path.write_text(json.dumps(explored, indent=2))
-    ledger = LEDGER.read_text()
-    heading = f"\n## {test}'s exploratory runs on the holdout years"
-    if heading in ledger:
-        ledger = ledger[: ledger.index(heading)]
     LEDGER.write_text(
-        ledger.rstrip("\n") + "\n" + explore_section(test, explored, official)
+        replace_section(
+            LEDGER.read_text(),
+            f"\n## {test}'s exploratory runs on the holdout years",
+            explore_section(test, explored, official),
+        )
     )
     bar = official["count_only"]
     label = f"variant {official['variant']['variant']} (the test)"
@@ -684,9 +695,16 @@ def concentration(days: pl.DataFrame, best: int = 10) -> dict:
     rest = scores[best:]
     return {
         "days": len(scores),
-        "share_of_best": float(scores[:best].sum() / scores.sum()),
+        # a share of a sum that is not positive means nothing
+        "share_of_best": (
+            float(scores[:best].sum() / scores.sum()) if scores.sum() > 0 else None
+        ),
         "without_best_bps": float(rest.mean() * 1e4),
     }
+
+
+def share(value: float | None) -> str:
+    return "\u2014" if value is None else f"{value:.0%}"
 
 
 def months(days: pl.DataFrame, year: int) -> list[tuple[str, int, float]]:
@@ -725,7 +743,7 @@ def reports_section(found: dict) -> str:
         lines.append(
             f"| {test} | "
             + " | ".join(cells)
-            + f" | {c['share_of_best']:.0%} | {signed(c['without_best_bps'])} |"
+            + f" | {share(c['share_of_best'])} | {signed(c['without_best_bps'])} |"
         )
     lines += ["", "| Day by day | Bps a day | t | Days |", "|---|---|---|---|"]
     for (a, b), d in found["pairs"].items():
@@ -780,11 +798,13 @@ def reports(harness, efe_model) -> None:
     DEV.mkdir(parents=True, exist_ok=True)
     for test, days in series.items():
         days.write_parquet(DEV / f"days_{test}.parquet")
-    ledger = LEDGER.read_text()
-    heading = "\n## Reported with the holdouts (not part of the pass)"
-    if heading in ledger:
-        ledger = ledger[: ledger.index(heading)]
-    LEDGER.write_text(ledger.rstrip("\n") + "\n" + reports_section(found))
+    LEDGER.write_text(
+        replace_section(
+            LEDGER.read_text(),
+            "\n## Reported with the holdouts (not part of the pass)",
+            reports_section(found),
+        )
+    )
     out = DEV / "reports.html"
     out.write_text(reports_page(found))
     for test, f in found["tests"].items():
@@ -813,7 +833,7 @@ def reports_page(found: dict) -> str:
                 )
             ]
             + [
-                f'<td class="num">{f["concentration"]["share_of_best"]:.0%}</td>',
+                f'<td class="num">{share(f["concentration"]["share_of_best"])}</td>',
                 f'<td class="num">{signed(f["concentration"]["without_best_bps"])}</td>',
             ],
         )

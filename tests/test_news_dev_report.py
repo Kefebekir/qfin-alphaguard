@@ -646,3 +646,21 @@ def test_the_reports_write_nothing_unless_each_choice_reproduces_its_lock(
     assert "| N3 less N2 | +6.00 |" in text and "| N4 less N3 | +2.00 |" in text
     assert (tmp_path / "dev" / "reports.html").exists()
     assert (tmp_path / "dev" / "days_N4.parquet").exists()
+
+
+def test_a_section_is_replaced_and_what_follows_it_kept():
+    ledger = "# Ledger\n\n## A\n\nold\n\n## B\n\nkept\n"
+    got = dev_report.replace_section(ledger, "\n## A", "\n## A\n\nnew\n")
+    assert got == "# Ledger\n\n## A\n\nnew\n\n## B\n\nkept\n"
+    added = dev_report.replace_section("# Ledger\n", "\n## C", "\n## C\n\nc\n")
+    assert added == "# Ledger\n\n## C\n\nc\n"
+    last = dev_report.replace_section(got, "\n## B", "\n## B\n\nnewer\n")
+    assert last.endswith("## B\n\nnewer\n") and "## A\n\nnew" in last
+
+
+def test_no_share_of_the_best_days_when_the_sum_is_not_positive():
+    got = dev_report.concentration(
+        days_frame([0.001, -0.003, 0.0005] + [0.0] * 10), best=2
+    )
+    assert got["share_of_best"] is None and dev_report.share(None) == "\u2014"
+    assert dev_report.share(0.625) == "62%"
