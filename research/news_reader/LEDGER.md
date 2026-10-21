@@ -237,3 +237,38 @@ Each once, after the test's own. Four tries sharing N4's 0.625% would each need 
 | Variant 6: components 64, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | 1,197 | +3.09 bps | +0.98 | −1.24 / −0.18 / +6.67 / −8.25 / +22.91 |
 | Variant 10: components 96, penalty 10.0, features base-last, target scaled, side tenth, weights equal, sectors none | 1,197 | +1.03 bps | +0.31 | −0.67 / −1.12 / +2.83 / −8.68 / +16.17 |
 | Variant 8: components 128, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | 1,197 | +0.97 bps | +0.32 | −1.12 / −5.52 / +2.10 / −0.18 / +12.01 |
+
+## Reported with the holdouts (not part of the pass)
+
+Each choice run again on the holdout years by `dev_report.py reports`, reproducing its locked mean and days. Bps a day, t in brackets. The long side is against the mean of the day's members with news, the short side is that mean less it.
+
+| | After costs | Before costs | Long side | Short side | Best 10 days' share | Without them |
+|---|---|---|---|---|---|---|
+| N2 | −2.22 (−0.78) | −0.22 (−0.08) | −0.64 (−0.35) | +0.42 (+0.22) | — | −5.30 |
+| N3 | +4.24 (+1.18) | +6.24 (+1.74) | +1.64 (+0.67) | +4.60 (+2.19) | 108% | −0.33 |
+| N4 | +6.53 (+1.86) | +8.53 (+2.43) | +3.71 (+1.50) | +4.82 (+2.41) | 63% | +2.42 |
+
+| Day by day | Bps a day | t | Days |
+|---|---|---|---|
+| N3 less N2 | +6.46 | +1.61 | 1,197 |
+| N4 less N3 | +2.30 | +1.07 | 1,197 |
+
+2026 by month, bps a day after costs (days):
+
+- N2: 01 −26.08 (20), 02 −58.01 (19), 03 +13.28 (22), 04 +3.15 (21), 05 +47.77 (20), 06 −64.77 (21), 07 −3.67 (22), 08 +32.00 (21), 09 +2.15 (21), 10 +1.81 (7)
+- N3: 01 −1.47 (20), 02 +5.56 (19), 03 +29.90 (22), 04 +24.90 (21), 05 +104.51 (20), 06 −7.18 (21), 07 −34.69 (22), 08 +58.64 (21), 09 +42.25 (21), 10 −16.28 (7)
+- N4: 01 −1.28 (20), 02 +38.33 (19), 03 +11.53 (22), 04 +64.59 (21), 05 +145.53 (20), 06 −3.02 (21), 07 −9.64 (22), 08 +57.74 (21), 09 +48.70 (21), 10 −40.93 (7)
+
+## Reading the reports (21 October 2026)
+
+- N3 less N2, +6.46 bps a day (t +1.61): reading the same member-days with PIT-4B rather
+  than ChronoBERT did better day by day, though short of any bar.
+- In N3 and N4 the short side carries more than the long (+4.60, t +2.19; +4.82, t +2.41):
+  the members whose headlines read worst fell behind the others with news the next day.
+- N3's result is ten days: without its ten best of 1,197 it made −0.33 bps a day. N4's is
+  less so: +2.42 a day without its ten best, and it was positive on 56% of 2026's days
+  against 50% in 2022-2025, so 2026 was more than a few days.
+- N4's 2026 was strong in February, April, May, August and September and weak in January,
+  June, July and October's first week; its best days fall in late May and late August, the
+  heart of the earnings seasons. That is an observation to carry into a forward test, not a
+  finding: these years have been seen.
