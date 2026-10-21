@@ -4,6 +4,10 @@ Efe runs it, with the settings he chose:
 
     uv run python research/news_reader/dev_report.py N2 16 10.0
     uv run python research/news_reader/dev_report.py N3 16 10.0 base-last
+    uv run python research/news_reader/dev_report.py N4 64 10.0 base-last target=scaled side=fifth
+
+N4's levers (target, side, weights, sectors) left out take N3's values; all four go in the
+ledger. Once a test's choice is committed, no more of its variants are run.
 
 It fits and scores efe_model.make(components, penalty) on the development years
 (harness.run), then:
@@ -42,11 +46,32 @@ def signed(x: float, digits: int = 2) -> str:
     return f"{x:+.{digits}f}".replace("-", "−")
 
 
+LEVERS = (
+    "target",
+    "side",
+    "weights",
+    "sectors",
+)  # N4's, in the pre-registration's order
+
+
 def settings_text(settings: dict) -> str:
     text = f"components {settings['components']}, penalty {settings['penalty']}"
     if settings.get("features"):
         text += f", features {settings['features']}"
+    if "target" in settings:
+        text += ", " + ", ".join(f"{lever} {settings[lever]}" for lever in LEVERS)
     return text
+
+
+def chart_label(name: str, settings: dict) -> str:
+    """A variant's name on the chart: in full, or shortened when it carries N4's levers."""
+    if "target" not in settings:
+        return f"{name} · {settings_text(settings)}"
+    levers = "/".join(settings[lever] for lever in LEVERS)
+    return (
+        f"{name} · {settings['components']} comp, pen {settings['penalty']:g}, "
+        f"{settings['features']}, {levers}"
+    )
 
 
 def ledger_row(
@@ -249,6 +274,9 @@ def page(test: str, store: dict) -> str:
         (f"{v['n']} · {settings_text(v['settings'])}", v["result"]) for v in variants
     ]
     head, body = _table(rows, bar)
+    chart_rows = [
+        (chart_label(str(v["n"]), v["settings"]), v["result"]) for v in variants
+    ]
     best = max(variants, key=lambda v: v["result"]["mean_bps"]) if variants else None
     summary = [
         f"Variants tried: <b>{len(variants)} of {LIMIT}</b>.",
@@ -269,7 +297,7 @@ def page(test: str, store: dict) -> str:
         "Means are bps a day after costs of 2 bps a day (1 bp a round trip on each side). "
         "The pass, t &ge; 2.50, applies only to the holdout, run once after the choice."
     )
-    chart = _bars(rows, bar) if rows else "<p>No variant yet.</p>"
+    chart = _bars(chart_rows, bar) if rows else "<p>No variant yet.</p>"
     return PAGE.format(
         title=f"{html.escape(test)} development",
         heading=f"{html.escape(test)}: the variants on the development years",
@@ -313,7 +341,7 @@ def holdout_page(test: str, result: dict) -> str:
         updated=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         summary="".join(f"<li>{s}</li>" for s in summary),
         chart_title="Mean a day after costs, 2022-2026 (bps)",
-        chart=_bars([(label, result)], bar),
+        chart=_bars([(chart_label(f"variant {v['variant']}", v), result)], bar),
         table_title="Each holdout year (bps a day after costs)",
         head=head,
         rows=body,
@@ -429,8 +457,8 @@ def holdout(test: str, harness, efe_model) -> None:
     """The chosen variant on the holdout, once: harness.run_holdout checks the choice is
     committed and refuses a second run. The settings come from the committed choice. The
     ledger's record is written before the page, so a page that fails loses nothing."""
-    if test not in ("N2", "N3"):
-        raise SystemExit("dev_report.py runs N2 and N3, the tests still open")
+    if test not in ("N2", "N3", "N4"):
+        raise SystemExit("dev_report.py runs N2, N3 and N4")
     DEV.mkdir(parents=True, exist_ok=True)
     out = DEV / f"{test}_holdout.html"
     lock = harness.LOCKS / f"holdout_{test}.json"
@@ -467,6 +495,32 @@ def holdout(test: str, harness, efe_model) -> None:
     print(f"the page: {out}")
 
 
+def parse_settings(test: str, args: list[str], harness) -> dict:
+    """COMPONENTS PENALTY [FEATURES] [LEVER=VALUE ...]: N3 and N4 name a feature set, N4 sets
+    its levers (those left out take N3's values, and all four are written down)."""
+    settings = {"components": int(args[0]), "penalty": float(args[1])}
+    if test == "N2":
+        if len(args) != 2:
+            raise SystemExit("N2 has one feature set; leave FEATURES out")
+        return settings
+    if len(args) < 3:
+        raise SystemExit(f"{test} needs a feature set: one of {harness.N3_FEATURES}")
+    settings["features"] = args[2]
+    if test == "N3":
+        if len(args) != 3:
+            raise SystemExit("N3 takes no levers; they are N4's")
+        return settings
+    levers = dict(harness.N3_LEVERS)
+    for arg in args[3:]:
+        lever, _, value = arg.partition("=")
+        if lever not in harness.N4_LEVERS or value not in harness.N4_LEVERS[lever]:
+            raise SystemExit(
+                f"a lever is LEVER=VALUE from {harness.N4_LEVERS}; got {arg!r}"
+            )
+        levers[lever] = value
+    return settings | levers
+
+
 def main(argv: list[str]) -> None:
     sys.path.insert(0, str(Path(__file__).parent))
     import efe_model
@@ -475,20 +529,20 @@ def main(argv: list[str]) -> None:
     if len(argv) == 2 and argv[1] == "holdout":
         holdout(argv[0], harness, efe_model)
         return
-    if len(argv) not in (3, 4):
+    if len(argv) < 3:
         raise SystemExit(
-            "usage: dev_report.py TEST COMPONENTS PENALTY [FEATURES] | TEST holdout"
+            "usage: dev_report.py TEST COMPONENTS PENALTY [FEATURES] [LEVER=VALUE ...]"
+            " | TEST holdout"
         )
     test = argv[0]
-    if test not in ("N2", "N3"):
-        raise SystemExit("dev_report.py runs N2 and N3, the tests still open")
-    settings = {"components": int(argv[1]), "penalty": float(argv[2])}
-    if test == "N3":
-        if len(argv) != 4:
-            raise SystemExit(f"N3 needs a feature set: one of {harness.N3_FEATURES}")
-        settings["features"] = argv[3]
-    elif len(argv) == 4:
-        raise SystemExit("N2 has one feature set; leave FEATURES out")
+    if test not in ("N2", "N3", "N4"):
+        raise SystemExit("dev_report.py runs N2, N3 and N4")
+    chosen = harness.VARIANTS / f"{test}_chosen.json"
+    if chosen.exists():
+        raise SystemExit(
+            f"{test}'s choice is made ({chosen}): no more variants are run"
+        )
+    settings = parse_settings(test, argv[1:], harness)
     DEV.mkdir(parents=True, exist_ok=True)
     store_path = DEV / f"{test}.json"
     store = (
@@ -515,6 +569,9 @@ def main(argv: list[str]) -> None:
             test,
             efe_model.make(settings["components"], settings["penalty"]),
             features=settings.get("features"),
+            levers={lever: settings[lever] for lever in LEVERS}
+            if test == "N4"
+            else None,
         )
     )
     run_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")

@@ -142,3 +142,34 @@ volatility and its momentum from 12 months to 1 month; the harness does not supp
 
 Most ideas fail; our own measures say the news's direction is mostly priced within a minute
 (research/frontier). A failed test is a result: it goes in the ledger and saves money.
+
+## N4: N3 read with less noise
+
+N3's holdout made +4.24 bps a day after costs, but its long-short swings by about 124 bps a
+day: a Sharpe ratio near 0.5. N4 (`preregistrations/N4_member_news_less_noise.txt`) keeps N3's
+features and your model, and adds four levers against the noise. Each variant sets all four;
+those you leave out take N3's values, and all four go in the ledger.
+
+| Lever | Values (N3's first) | What it does |
+|---|---|---|
+| `target` | `plain`, `scaled` | `scaled` divides the target by the member's volatility, so a volatile stock's noise weighs less in training |
+| `side` | `tenth`, `fifth`, `third` | how many members go long and how many short each day; more members, less noise |
+| `weights` | `equal`, `inverse` | `inverse` weights each member by one over its volatility within its side |
+| `sectors` | `none`, `neutral` | `neutral` ranks each statistical sector apart and holds each sector as much long as short |
+
+A member's volatility is the standard deviation of its last 20 daily returns, ending the
+session before the day. The sectors are 11 groups a year, formed from the year before's
+returns (`risk.py`): energy, banks, technology, utilities and so on fall together without any
+outside data.
+
+```bash
+uv run python research/news_reader/dev_report.py N4 64 10.0 base-last target=scaled side=fifth
+```
+
+The bar is N3's counting alone (−1.22 on development). As before: at most 10 variants on
+2018-2021, the highest goes once to 2022 – 9 October 2026, which passes at t ≥ 2.50. Those
+years were seen through N2's and N3's holdouts before N4 was designed, so a pass only earns
+N4 a place in the shadow record.
+
+One way to read the levers apart: start from N3's best settings (64 components, base-last),
+change one lever a variant, and keep what helps.
