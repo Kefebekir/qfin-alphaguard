@@ -936,6 +936,7 @@ def check(tmp_path, alpaca, *failing, seconds=0.5):
             data=FakeData(),
             bars=bars,
             trades=trades,
+            now=alpaca.clock.now,
         )
     )
 

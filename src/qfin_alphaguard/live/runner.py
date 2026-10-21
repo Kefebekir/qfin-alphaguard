@@ -706,6 +706,7 @@ async def check_session(
     data=None,
     bars=minute_bars,
     trades=trade_updates,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> str:
     """The morning, a reconciliation and both streams, then out: nothing is traded.
 
@@ -715,7 +716,7 @@ async def check_session(
     files = DayFiles(root / "check", day)
     broker = broker or AlpacaBroker(*keys)
     data = data or AlpacaClient(*keys)
-    core, start, journal = prepare(day, files, limits, broker, data)
+    core, start, journal = prepare(day, files, limits, broker, data, now=now)
     try:
         result = await asyncio.to_thread(
             reconcile, dict(core.orders), broker, start.positions
