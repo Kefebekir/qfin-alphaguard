@@ -129,6 +129,12 @@ variant 2 (components 64, penalty 10.0; `variants/N2_chosen.json`), the highest 
 the development years (+4.03 bps after costs, t +0.93), as the pre-registration says. No more
 N2 variant is run.
 
+**N3's choice for the holdout, fixed 2026-10-21 12:42 UTC by Efe after seven variants:** variant 1
+(components 64, penalty 10.0, base-last; `variants/N3_chosen.json`), the highest mean a day on
+the development years (+6.34 bps after costs, t +1.43), as the pre-registration says. It was
+fixed after N2's holdout had failed; N3's own variants were all run before that. No more N3
+variant is run.
+
 ## N1's holdout (run once, 17 October 2026, commit 0893980)
 
 `data/news_reader/holdout_N1.json`; a second run is refused.
