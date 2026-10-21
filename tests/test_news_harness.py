@@ -366,3 +366,58 @@ def test_n4_needs_its_four_levers_and_the_others_take_none(tmp_path, monkeypatch
     )
     with pytest.raises(RuntimeError, match="four levers"):
         harness.run_holdout("N4", object)
+
+
+def test_a_day_in_full_adds_up_to_its_score():
+    frames = []
+    for seed in range(4):
+        forecast, vol, sector, r = n4_day(seed=seed)
+        frames.append(
+            pl.DataFrame(
+                {
+                    "day": [date(2022, 2, 1 + seed)] * len(r),
+                    "next_return": r,
+                    "vol": vol,
+                    "sector": sector,
+                    "forecast": forecast,
+                }
+            )
+        )
+    frame = pl.concat(frames)
+    data = harness.Year(2022, None, None, None, pl.DataFrame(), frame.drop("forecast"))
+    f = frame["forecast"].to_numpy()
+    n2 = harness.n2_days(data, f)
+    n4 = harness.n4_days(data, f, N3_LEVERS)
+    assert [d["day"] for d in n2] == [date(2022, 2, 1 + i) for i in range(4)]
+    for a, b in zip(n2, n4, strict=True):
+        assert a["score"] == pytest.approx(a["long"] - a["short"] - 2 * harness.COST)
+        for key in ("long", "short", "everyone", "score"):
+            assert a[key] == pytest.approx(b[key], abs=1e-15)
+    levers = N3_LEVERS | {"weights": "inverse", "sectors": "neutral", "side": "fifth"}
+    for d in harness.n4_days(data, f, levers):
+        assert d["score"] == pytest.approx(d["long"] - d["short"] - 2 * harness.COST)
+    assert harness.n2_score(data, f).tolist() == [d["score"] for d in n2]
+
+
+def test_daily_runs_run_s_fits_for_each_year_and_only_for_n2_to_n4(monkeypatch):
+    with pytest.raises(ValueError, match="N2, N3 and N4"):
+        harness.daily("N1", object)
+    monkeypatch.setattr(harness, "next_day_returns", lambda: "returns")
+    seen = []
+
+    def days(test, year, make, returns, count_only, features, levers):
+        seen.append((test, year, returns, count_only, features, levers))
+        return [
+            {
+                "day": date(year, 1, 3),
+                "long": 0.0,
+                "short": 0.0,
+                "everyone": 0.0,
+                "score": 0.0,
+            }
+        ]
+
+    monkeypatch.setattr(harness, "_days", days)
+    got = harness.daily("N4", object, "holdout", features="base-last", levers=N3_LEVERS)
+    assert got["day"].dt.year().to_list() == list(harness.HOLDOUT)
+    assert seen[0] == ("N4", 2022, "returns", False, "base-last", N3_LEVERS)
