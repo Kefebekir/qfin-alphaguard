@@ -13,7 +13,7 @@ tried on them is listed here before its holdout run.
 | N1 | 2026-10-16 13:43:43 | `N1_morning_news_qqq.txt` | `857208114180ee6af8dd2dadfd784e925f9595bc8c481dbc783e5448720ef481` | The morning's news (16:00 to 09:55), read by ChronoBERT of the year before, tells the QQQ rule's day; the rule sized ×1.5 / ×1 / ×0.5 by the forecast's third beats the rule at equal risk | one-sided t ≥ 2.24 on 2022 – 9 October 2026 | **Failed.** Variant 5 (2 components): −1.52 bps a day, t −1.75, over 1,197 days; −3.24 / −4.69 / +1.80 / −1.68 / +0.71 in 2022-2026. The count alone: −3.35, t −3.29 |
 | N2 | 2026-10-16 13:43:43 | `N2_member_news_next_day.txt` | `ea92212a00d072e7bc294aeb4e6cb607aee3fedfab4a6c3c86fe8e2ac698190a` | A member's news to 15:30 tells its next close-to-close return against the other members with news; long the top tenth, short the bottom tenth | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (amendments 2 and 3; it was t ≥ 2.24 after 10 bps) | **Failed.** Variant 2 (64 components): −2.22 bps a day after costs, t −0.78, over 1,197 days; −4.19 / +5.03 / −5.87 / −1.46 / −5.26 in 2022-2026. The count alone: −3.10, t −1.19 |
 | N3 | 2026-10-18 17:07 | `N3_member_news_pit4b.txt` | `1e3cd2b547670b44218ab1eec68ddb9a69eb0015ab974d05635883f11e79264c` | N2 read by PIT-4B, a 4-billion-parameter point-in-time model, its last token's state or its mean (amendment 4: the base model only) | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 | **Failed.** Variant 1 (64 components, base-last): +4.24 bps a day after costs, t +1.18, over 1,197 days; +0.84 / +7.67 / +5.33 / −11.34 / +22.88 in 2022-2026. The count alone: −3.10, t −1.19 |
-| N4 | 2026-10-21 13:05 | `N4_member_news_less_noise.txt` | `e9027c6b00801b2ddcede19fc3fc5618076234eae02d19bcdb6c4f405d788bd5` | N3 read with less noise: the target scaled by volatility, a fifth or a third per side, weights inverse to volatility, statistical sectors neutral; tuned on 2018-2021. Designed after N2's and N3's holdouts were seen, so its run on those years is a second look, and a pass leads only to the shadow record | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (its own 0.625%) | pending |
+| N4 | 2026-10-21 13:05 | `N4_member_news_less_noise.txt` | `e9027c6b00801b2ddcede19fc3fc5618076234eae02d19bcdb6c4f405d788bd5` | N3 read with less noise: the target scaled by volatility, a fifth or a third per side, weights inverse to volatility, statistical sectors neutral; tuned on 2018-2021. Designed after N2's and N3's holdouts were seen, so its run on those years is a second look, and a pass leads only to the shadow record | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (its own 0.625%) | **Failed.** Variant 2 (64 components, base-last, target scaled): +6.53 bps a day after costs, t +1.86, over 1,197 days; +1.32 / +5.78 / +5.97 / −9.42 / +35.55 in 2022-2026; without 2026, +0.92. Explored beside it (amendment 6): variants 6, 10 and 8, +3.09, +1.03 and +0.97 |
 
 ## Amendments
 
@@ -204,3 +204,36 @@ of five years and close to its development result (+6.34). But 2025 lost 11.34 b
 2026's +22.88 is nine months, and a t of +1.18 comes from noise about one time in eight. By
 the pre-registration N3 is recorded as failed, and nothing trades on it. The lean is an
 observation, not a finding: testing it again needs data not yet seen, the months from now on.
+
+## N4's holdout (run once, 21 October 2026, commit 708ac05)
+
+`data/news_reader/holdout_N4.json`; a second run is refused.
+
+| | Days | Mean a day | t | 2022 / 2023 / 2024 / 2025 / 2026, bps a day |
+|---|---|---|---|---|
+| Variant 2: components 64, penalty 10.0, features base-last, target scaled, side tenth, weights equal, sectors none | 1,197 | +6.53 bps | +1.86 | +1.32 / +5.78 / +5.97 / −9.42 / +35.55 |
+| The count alone (the comparison) | 1,197 | −3.10 bps | −1.19 | +2.53 / −0.11 / −4.56 / −5.91 / −8.70 |
+
+**N4 failed on its holdout: t +1.86 < 2.50.**
+
+A member's headlines to 15:30, read by PIT-4B and a linear model trained on a target scaled by
+volatility, did not pass: +6.53 bps a day after costs, t +1.86, against 2.50; noise gives as
+much about one time in 32. The result rests on 2026. Its 194 days made +35.55 bps a day (t
++3.00 on their own); the 1,003 days of 2022-2025 made +0.92, which is nothing, and 2025 lost
+9.42 a day. The three variants explored beside it, close kin and as good on development, made
++3.09, +1.03 and +0.97 bps a day (t +0.98, +0.31, +0.32): development's ranking among them did
+not carry over, and in all four 2026 was the best year. N4 was designed after these years had
+been seen, so even a pass would have been a second look. It is recorded as failed, and nothing
+trades on it. Whether 2026's strength is a lasting change, a change in the news, or chance,
+only days not yet seen can tell.
+
+## N4's exploratory runs on the holdout years (amendment 6; not tests)
+
+Each once, after the test's own. Four tries sharing N4's 0.625% would each need t ≥ 2.96; a variant other than the test's counts only after a forward test in the shadow record.
+
+| | Days | Mean a day | t | 2022 / 2023 / 2024 / 2025 / 2026, bps a day |
+|---|---|---|---|---|
+| Variant 2 (the test) | 1,197 | +6.53 bps | +1.86 | +1.32 / +5.78 / +5.97 / −9.42 / +35.55 |
+| Variant 6: components 64, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | 1,197 | +3.09 bps | +0.98 | −1.24 / −0.18 / +6.67 / −8.25 / +22.91 |
+| Variant 10: components 96, penalty 10.0, features base-last, target scaled, side tenth, weights equal, sectors none | 1,197 | +1.03 bps | +0.31 | −0.67 / −1.12 / +2.83 / −8.68 / +16.17 |
+| Variant 8: components 128, penalty 10.0, features base-last, target scaled, side tenth, weights inverse, sectors none | 1,197 | +0.97 bps | +0.32 | −1.12 / −5.52 / +2.10 / −0.18 / +12.01 |
