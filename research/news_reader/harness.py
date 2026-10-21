@@ -284,10 +284,15 @@ def n4_weights(
 def n4_score(data: Year, forecasts: np.ndarray, levers: dict) -> np.ndarray:
     """Each test day's long-short return after costs under N4's levers, on days with at
     least 20 members; with N3's levers, N3's score."""
+    return np.array([d["score"] for d in n4_days(data, forecasts, levers)])
+
+
+def n4_days(data: Year, forecasts: np.ndarray, levers: dict) -> list[dict]:
+    """n4_score's days in full, as n2_days."""
     frame = data.test.select("day", "next_return", "vol", "sector").with_columns(
         forecast=pl.Series(forecasts)
     )
-    daily = []
+    days = []
     for _, day in frame.group_by("day", maintain_order=True):
         if day.height < MIN_MEMBERS:
             continue
@@ -299,8 +304,18 @@ def n4_score(data: Year, forecasts: np.ndarray, levers: dict) -> np.ndarray:
         )
         if positions is None:
             continue
-        daily.append(float(positions @ day["next_return"].to_numpy()) - 2 * COST)
-    return np.array(daily)
+        returns = day["next_return"].to_numpy()
+        long, short = positions > 0, positions < 0
+        days.append(
+            {
+                "day": day["day"][0],
+                "long": float(positions[long] @ returns[long]),
+                "short": float(-positions[short] @ returns[short]),
+                "everyone": float(returns.mean()),
+                "score": float(positions @ returns) - 2 * COST,
+            }
+        )
+    return days
 
 
 def t_stat(values: np.ndarray) -> float:
@@ -331,10 +346,16 @@ def n2_score(data: Year, forecasts: np.ndarray) -> np.ndarray:
     ties included (amendment 5: the order of rows used to choose among ties). A day whose
     edges meet, so that no forecast separates the two sides, has no trade.
     """
+    return np.array([d["score"] for d in n2_days(data, forecasts)])
+
+
+def n2_days(data: Year, forecasts: np.ndarray) -> list[dict]:
+    """n2_score's days in full: each scored day, its long side's and short side's mean
+    return and the mean of all its members (before costs), and the score after costs."""
     frame = data.test.select("day", "next_return").with_columns(
         forecast=pl.Series(forecasts)
     )
-    daily = []
+    days = []
     for _, day in frame.group_by("day", maintain_order=True):
         if day.height < MIN_MEMBERS:
             continue
@@ -347,8 +368,90 @@ def n2_score(data: Year, forecasts: np.ndarray) -> np.ndarray:
             continue
         long = returns[forecast >= high].mean()
         short = returns[forecast <= low].mean()
-        daily.append(long - short - 2 * COST)
-    return np.array(daily)
+        days.append(
+            {
+                "day": day["day"][0],
+                "long": float(long),
+                "short": float(short),
+                "everyone": float(returns.mean()),
+                "score": float(long - short - 2 * COST),
+            }
+        )
+    return days
+
+
+def _checked(
+    test: str,
+    make: Callable,
+    split: str,
+    count_only: bool,
+    features: str | None,
+    levers: dict | None,
+) -> tuple[Callable, tuple[int, ...], dict | None]:
+    """The model maker, the years and N4's levers for a run, after checking its arguments."""
+    if count_only:
+        make = LinearRegression
+    if split not in ("development", "holdout"):
+        raise ValueError(f"split must be development or holdout, got {split!r}")
+    if test in ("N3", "N4") and not count_only and features not in N3_FEATURES:
+        raise ValueError(
+            f"{test}'s features are one of {N3_FEATURES}, got {features!r}"
+        )
+    if test not in ("N3", "N4") and features is not None:
+        raise ValueError(f"{test} has one feature set; features is for N3 and N4")
+    if test == "N4":
+        levers = check_levers(
+            N3_LEVERS if count_only and levers is None else levers or {}
+        )
+    elif levers is not None:
+        raise ValueError(f"levers are N4's; {test} has none")
+    return make, DEVELOPMENT if split == "development" else HOLDOUT, levers
+
+
+def _days(
+    test: str,
+    year: int,
+    make: Callable,
+    returns: pl.DataFrame,
+    count_only: bool,
+    features: str | None,
+    levers: dict | None,
+) -> list[dict]:
+    """One test year of N2, N3 or N4: a fresh model fitted on the years before, its days."""
+    if test == "N2":
+        data = n2_year(year, returns, count_only)
+    elif test == "N3":
+        data = n3_year(year, returns, features, count_only)
+    else:
+        data = n4_year(year, returns, features, levers, count_only)
+    model = make().fit(data.train_x, data.train_y)
+    forecasts = model.predict(data.test_x)
+    if test == "N4":
+        return n4_days(data, forecasts, levers)
+    return n2_days(data, forecasts)
+
+
+def daily(
+    test: str,
+    make: Callable,
+    split: str = "holdout",
+    features: str | None = None,
+    levers: dict | None = None,
+) -> pl.DataFrame:
+    """N2's, N3's or N4's days, as run scores them: each scored day's long side, short side
+    and members' mean return before costs, and its score after them. For the reports the
+    pre-registrations ask for beside the pass; it runs the same fits as run."""
+    if test not in ("N2", "N3", "N4"):
+        raise ValueError(f"daily is for N2, N3 and N4, got {test!r}")
+    make, years, levers = _checked(test, make, split, False, features, levers)
+    returns = next_day_returns()
+    return pl.DataFrame(
+        [
+            d
+            for year in years
+            for d in _days(test, year, make, returns, False, features, levers)
+        ]
+    )
 
 
 def run(
@@ -366,42 +469,18 @@ def run(
     `features` names N3's or N4's feature set; N1 and N2 have one set each and take none.
     `levers` sets N4's four; N4's count_only takes N3's.
     """
-    if count_only:
-        make = LinearRegression
-    if split not in ("development", "holdout"):
-        raise ValueError(f"split must be development or holdout, got {split!r}")
-    if test in ("N3", "N4") and not count_only and features not in N3_FEATURES:
-        raise ValueError(
-            f"{test}'s features are one of {N3_FEATURES}, got {features!r}"
-        )
-    if test not in ("N3", "N4") and features is not None:
-        raise ValueError(f"{test} has one feature set; features is for N3 and N4")
-    if test == "N4":
-        levers = check_levers(
-            N3_LEVERS if count_only and levers is None else levers or {}
-        )
-    elif levers is not None:
-        raise ValueError(f"levers are N4's; {test} has none")
-    years = DEVELOPMENT if split == "development" else HOLDOUT
+    make, years, levers = _checked(test, make, split, count_only, features, levers)
     returns = next_day_returns() if test in ("N2", "N3", "N4") else None
     per_year, all_scores = {}, []
     for year in years:
         if test == "N1":
             data = n1_year(year, count_only)
-        elif test == "N2":
-            data = n2_year(year, returns, count_only)
-        elif test == "N3":
-            data = n3_year(year, returns, features, count_only)
-        else:
-            data = n4_year(year, returns, features, levers, count_only)
-        model = make().fit(data.train_x, data.train_y)
-        forecasts = model.predict(data.test_x)
-        if test == "N1":
+            model = make().fit(data.train_x, data.train_y)
+            forecasts = model.predict(data.test_x)
             scores = n1_score(data, model.predict(data.train_x), forecasts)
-        elif test == "N4":
-            scores = n4_score(data, forecasts, levers)
         else:
-            scores = n2_score(data, forecasts)
+            days = _days(test, year, make, returns, count_only, features, levers)
+            scores = np.array([d["score"] for d in days])
         all_scores.append(scores)
         per_year[year] = {
             "days": len(scores),
