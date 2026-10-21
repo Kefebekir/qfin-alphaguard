@@ -122,7 +122,7 @@ def test_a_day_whose_edges_meet_has_no_trade():
 def test_each_test_passes_at_its_own_threshold():
     # N1 had half of the news tests' 2.5% (Bonferroni over N1 and N2); N2 and N3 share the
     # other half (amendment 3).
-    assert harness.THRESHOLDS == {"N1": 2.24, "N2": 2.50, "N3": 2.50}
+    assert harness.THRESHOLDS == {"N1": 2.24, "N2": 2.50, "N3": 2.50, "N4": 2.50}
     assert harness.COST == 0.0001
 
 
@@ -240,3 +240,129 @@ def test_n3_s_holdout_takes_the_feature_set_from_the_chosen_variant(
     (tmp_path / "N3_chosen.json").write_text('{"components": 4, "penalty": 10.0}')
     with pytest.raises(RuntimeError, match="feature set"):
         harness.run_holdout("N3", object)
+
+
+N3_LEVERS = {"target": "plain", "side": "tenth", "weights": "equal", "sectors": "none"}
+
+
+def n4_day(n=40, seed=0, ties=True):
+    g = np.random.default_rng(seed)
+    forecast = np.round(g.normal(size=n), 1 if ties else 6)  # one decimal: many ties
+    return (
+        forecast,
+        g.uniform(0.01, 0.04, n),  # volatilities
+        g.integers(0, 4, n),  # sectors
+        g.normal(0, 0.02, n),  # next returns
+    )
+
+
+def test_n4_with_n3_s_levers_scores_as_n3():
+    days = []
+    for seed in range(6):
+        forecast, vol, sector, r = n4_day(seed=seed)
+        days.append(
+            pl.DataFrame(
+                {
+                    "day": [date(2022, 1, 3 + seed)] * len(r),
+                    "next_return": r,
+                    "vol": vol,
+                    "sector": sector,
+                    "forecast": forecast,
+                }
+            )
+        )
+    frame = pl.concat(days)
+    data = harness.Year(2022, None, None, None, pl.DataFrame(), frame.drop("forecast"))
+    forecasts = frame["forecast"].to_numpy()
+    want = harness.n2_score(data, forecasts)
+    got = harness.n4_score(data, forecasts, N3_LEVERS)
+    assert len(want) == 6 and got == pytest.approx(want, abs=1e-15)
+
+
+def test_each_side_sums_to_one_and_inverse_weights_follow_one_over_volatility():
+    forecast, vol, sector, _ = n4_day(ties=False)
+    for side, k in (("tenth", 10), ("fifth", 5), ("third", 3)):
+        levers = N3_LEVERS | {"side": side, "weights": "inverse"}
+        w = harness.n4_weights(forecast, vol, sector, levers)
+        assert w[w > 0].sum() == pytest.approx(1) and w[w < 0].sum() == pytest.approx(
+            -1
+        )
+        assert (w > 0).sum() == len(forecast) // k == (w < 0).sum()
+        long = w > 0
+        assert w[long] * vol[long] == pytest.approx(
+            np.full(long.sum(), (w[long] * vol[long])[0])
+        )
+        top = np.argsort(forecast)[-(len(forecast) // k) :]
+        assert set(np.flatnonzero(long)) == set(top)
+
+
+def test_sectors_neutral_hold_each_sector_long_as_much_as_short():
+    forecast, vol, sector, _ = n4_day(n=60, ties=False)
+    sector[:3] = 9  # a sector of three: too few for a fifth (3 // 5 == 0), left out
+    levers = N3_LEVERS | {"side": "fifth", "sectors": "neutral"}
+    w = harness.n4_weights(forecast, vol, sector, levers)
+    assert not w[sector == 9].any()
+    given = {g: (sector == g).sum() // 5 for g in np.unique(sector) if g != 9}
+    for group, n in given.items():
+        in_group = w[sector == group]
+        assert in_group[in_group > 0].sum() == pytest.approx(n / sum(given.values()))
+        assert in_group[in_group < 0].sum() == pytest.approx(-n / sum(given.values()))
+        members = np.flatnonzero(sector == group)
+        best = members[np.argsort(forecast[members])[-n:]]
+        assert set(np.flatnonzero((w > 0) & (sector == group))) == set(best)
+
+
+def test_the_scaled_target_divides_by_the_member_s_volatility(tmp_path, monkeypatch):
+    days = [date(2016, 3, 1), date(2017, 3, 1), date(2018, 3, 1), date(2018, 3, 1)]
+    rows = pl.DataFrame(
+        {
+            "ticker": ["AAA", "AAA", "AAA", "BBB", "AAA"],
+            "day": [*days, date(2019, 3, 1)],
+            "count": [1, 2, 1, 3, 1],
+        }
+    )
+    rows.write_parquet(tmp_path / "n3_rows.parquet")
+    np.save(
+        tmp_path / "n3_base-mean.npy", np.arange(10, dtype=np.float16).reshape(5, 2)
+    )
+    monkeypatch.setattr(harness, "PIT_EMB", tmp_path)
+    returns = rows.select(
+        "day", "ticker", next_return=pl.Series([0.01, 0.02, 0.03, -0.01, 0.0])
+    )
+    risk = returns.select(
+        "day", "ticker", vol=pl.Series([0.01, 0.02, 0.04, None, 0.05]), sector=pl.lit(1)
+    )
+    risk.write_parquet(tmp_path / "risk.parquet")
+    monkeypatch.setattr(harness, "RISK", tmp_path / "risk.parquet")
+    plain = harness.n4_year(2019, returns, "base-mean", N3_LEVERS)
+    scaled = harness.n4_year(
+        2019, returns, "base-mean", N3_LEVERS | {"target": "scaled"}
+    )
+    vol = plain.train["vol"].to_numpy()
+    assert vol.tolist() == [0.01, 0.02, 0.04, 0.04]  # BBB's missing: its day's median
+    assert scaled.train_y.tolist() == pytest.approx((plain.train_y / vol).tolist())
+    assert np.array_equal(scaled.train_x, plain.train_x)
+    # A day where no member has a volatility has no median: refused, not NaN.
+    risk.with_columns(vol=pl.Series([0.01, 0.02, None, None, 0.05])).write_parquet(
+        tmp_path / "risk.parquet"
+    )
+    with pytest.raises(ValueError, match="no member's volatility"):
+        harness.n4_year(2019, returns, "base-mean", N3_LEVERS)
+
+
+def test_n4_needs_its_four_levers_and_the_others_take_none(tmp_path, monkeypatch):
+    with pytest.raises(ValueError, match="N4's levers"):
+        harness.run("N4", object, features="base-last")
+    with pytest.raises(ValueError, match="N4's levers"):
+        harness.run(
+            "N4", object, features="base-last", levers=N3_LEVERS | {"side": "half"}
+        )
+    with pytest.raises(ValueError, match="levers are N4's"):
+        harness.run("N3", object, features="base-last", levers=N3_LEVERS)
+    monkeypatch.setattr(harness, "VARIANTS", tmp_path)
+    monkeypatch.setattr(harness, "LOCKS", tmp_path)
+    (tmp_path / "N4_chosen.json").write_text(
+        '{"components": 64, "penalty": 10.0, "features": "base-last", "target": "scaled"}'
+    )
+    with pytest.raises(RuntimeError, match="four levers"):
+        harness.run_holdout("N4", object)
