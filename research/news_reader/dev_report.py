@@ -35,6 +35,17 @@ Exploration, by amendment 6, after the test's own holdout:
 It runs those development variants, and only those, on the holdout years, each once, keeps
 them in data/news_reader/explore_<test>.json, records them in the ledger as exploration, not
 tests, beside the bar four tries would need, and writes <test>_explore.html.
+
+The reports the pre-registrations ask for beside the pass, after N2's, N3's and N4's holdouts:
+
+    uv run python research/news_reader/dev_report.py reports
+
+It runs each committed choice again on the holdout years, day by day (harness.daily), and
+stops unless each reproduces its locked mean and days. Then: before costs; the long and the
+short side apart, each against the mean of the day's members with news; N3 less N2 and N4
+less N3, day by day, with their t; and, as a diagnostic, each month of 2026 and how much of
+the result its ten best days carry. To the ledger and to reports.html; the days to
+data/news_reader/dev/days_<test>.parquet.
 """
 
 import html
@@ -42,6 +53,9 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+import numpy as np
+import polars as pl
 
 LEDGER = Path("research/news_reader/LEDGER.md")
 DEV = Path("data/news_reader/dev")
@@ -634,6 +648,238 @@ def explore(test: str, numbers: list[int], harness, efe_model) -> None:
     print(f"the page: {out}")
 
 
+REPORTED = ("N2", "N3", "N4")
+PAIRS = (("N3", "N2"), ("N4", "N3"))  # N3 less N2 (N3's file), N4 less N3 (N4's file)
+
+
+def _mean_t(values: np.ndarray) -> tuple[float, float]:
+    v = np.asarray(values, dtype=float)
+    return float(v.mean() * 1e4), float(v.mean() / v.std(ddof=1) * np.sqrt(len(v)))
+
+
+def sides(days: pl.DataFrame) -> dict:
+    """After and before costs, and each side against the mean of the day's members with
+    news (the long side's excess, the short side's shortfall), in bps a day with t."""
+    long, short, everyone = (days[c].to_numpy() for c in ("long", "short", "everyone"))
+    return {
+        "after": _mean_t(days["score"].to_numpy()),
+        "before": _mean_t(long - short),
+        "long": _mean_t(long - everyone),
+        "short": _mean_t(everyone - short),
+    }
+
+
+def difference(a: pl.DataFrame, b: pl.DataFrame) -> dict:
+    """a less b on the days both scored: bps a day, t, days."""
+    both = a.select("day", "score").join(
+        b.select("day", pl.col("score").alias("other")), on="day", how="inner"
+    )
+    mean, t = _mean_t((both["score"] - both["other"]).to_numpy())
+    return {"mean_bps": mean, "t": t, "days": both.height}
+
+
+def concentration(days: pl.DataFrame, best: int = 10) -> dict:
+    """How much of the days' sum the best few carry, and the mean a day without them."""
+    scores = np.sort(days["score"].to_numpy())[::-1]
+    rest = scores[best:]
+    return {
+        "days": len(scores),
+        "share_of_best": float(scores[:best].sum() / scores.sum()),
+        "without_best_bps": float(rest.mean() * 1e4),
+    }
+
+
+def months(days: pl.DataFrame, year: int) -> list[tuple[str, int, float]]:
+    """Each month of `year`: (month, days, bps a day after costs)."""
+    part = days.filter(pl.col("day").dt.year() == year).with_columns(
+        pl.col("day").dt.strftime("%Y-%m").alias("month")
+    )
+    rows = part.group_by("month").agg(
+        pl.len(), (pl.col("score").mean() * 1e4).alias("bps")
+    )
+    return [tuple(r) for r in rows.sort("month").iter_rows()]
+
+
+def reports_section(found: dict) -> str:
+    """The ledger's record of the reports, after the holdouts."""
+    lines = [
+        "\n## Reported with the holdouts (not part of the pass)\n",
+        (
+            "Each choice run again on the holdout years by `dev_report.py reports`, "
+            "reproducing its locked mean and days. Bps a day, t in brackets. The long side "
+            "is against the mean of the day's members with news, the short side is that "
+            "mean less it.\n"
+        ),
+        (
+            "| | After costs | Before costs | Long side | Short side | Best 10 days' share "
+            "| Without them |"
+        ),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for test, f in found["tests"].items():
+        cells = [
+            f"{signed(m)} ({signed(t)})"
+            for m, t in (f["sides"][k] for k in ("after", "before", "long", "short"))
+        ]
+        c = f["concentration"]
+        lines.append(
+            f"| {test} | "
+            + " | ".join(cells)
+            + f" | {c['share_of_best']:.0%} | {signed(c['without_best_bps'])} |"
+        )
+    lines += ["", "| Day by day | Bps a day | t | Days |", "|---|---|---|---|"]
+    for (a, b), d in found["pairs"].items():
+        lines.append(
+            f"| {a} less {b} | {signed(d['mean_bps'])} | {signed(d['t'])} | {d['days']:,} |"
+        )
+    lines += ["", "2026 by month, bps a day after costs (days):", ""]
+    for test, f in found["tests"].items():
+        cells = ", ".join(
+            f"{m[5:]} {signed(bps)} ({n})" for m, n, bps in f["months_2026"]
+        )
+        lines.append(f"- {test}: {cells}")
+    return "\n".join(lines) + "\n"
+
+
+def reports(harness, efe_model) -> None:
+    """The pre-registered reports beside the pass, from each choice run again day by day;
+    nothing is written unless every run reproduces its locked result."""
+    found = {"tests": {}, "pairs": {}}
+    series = {}
+    for test in REPORTED:
+        lock = harness.LOCKS / f"holdout_{test}.json"
+        if not lock.exists():
+            raise SystemExit(f"{test}'s holdout has not been run")
+        locked = json.loads(lock.read_text())
+        chosen = json.loads((harness.VARIANTS / f"{test}_chosen.json").read_text())
+        print(
+            f"{test}'s choice again, day by day: {settings_text(chosen)} ...",
+            flush=True,
+        )
+        days = harness.daily(
+            test,
+            efe_model.make(chosen["components"], chosen["penalty"]),
+            "holdout",
+            features=chosen.get("features"),
+            levers={lever: chosen[lever] for lever in LEVERS} if test == "N4" else None,
+        )
+        mean = float(days["score"].mean() * 1e4)
+        if days.height != locked["days"] or abs(mean - locked["mean_bps"]) > 1e-6:
+            raise SystemExit(
+                f"{test} does not reproduce its holdout: {mean:+.6f} bps over {days.height} "
+                f"days, locked {locked['mean_bps']:+.6f} over {locked['days']}; nothing written"
+            )
+        series[test] = days
+        found["tests"][test] = {
+            "sides": sides(days),
+            "concentration": concentration(days),
+            "months_2026": months(days, 2026),
+        }
+    for a, b in PAIRS:
+        found["pairs"][(a, b)] = difference(series[a], series[b])
+    DEV.mkdir(parents=True, exist_ok=True)
+    for test, days in series.items():
+        days.write_parquet(DEV / f"days_{test}.parquet")
+    ledger = LEDGER.read_text()
+    heading = "\n## Reported with the holdouts (not part of the pass)"
+    if heading in ledger:
+        ledger = ledger[: ledger.index(heading)]
+    LEDGER.write_text(ledger.rstrip("\n") + "\n" + reports_section(found))
+    out = DEV / "reports.html"
+    out.write_text(reports_page(found))
+    for test, f in found["tests"].items():
+        after, before = f["sides"]["after"], f["sides"]["before"]
+        print(
+            f"{test}: after costs {signed(after[0])} (t {signed(after[1])}), before {signed(before[0])}"
+        )
+    for (a, b), d in found["pairs"].items():
+        print(f"{a} less {b}: {signed(d['mean_bps'])} bps a day (t {signed(d['t'])})")
+    print(f"the page: {out}")
+
+
+def reports_page(found: dict) -> str:
+    """The reports as a page: the tables, months coloured by gain and loss."""
+
+    def row(label: str, cells: list[str]) -> str:
+        return f"<tr><td>{html.escape(label)}</td>" + "".join(cells) + "</tr>"
+
+    sides_rows = "".join(
+        row(
+            test,
+            [
+                f'<td class="num">{signed(m)} <span class="t">t {signed(t)}</span></td>'
+                for m, t in (
+                    f["sides"][k] for k in ("after", "before", "long", "short")
+                )
+            ]
+            + [
+                f'<td class="num">{f["concentration"]["share_of_best"]:.0%}</td>',
+                f'<td class="num">{signed(f["concentration"]["without_best_bps"])}</td>',
+            ],
+        )
+        for test, f in found["tests"].items()
+    )
+    pair_rows = "".join(
+        row(
+            f"{a} less {b}",
+            [
+                f'<td class="num">{signed(d["mean_bps"])}</td>',
+                f'<td class="num">{signed(d["t"])}</td>',
+                f'<td class="num">{d["days"]:,}</td>',
+            ],
+        )
+        for (a, b), d in found["pairs"].items()
+    )
+    all_months = sorted(
+        {m for f in found["tests"].values() for m, _, _ in f["months_2026"]}
+    )
+    scale = max(
+        [abs(b) for f in found["tests"].values() for _, _, b in f["months_2026"]]
+        + [5.0]
+    )
+    month_rows = "".join(
+        row(
+            test,
+            [
+                _cell({m: b for m, _, b in f["months_2026"]}.get(month, 0.0), scale)
+                for month in all_months
+            ],
+        )
+        for test, f in found["tests"].items()
+    )
+    body = f"""
+<h2>Beside the pass (bps a day; t)</h2>
+<div class="tables"><table><thead><tr><th>Test</th><th class="num">After costs</th>
+<th class="num">Before costs</th><th class="num">Long side</th><th class="num">Short side</th>
+<th class="num">Best 10 days' share</th><th class="num">Without them</th></tr></thead>
+<tbody>{sides_rows}</tbody></table></div>
+<p class="note">The long side is against the mean of the day's members with news; the short
+side is that mean less it. Before costs = long side + short side.</p>
+<h2>Day by day</h2>
+<div class="tables"><table><thead><tr><th></th><th class="num">Bps a day</th>
+<th class="num">t</th><th class="num">Days</th></tr></thead><tbody>{pair_rows}</tbody></table></div>
+<h2>2026 by month (bps a day after costs)</h2>
+<div class="tables"><table><thead><tr><th>Test</th>{"".join(f"<th class='num'>{m[5:]}</th>" for m in all_months)}
+</tr></thead><tbody>{month_rows}</tbody></table></div>
+"""
+    page = PAGE.format(
+        title="News reports",
+        heading="The news tests: reported with the holdouts",
+        updated=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+        summary="<li>Not part of any pass: what the pre-registrations ask to report, and a "
+        "diagnostic of 2026.</li>",
+        chart_title="",
+        chart="",
+        table_title="",
+        head="",
+        rows="",
+        note="",
+    )
+    start = page.index("<h2></h2>")
+    end = page.index("</main>")
+    return page[:start] + body + page[end:]
+
+
 def main(argv: list[str]) -> None:
     sys.path.insert(0, str(Path(__file__).parent))
     import efe_model
@@ -641,6 +887,9 @@ def main(argv: list[str]) -> None:
 
     if len(argv) == 2 and argv[1] == "holdout":
         holdout(argv[0], harness, efe_model)
+        return
+    if argv == ["reports"]:
+        reports(harness, efe_model)
         return
     if len(argv) >= 2 and argv[1] == "explore":
         explore(argv[0], [int(n) for n in argv[2:]], harness, efe_model)

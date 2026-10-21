@@ -3,8 +3,10 @@
 import importlib.util
 import json
 import types
+from datetime import date
 from pathlib import Path
 
+import polars as pl
 import pytest
 
 _spec = importlib.util.spec_from_file_location(
@@ -534,3 +536,113 @@ def test_each_explored_variant_runs_once_and_the_ledger_keeps_one_record(
     page = (tmp_path / "dev" / "N4_explore.html").read_text()
     assert "exploration on the holdout years (not tests)" in page
     assert "variant 8" in page and "+12.80" in page  # 128 / 10
+
+
+def days_frame(scores, start=date(2026, 1, 2), long=None, short=None, everyone=None):
+    n = len(scores)
+    return pl.DataFrame(
+        {
+            "day": [start + __import__("datetime").timedelta(days=i) for i in range(n)],
+            "long": long if long is not None else [0.0] * n,
+            "short": short if short is not None else [0.0] * n,
+            "everyone": everyone if everyone is not None else [0.0] * n,
+            "score": scores,
+        }
+    )
+
+
+def test_the_sides_split_the_result_before_costs():
+    days = days_frame(
+        [0.0008, -0.0002, 0.0004],
+        long=[0.003, 0.001, 0.002],
+        short=[0.002, 0.001, 0.0014],
+        everyone=[0.0025, 0.0, 0.0015],
+    )
+    got = dev_report.sides(days)
+    assert got["before"][0] == pytest.approx((0.001 + 0.0 + 0.0006) / 3 * 1e4)
+    assert got["long"][0] == pytest.approx((0.0005 + 0.001 + 0.0005) / 3 * 1e4)
+    assert got["short"][0] == pytest.approx((0.0005 - 0.001 + 0.0001) / 3 * 1e4)
+    assert got["long"][0] + got["short"][0] == pytest.approx(got["before"][0])
+    assert got["after"][0] == pytest.approx(0.0010 / 3 * 1e4)
+
+
+def test_a_difference_is_taken_on_the_days_both_scored():
+    a = days_frame([0.001, 0.002, 0.003])
+    b = days_frame([0.0005, 0.001], start=date(2026, 1, 3))  # the 3rd and the 4th
+    got = dev_report.difference(a, b)
+    assert got["days"] == 2 and got["mean_bps"] == pytest.approx(
+        (0.0015 + 0.002) / 2 * 1e4
+    )
+
+
+def test_the_best_days_share_and_the_mean_without_them():
+    scores = [0.01, 0.02, -0.005] + [0.0001] * 20
+    got = dev_report.concentration(days_frame(scores), best=2)
+    assert got["share_of_best"] == pytest.approx(0.03 / (0.025 + 0.002))
+    assert got["without_best_bps"] == pytest.approx((-0.005 + 0.002) / 21 * 1e4)
+
+
+def test_months_of_a_year():
+    days = days_frame([0.001] * 40, start=date(2025, 12, 20))
+    got = dev_report.months(days, 2026)
+    assert [m for m, _, _ in got] == ["2026-01"] and got[0][1] == 28
+
+
+class FakeReports:
+    """harness.daily and the locks, as the reports read them."""
+
+    def __init__(self, root, means):
+        self.LOCKS = root
+        self.VARIANTS = root
+        self.means = means
+        for test, mean in means.items():
+            (root / f"holdout_{test}.json").write_text(
+                json.dumps({"mean_bps": mean, "days": 30})
+            )
+            choice = {"components": 64, "penalty": 10.0}
+            if test != "N2":
+                choice["features"] = "base-last"
+            if test == "N4":
+                choice |= {
+                    "target": "scaled",
+                    "side": "tenth",
+                    "weights": "equal",
+                    "sectors": "none",
+                }
+            (root / f"{test}_chosen.json").write_text(json.dumps(choice))
+
+    def daily(self, test, make, split, features=None, levers=None):
+        # A small swing about the mean, in a different phase for each test, so that every
+        # series and every difference has a spread.
+        phase = ("N2", "N3", "N4").index(test)
+        swing = [1e-5 * (-1) ** (i + phase) for i in range(30)]
+        return days_frame(
+            [self.means[test] / 1e4 + x for x in swing],
+            long=[0.001 + x for x in swing],
+            short=[0.0005 - 2 * x for x in swing],
+            everyone=[0.0007 + 3 * x for x in swing],
+        )
+
+
+def test_the_reports_write_nothing_unless_each_choice_reproduces_its_lock(
+    tmp_path, monkeypatch
+):
+    model = types.SimpleNamespace(make=lambda components, penalty: None)
+    monkeypatch.setattr(dev_report, "DEV", tmp_path / "dev")
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text(LEDGER)
+    monkeypatch.setattr(dev_report, "LEDGER", ledger)
+    fake = FakeReports(tmp_path, {"N2": -2.0, "N3": 4.0, "N4": 6.0})
+    (tmp_path / "holdout_N4.json").write_text(json.dumps({"mean_bps": 6.5, "days": 30}))
+    with pytest.raises(SystemExit, match="N4 does not reproduce"):
+        dev_report.reports(fake, model)
+    assert ledger.read_text() == LEDGER and not (tmp_path / "dev").exists()
+
+    fake = FakeReports(tmp_path, {"N2": -2.0, "N3": 4.0, "N4": 6.0})
+    dev_report.reports(fake, model)
+    dev_report.reports(fake, model)  # again: the record replaced, not repeated
+    text = ledger.read_text()
+    assert text.count("## Reported with the holdouts") == 1
+    assert "| N3 less N2 | +6.00 |" in text and "| N4 less N3 | +2.00 |" in text
+    assert (tmp_path / "dev" / "reports.html").exists()
+    assert (tmp_path / "dev" / "days_N4.parquet").exists()

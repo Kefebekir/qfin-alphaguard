@@ -173,3 +173,17 @@ N4 a place in the shadow record.
 
 One way to read the levers apart: start from N3's best settings (64 components, base-last),
 change one lever a variant, and keep what helps.
+
+## The reports beside the pass
+
+After the holdouts, the pre-registrations ask for more than the pass: the result before costs,
+the long side and the short side apart, and N3 less N2 and N4 less N3, day by day. One command
+runs each committed choice again on the holdout years, day by day, and stops unless each
+reproduces its locked mean and days:
+
+```bash
+uv run python research/news_reader/dev_report.py reports
+```
+
+It adds them to the ledger and to `data/news_reader/dev/reports.html`, with a diagnostic of
+2026: each month, and how much of the result the ten best days carry.
