@@ -1,0 +1,64 @@
+PRE-REGISTRATION N4
+Written 2026-10-21 13:05 UTC; approved by Efe before any result of this test was computed.
+Written after N2's and N3's holdouts were run (21 October 2026): see WHAT IS ALREADY KNOWN.
+
+Can N3 be read with less noise? N3's chosen variant made +4.24 bps a day after costs on its
+holdout, t +1.18, with a daily standard deviation of about 124 bps: a Sharpe ratio near 0.5,
+which would need about 21 years of days to reach t 2.50. N4 is N3 with four ways to cut the
+noise, chosen on the development years only.
+
+WHAT IS ALREADY KNOWN
+N4 is designed knowing N2's and N3's results on 2022 to 9 October 2026, among them that N3
+lost 11.34 bps a day in 2025. So N4's run on those years is a second look at seen years, not
+an independent test: its evidence is weaker than N3's was, and a pass earns a place in the
+shadow record, judged forward on days not yet seen, never a trade. The news tests' 2.5% was
+spent by N1, N2 and N3; N4 has its own one-sided 0.625% (t >= 2.50), Efe's choice.
+
+DATA
+As N3: the same member-days, windows (16:00 on the session before to 15:30), members,
+returns (the day's close to the next session's close), at least 20 members with news for a
+day to trade, and costs of 1 bp a round trip on each side, 2 bps a day.
+
+FEATURES
+N3's: the member-day's mean PIT-4B embedding (base-last or base-mean, each headline read by the
+checkpoint of the year before its own) and log(1 + the number of headlines).
+
+THE FOUR LEVERS (each variant sets each one; N3 is all four at their first value)
+1. Target: "plain", N3's (the next return less the mean of that day's members with news), or
+   "scaled", that divided by the member's volatility.
+2. Side: "tenth", "fifth" or "third" of the day's members long, the same short. Members tied at
+   an edge are all in (amendment 5).
+3. Weights within a side: "equal", or "inverse" to the member's volatility, normalised so that
+   each side sums to one.
+4. Sectors: "none", or "neutral": each sector's members ranked apart, its top and bottom
+   fraction taken (as many from each end, its members // 10, // 5 or // 3; a sector with too
+   few members is left out that day), each sector holding on each side a weight in
+   proportion to the members it gives.
+A member's volatility: the standard deviation of its daily close-to-close returns over the 20
+sessions ending the session before the day (known before the day's trades); the day's median
+for a member with fewer than 20.
+Sectors, statistical, one set a calendar year: the S&P 500 members on the year's first session
+with at least 200 daily returns in the 252 sessions before it, grouped into 11 by Ward's
+hierarchical clustering on the distance sqrt(2 (1 - correlation)) of those returns; a member
+without the history, or new in the year, is in a twelfth group of its own kind. Nothing after
+the year's first session is used.
+
+MODEL (trained by Efe; the protocol fixed here)
+- Family as N2 and N3: principal components and ridge (efe_model.make), components and penalty
+  chosen with the levers. At most 10 variants on development in all, each in the ledger
+  before the next is run.
+- The variant with the highest mean a day after costs on the development years goes to the
+  run on 2022-2026, whatever it is.
+
+SPLITS
+- Development: test years 2018-2021, fitted on the years from 2016 before each.
+- The second look: 2022 to 9 October 2026, each year fitted on all years before it, run once
+  after this file and the chosen variant are committed.
+
+TEST
+- The long-short's mean daily return after costs over 2022 to 9 October 2026: one-sided
+  t >= 2.50.
+- Reported, not part of the pass: before costs; the long side and the short side apart; each
+  year; N4 less N3, day by day, with its t.
+- If it passes, the model is frozen on a card and judged forward in the shadow record; if it
+  fails, it is recorded as failed. Either way nothing trades on this run.
