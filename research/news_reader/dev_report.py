@@ -15,6 +15,14 @@ It fits and scores efe_model.make(components, penalty) on the development years
   pre-registered comparison, computed once.
 - writes data/news_reader/dev/<test>.html: each variant's mean a day after costs against
   counting alone, and each development year.
+
+The holdout, once, after the choice is committed in variants/<test>_chosen.json:
+
+    uv run python research/news_reader/dev_report.py N2 holdout
+
+It runs the committed choice through harness.run_holdout, adds the result to the end of
+LEDGER.md and writes data/news_reader/dev/<test>_holdout.html. Run again, it runs nothing:
+it writes the page from the stored result.
 """
 
 import html
@@ -215,12 +223,9 @@ def _bars(rows: list[tuple[str, dict]], bar: dict) -> str:
     return "".join(parts)
 
 
-def page(test: str, store: dict) -> str:
-    bar = store["count_only"]
-    variants = store["variants"]
-    rows = [
-        (f"{v['n']} · {settings_text(v['settings'])}", v["result"]) for v in variants
-    ]
+def _table(rows: list[tuple[str, dict]], bar: dict) -> tuple[str, str]:
+    """The year table's head and body: each row's years, all of them, t and days, then
+    counting alone; cells coloured by gain and loss on one scale."""
     years = list(bar["years"])
     cells = [r["years"][y]["mean_bps"] for _, r in rows for y in years]
     cells += [bar["years"][y]["mean_bps"] for y in years]
@@ -233,6 +238,17 @@ def page(test: str, store: dict) -> str:
             + _cell(r["mean_bps"], scale)
             + f'<td class="num">{signed(r["t"])}</td><td class="num">{r["days"]:,}</td></tr>'
         )
+    head = "".join(f"<th class='num'>{y}</th>" for y in years)
+    return head, "".join(body_rows)
+
+
+def page(test: str, store: dict) -> str:
+    bar = store["count_only"]
+    variants = store["variants"]
+    rows = [
+        (f"{v['n']} · {settings_text(v['settings'])}", v["result"]) for v in variants
+    ]
+    head, body = _table(rows, bar)
     best = max(variants, key=lambda v: v["result"]["mean_bps"]) if variants else None
     summary = [
         f"Variants tried: <b>{len(variants)} of {LIMIT}</b>.",
@@ -255,12 +271,80 @@ def page(test: str, store: dict) -> str:
     )
     chart = _bars(rows, bar) if rows else "<p>No variant yet.</p>"
     return PAGE.format(
-        test=html.escape(test),
+        title=f"{html.escape(test)} development",
+        heading=f"{html.escape(test)}: the variants on the development years",
         updated=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         summary="".join(f"<li>{s}</li>" for s in summary),
+        chart_title="Mean a day after costs, 2018-2021 (bps)",
         chart=chart,
-        head="".join(f"<th class='num'>{y}</th>" for y in years),
-        rows="".join(body_rows),
+        table_title="Each development year (bps a day after costs)",
+        head=head,
+        rows=body,
+        note="A variant worth choosing beats counting alone in most years, not in one.",
+    )
+
+
+def holdout_page(test: str, result: dict) -> str:
+    """The holdout, run once: the chosen variant against the threshold and counting alone."""
+    bar = result["count_only"]
+    v = result["variant"]
+    label = f"variant {v['variant']} · {settings_text(v)}"
+    head, body = _table([(label, result)], bar)
+    verdict = "Passed" if result["passes"] else "Failed"
+    mark = "&#10003;" if result["passes"] else "&#10007;"
+    summary = [
+        (
+            f"<b>{mark} {verdict}:</b> t {signed(result['t'])} against the pre-registered "
+            f"{result['threshold']:.2f}, one-sided, over {result['days']:,} days."
+        ),
+        (
+            f"The chosen variant, {html.escape(label)}: <b>{signed(result['mean_bps'])} bps a "
+            f"day</b> after costs; counting alone {signed(bar['mean_bps'])} "
+            f"(t {signed(bar['t'])})."
+        ),
+        (
+            f"Run once, at commit <code>{html.escape(result['commit'][:7])}</code>; "
+            "a second run is refused."
+        ),
+    ]
+    return PAGE.format(
+        title=f"{html.escape(test)} holdout",
+        heading=f"{html.escape(test)}: the holdout, 2022 to 9 October 2026",
+        updated=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+        summary="".join(f"<li>{s}</li>" for s in summary),
+        chart_title="Mean a day after costs, 2022-2026 (bps)",
+        chart=_bars([(label, result)], bar),
+        table_title="Each holdout year (bps a day after costs)",
+        head=head,
+        rows=body,
+        note="The holdout is the test; development years only chose the variant.",
+    )
+
+
+def holdout_section(test: str, result: dict, day: str) -> str:
+    """The ledger's record of a holdout, as N1's."""
+    bar = result["count_only"]
+    v = result["variant"]
+
+    def line(label: str, r: dict) -> str:
+        years = " / ".join(signed(y["mean_bps"]) for y in r["years"].values())
+        return (
+            f"| {label} | {r['days']:,} | {signed(r['mean_bps'])} bps | {signed(r['t'])} | "
+            f"{years} |"
+        )
+
+    verdict = "passed" if result["passes"] else "failed"
+    sign = "\u2265" if result["passes"] else "<"
+    return (
+        f"\n## {test}'s holdout (run once, {day}, commit {result['commit'][:7]})\n\n"
+        f"`data/news_reader/holdout_{test}.json`; a second run is refused.\n\n"
+        "| | Days | Mean a day | t | 2022 / 2023 / 2024 / 2025 / 2026, bps a day |\n"
+        "|---|---|---|---|---|\n"
+        + line(f"Variant {v['variant']}: {settings_text(v)}", result)
+        + "\n"
+        + line("The count alone (the comparison)", bar)
+        + f"\n\n**{test} {verdict} on its holdout: t {signed(result['t'])} {sign} "
+        f"{result['threshold']:.2f}.**\n"
     )
 
 
@@ -269,7 +353,7 @@ PAGE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{test} development</title>
+<title>{title}</title>
 <style>
 :root {{
   color-scheme: light;
@@ -318,20 +402,69 @@ td.num {{ border-radius: 3px; }}
 </head>
 <body>
 <main>
-<h1>{test}: the variants on the development years</h1>
+<h1>{heading}</h1>
 <p class="updated">Updated {updated}</p>
 <ul class="summary">{summary}</ul>
-<h2>Mean a day after costs, 2018-2021 (bps)</h2>
+<h2>{chart_title}</h2>
 {chart}
-<h2>Each development year (bps a day after costs)</h2>
+<h2>{table_title}</h2>
 <div class="tables"><table><thead><tr><th>Variant</th>{head}<th class="num">All</th>
 <th class="num">t</th><th class="num">Days</th></tr></thead><tbody>{rows}</tbody></table></div>
 <p class="note">Blue cells earned, red cells lost; the stronger the colour, the larger the
-amount. A variant worth choosing beats counting alone in most years, not in one.</p>
+amount. {note}</p>
 </main>
 </body>
 </html>
 """
+
+
+def record(test: str, result: dict, day: str) -> None:
+    """The holdout's record at the end of the ledger."""
+    LEDGER.write_text(
+        LEDGER.read_text().rstrip("\n") + "\n" + holdout_section(test, result, day)
+    )
+
+
+def holdout(test: str, harness, efe_model) -> None:
+    """The chosen variant on the holdout, once: harness.run_holdout checks the choice is
+    committed and refuses a second run. The settings come from the committed choice. The
+    ledger's record is written before the page, so a page that fails loses nothing."""
+    if test not in ("N2", "N3"):
+        raise SystemExit("dev_report.py runs N2 and N3, the tests still open")
+    DEV.mkdir(parents=True, exist_ok=True)
+    out = DEV / f"{test}_holdout.html"
+    lock = harness.LOCKS / f"holdout_{test}.json"
+    if lock.exists():
+        # Run already: its result is in the lock. Write the page, and the ledger's record if
+        # it is missing, from there; nothing runs again.
+        result = json.loads(lock.read_text())
+        result["threshold"] = harness.THRESHOLDS[test]
+        out.write_text(holdout_page(test, result))
+        if f"## {test}'s holdout" not in LEDGER.read_text():
+            day = datetime.fromtimestamp(lock.stat().st_mtime, UTC).strftime(
+                "%-d %B %Y"
+            )
+            record(test, result, day)
+        print(f"{test}'s holdout has been run; its page is written again: {out}")
+        return
+    chosen = harness.VARIANTS / f"{test}_chosen.json"
+    if not chosen.exists():
+        raise SystemExit(f"write and commit {chosen} with the chosen variant first")
+    settings = json.loads(chosen.read_text())
+    print(f"{test}'s holdout, once: {settings_text(settings)} ...", flush=True)
+    result = stored(
+        harness.run_holdout(
+            test, efe_model.make(settings["components"], settings["penalty"])
+        )
+    )
+    result["threshold"] = harness.THRESHOLDS[test]
+    record(test, result, datetime.now(UTC).strftime("%-d %B %Y"))
+    out.write_text(holdout_page(test, result))
+    verdict = "passed" if result["passes"] else "failed"
+    print(
+        f"{test} {verdict}: t {signed(result['t'])}, {signed(result['mean_bps'])} bps a day"
+    )
+    print(f"the page: {out}")
 
 
 def main(argv: list[str]) -> None:
@@ -339,8 +472,13 @@ def main(argv: list[str]) -> None:
     import efe_model
     import harness
 
+    if len(argv) == 2 and argv[1] == "holdout":
+        holdout(argv[0], harness, efe_model)
+        return
     if len(argv) not in (3, 4):
-        raise SystemExit("usage: dev_report.py TEST COMPONENTS PENALTY [FEATURES]")
+        raise SystemExit(
+            "usage: dev_report.py TEST COMPONENTS PENALTY [FEATURES] | TEST holdout"
+        )
     test = argv[0]
     if test not in ("N2", "N3"):
         raise SystemExit("dev_report.py runs N2 and N3, the tests still open")

@@ -1,6 +1,8 @@
 """Efe's development runs (research/news_reader/dev_report.py): counting, the ledger, the page."""
 
 import importlib.util
+import json
+import types
 from pathlib import Path
 
 import pytest
@@ -259,3 +261,119 @@ def test_a_long_label_gets_room_on_the_left():
     assert x >= 6.6 * len(
         label
     )  # the label, right-aligned at x, starts inside the chart
+
+
+def holdout_result(passes=False, t=1.8, years_as=str):
+    def years(values):
+        return {
+            years_as(y): {"mean_bps": v, "days": 240, "t": 0.0}
+            for y, v in zip(range(2022, 2027), values, strict=True)
+        }
+
+    return {
+        "test": "N2",
+        "split": "holdout",
+        "scoring": RULE,
+        "passes": passes,
+        "t": t,
+        "mean_bps": 3.1,
+        "days": 1197,
+        "years": years([1.0, 2.0, 3.0, 4.0, 5.5]),
+        "count_only": {
+            "mean_bps": -1.5,
+            "t": -0.6,
+            "days": 1197,
+            "years": years([-1.0, -2.0, -1.0, -2.0, -1.5]),
+        },
+        "commit": "abcdef1234567",
+        "variant": {"components": 64, "penalty": 10.0, "variant": 2, "rule": "x"},
+    }
+
+
+def test_the_holdout_page_gives_the_verdict_against_the_threshold():
+    page = dev_report.holdout_page("N2", holdout_result() | {"threshold": 2.5})
+    assert "&#10007; Failed:</b> t +1.80 against the pre-registered 2.50" in page
+    assert "variant 2 · components 64, penalty 10.0" in page and "abcdef1" in page
+    for year in range(2022, 2027):
+        assert f"<th class='num'>{year}</th>" in page
+    passed = dev_report.holdout_page(
+        "N2", holdout_result(True, 2.7) | {"threshold": 2.5}
+    )
+    assert "&#10003; Passed:</b> t +2.70" in passed
+
+
+def test_the_ledger_records_a_holdout_as_n1_s():
+    text = dev_report.holdout_section(
+        "N2", holdout_result() | {"threshold": 2.5}, "21 October 2026"
+    )
+    assert text == (
+        "\n## N2's holdout (run once, 21 October 2026, commit abcdef1)\n\n"
+        "`data/news_reader/holdout_N2.json`; a second run is refused.\n\n"
+        "| | Days | Mean a day | t | 2022 / 2023 / 2024 / 2025 / 2026, bps a day |\n"
+        "|---|---|---|---|---|\n"
+        "| Variant 2: components 64, penalty 10.0 | 1,197 | +3.10 bps | +1.80 | "
+        "+1.00 / +2.00 / +3.00 / +4.00 / +5.50 |\n"
+        "| The count alone (the comparison) | 1,197 | −1.50 bps | −0.60 | "
+        "−1.00 / −2.00 / −1.00 / −2.00 / −1.50 |\n\n"
+        "**N2 failed on its holdout: t +1.80 < 2.50.**\n"
+    )
+    passed = dev_report.holdout_section(
+        "N2", holdout_result(True, 2.7) | {"threshold": 2.5}, "21 October 2026"
+    )
+    assert passed.endswith("**N2 passed on its holdout: t +2.70 ≥ 2.50.**\n")
+
+
+class FakeHoldout:
+    """harness's holdout as it answers: once, with a lock, the years as numbers."""
+
+    def __init__(self, root):
+        self.THRESHOLDS = {"N2": 2.5, "N3": 2.5}
+        self.VARIANTS = root / "variants"
+        self.LOCKS = root
+        self.runs = []
+
+    def run_holdout(self, test, make):
+        self.runs.append(make)
+        result = holdout_result(years_as=int) | {
+            "variant": json.loads((self.VARIANTS / f"{test}_chosen.json").read_text())
+        }
+        (self.LOCKS / f"holdout_{test}.json").write_text(json.dumps(result))
+        return result
+
+
+def test_the_holdout_runs_the_committed_choice_once_and_is_never_lost(
+    tmp_path, monkeypatch
+):
+    fake = FakeHoldout(tmp_path)
+    model = types.SimpleNamespace(
+        make=lambda components, penalty: (components, penalty)
+    )
+    monkeypatch.setattr(dev_report, "DEV", tmp_path / "dev")
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text(LEDGER)
+    monkeypatch.setattr(dev_report, "LEDGER", ledger)
+
+    with pytest.raises(SystemExit, match="write and commit"):
+        dev_report.holdout("N2", fake, model)
+    fake.VARIANTS.mkdir()
+    (fake.VARIANTS / "N2_chosen.json").write_text(
+        '{"components": 64, "penalty": 10.0, "variant": 2, "rule": "x"}'
+    )
+    dev_report.holdout("N2", fake, model)
+    assert fake.runs == [(64, 10.0)]  # the committed settings, run once
+    page = tmp_path / "dev" / "N2_holdout.html"
+    assert "Failed" in page.read_text()
+    assert ledger.read_text().count("## N2's holdout") == 1
+
+    # Again: nothing runs; the page is written from the lock, the record not repeated.
+    page.unlink()
+    dev_report.holdout("N2", fake, model)
+    assert fake.runs == [(64, 10.0)] and page.exists()
+    assert ledger.read_text().count("## N2's holdout") == 1
+
+    # A record lost before it was committed comes back from the lock.
+    ledger.write_text(LEDGER)
+    dev_report.holdout("N2", fake, model)
+    assert ledger.read_text().count("## N2's holdout") == 1 and fake.runs == [
+        (64, 10.0)
+    ]
