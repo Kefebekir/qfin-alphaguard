@@ -1,0 +1,20 @@
+n6_context.py, 22 October 2026: N6's context, from the closes of the session before.
+
+data/news_reader/n6/context.parquet: 1,360,212 member-days, 2016-01-04 to 2026-10-12
+share null: {'r1': 0.0, 'r5': 0.0001, 'r20': 0.0003, 'r60': 0.001, 'mom': 0.0049, 'vol20': 0.0003, 'vol60': 0.001, 'range': 0.0, 'gap': 0.0, 'dollars': 0.0003, 'turnover': 0.0003, 'high52': 0.0035, 'beta': 0.001, 'corr60': 0.001, 'resid5': 0.001, 'sector': 0.0035, 'sector_r1': 0.0035, 'sector_r5': 0.0035, 'rel5': 0.0035, 'spy_r1': 0.0, 'spy_r5': 0.0, 'spy_r20': 0.0, 'spy_vol20': 0.0, 'vix': 0.0, 'vix_change5': 0.0, 'vix9d_ratio': 0.0, 'vix3m_ratio': 0.0, 'vvix': 0.0, 'dispersion': 0.0, 'dispersion20': 0.0, 'comove60': 0.0, 'weekday': 0.0, 'fomc': 0.0, 'cpi': 0.0, 'nfp': 0.0}
+everything from 2018-03-01 on scrambled: the days to it unchanged True, the session after changed True
+everything from 2021-06-01 on scrambled: the days to it unchanged True, the session after changed True
+everything from 2026-10-01 on scrambled: the days to it unchanged True, the session after changed True
+sectors on 2026-10-01: {'AAPL': 'XLF', 'JPM': 'XLF', 'NEE': 'XLU', 'XOM': 'XLE'} median beta 0.41
+by year:
+  2016: comove60 0.548, dispersion20 0.0158, median beta 1.07
+  2017: comove60 0.358, dispersion20 0.0130, median beta 0.97
+  2018: comove60 0.480, dispersion20 0.0149, median beta 0.93
+  2019: comove60 0.529, dispersion20 0.0145, median beta 0.99
+  2020: comove60 0.593, dispersion20 0.0221, median beta 1.00
+  2021: comove60 0.446, dispersion20 0.0158, median beta 0.95
+  2022: comove60 0.614, dispersion20 0.0182, median beta 0.93
+  2023: comove60 0.484, dispersion20 0.0158, median beta 0.93
+  2024: comove60 0.350, dispersion20 0.0161, median beta 0.73
+  2025: comove60 0.402, dispersion20 0.0179, median beta 0.76
+  2026: comove60 0.214, dispersion20 0.0225, median beta 0.55
