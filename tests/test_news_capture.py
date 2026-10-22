@@ -53,7 +53,9 @@ class FakeNews:
         return {"news": [article | {"id": 2, "symbols": []}], "next_page_token": None}
 
 
-def test_a_capture_keeps_every_page_with_its_capture_time(tmp_path):
+def test_a_capture_keeps_every_page_with_its_capture_time(tmp_path, monkeypatch):
+    slept = []
+    monkeypatch.setattr(nc.time, "sleep", slept.append)
     news = FakeNews()
     moment = utc(2026, 10, 19, 19, 31, 5)  # 15:31:05 in New York
     path = nc.capture(date(2026, 10, 19), tmp_path, news, now=lambda: moment)
@@ -68,10 +70,11 @@ def test_a_capture_keeps_every_page_with_its_capture_time(tmp_path):
         "summary": "",
         "captured_at": "2026-10-19T19:31:05Z",
     }
-    # Asked from two days before the window (Friday 16:00, so Wednesday) to the moment.
-    assert news.asked[0]["start"] == "2026-10-14T20:00:00Z"
+    # Asked from 30 days before the window (Friday 16:00, so 16 September) to the moment.
+    assert news.asked[0]["start"] == "2026-09-16T20:00:00Z"
     assert news.asked[0]["end"] == "2026-10-19T19:31:05Z"
     assert news.asked[1]["page_token"] == "next"
+    assert slept == [nc.SPACING]  # between the two pages, not before the first
     assert not path.with_suffix(".part").exists()
 
 
