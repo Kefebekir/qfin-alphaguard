@@ -11,9 +11,11 @@ is scored with N4's variant 2's portfolio. N4's variant 2 on the same years, fro
 data/news_reader/dev/N4.json, stands beside them. A variant passes the placebo gate (the
 decisions page, 4A) when it makes more a day over the four years than both placebos.
 
-Output: data/news_reader/n6/dev/<name>.json and <name>.html, and a summary printed. A name
-runs once. The pre-registration, written from the decisions page, will fix how many variants
-may run and how one is chosen; development runs wait for it.
+Output: data/news_reader/n6/dev/<name>.json and <name>.html, and a summary printed. As
+pre-registration N6 asks, each variant is written in LEDGER.md before it runs, at most ten,
+a name and settings once (n6_ledger.py). Then the choice, by the pre-registered rule:
+
+    PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py choose
 
 Before the first run, a check of speed and memory that shows no score:
 
@@ -34,6 +36,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).parent))
 import n6_harness as nh
+import n6_ledger
 import n6_model as nm
 from dev_report import PAGE, signed
 
@@ -198,17 +201,47 @@ def smoke() -> None:
     )
 
 
+def choose() -> None:
+    """The pre-registered choice, written to variants/N6_chosen.json once."""
+    if n6_ledger.CHOSEN.exists():
+        raise SystemExit(f"{n6_ledger.CHOSEN} is written already")
+    ledger = n6_ledger.LEDGER.read_text()
+    finished = [
+        r["name"]
+        for r in n6_ledger.rows(ledger)
+        if r["result"] not in (n6_ledger.RUNNING, n6_ledger.UNFINISHED)
+    ]
+    results = {n: json.loads((OUT / f"{n}.json").read_text()) for n in finished}
+    chosen = n6_ledger.choose(ledger, results)
+    n6_ledger.CHOSEN.write_text(json.dumps(chosen, indent=1) + "\n")
+    print(
+        f"chosen: variant {chosen['variant']}, {chosen['name']}, "
+        f"{chosen['development']['bps']:+.2f} bps a day; {n6_ledger.CHOSEN}"
+    )
+
+
 def main(argv: list[str]) -> None:
     if argv == ["smoke"]:
         return smoke()
+    if argv == ["choose"]:
+        return choose()
     name, s = parse(argv)
-    path = OUT / f"{name}.json"
-    if path.exists():
-        raise SystemExit(f"{path} exists: a run is not repeated under its name")
-    result = run(name, s)
+    when = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+    ledger, n = n6_ledger.start(n6_ledger.LEDGER.read_text(), name, asdict(s), when)
+    n6_ledger.LEDGER.write_text(ledger)
+    print(f"N6's variant {n}, {name}, written in {n6_ledger.LEDGER} before it runs")
+    try:
+        result = run(name, s)
+    except BaseException:
+        text = n6_ledger.unfinished(n6_ledger.LEDGER.read_text(), n)
+        n6_ledger.LEDGER.write_text(text)
+        raise
     OUT.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(result, indent=1))
+    (OUT / f"{name}.json").write_text(json.dumps(result, indent=1))
     (OUT / f"{name}.html").write_text(page(result))
+    n6_ledger.LEDGER.write_text(
+        n6_ledger.finish(n6_ledger.LEDGER.read_text(), n, result)
+    )
     total = result["all"]
     print(
         f"{name}: {total['model']['bps']:+.2f} bps a day (t {total['model']['t']:+.2f}); "

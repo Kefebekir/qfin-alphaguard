@@ -1,0 +1,92 @@
+PRE-REGISTRATION N6
+Written 2026-10-22 18:55 UTC, from Efe's choices on the decisions page (1A 2A 3A 4A 5A 6A);
+approved by Efe at 19:27 UTC, before any development run of N6.
+
+Can a network we train ourselves read the news better than N4's principal components and
+ridge? PIT-4B stays frozen as the eyes; everything after it is learned: a projection of each
+headline, attention over a member-day's headlines, a small network on its context, and a head
+joining them. Efe trains it.
+
+WHAT IS ALREADY KNOWN
+Every year of the data, 2016 to 9 October 2026, has been seen through N2's, N3's and N4's
+holdouts: N4's chosen variant made +6.53 bps a day after costs on 2022-2026 (t +1.86), resting
+on 2026 (+35.55 a day, +0.92 over 2022-2025). Before N6 was designed it was also seen that
+PIT-4B's checkpoints drift and two of them have one dominant dimension (eyes_check.py), and
+that in 2026 the S&P 500 members moved with SPY far less than in any year before
+(n6_context.py). So no run on these years is an independent test of N6: its test is forward,
+on sessions not yet seen, as N5's.
+
+DATA (built and checked before this file: results_n6_eyes.txt, results_n6_context.txt,
+results_n6_data.txt)
+- The member-days, articles, windows (16:00 on the session before to 15:30), members and next
+  returns of N3 and N4: 260,186 member-days, 2016 to 9 October 2026.
+- The eyes: each headline's last-token state, read by PIT-4B's checkpoint of the year before
+  its own, brought to 202412's scaled reading by method B (align_check.py, chosen by a rule
+  fixed before its run), frozen in data/models/n6-eyes.npz, SHA-256
+  bc95f2ed84130e156496728ae56a56a283243c25074cb8fa9e40e3ef85f2093d.
+- A member-day's last 32 headlines by the time they became known, each with log(1 + its age
+  in hours at 15:30), whether it counts from an edit, and whether it tags two stocks; and
+  log(1 + its number of headlines).
+- Its context, every number known by the close of the session before: the member's returns
+  over 1, 5, 20 and 60 sessions and a year's momentum, volatility over 20 and 60, range, gap,
+  traded value and turnover, distance from its 52-week high, beta and correlation with SPY,
+  the sector fund it moves most alike and that fund's returns; SPY's returns and volatility,
+  VIX, VIX9D, VIX3M and VVIX, the members' dispersion and co-movement; the weekday and the
+  scheduled FOMC, CPI and payrolls days. The member's numbers scaled within each day, the
+  market's on the training days only (n6_harness.py).
+- The target, N4's: the next return less the day's mean over the member-days with news, over
+  the member's 20-session volatility.
+
+MODEL (n6_model.py; trained by Efe, the protocol fixed here)
+- A learned projection of each headline's 4,096 numbers, attention over the member-day's
+  headlines, a network on the context, a head on the pooled news, the count and the context;
+  a second head on the size of the move. At most 250,000 trainable parameters (decision 6A).
+- The loss is a lever: MSE on the target, or minus the long-short Sharpe ratio over a batch's
+  days (decision 3A). So are the projection's size and start (principal components or random),
+  the layers' sizes, dropout, the auxiliary weight, the learning rate, weight decay, epochs and
+  days a batch. Nothing else is changed without an amendment.
+- A variant is one set of levers; its forecast is the mean of five models, seeds 0 to 4.
+
+DEVELOPMENT (decisions 1A and 2A)
+- Years 2018, 2019, 2020 and 2021, each validated with models trained on every member-day from
+  2016 that ends five sessions before the year's first.
+- At most 10 variants, each recorded in the ledger before the next is run (n6_run.py).
+- Each variant's two placebos are run beside it, with the same levers and seeds: its
+  headlines and counts dealt again among the day's member-days, each member's context and
+  return staying with it; and the context alone, without any headline or count.
+- THE PLACEBO GATE (decision 4A): a variant can be chosen only if its mean a day after costs
+  over the four years is above both its placebos'.
+- THE CHOICE: of the variants through the gate, the one with the highest mean a day after
+  costs over the four years, whatever it is. If none passes the gate, N6 fails here: no second
+  look and no card.
+
+THE SECOND LOOK (seen years; not a test)
+- The chosen variant, run once after it is committed in variants/N6_chosen.json, on each year
+  2022 to 9 October 2026, fitted on every member-day from 2016 that ends five sessions before
+  the year's first.
+- If its mean a day after costs is not above 0, N6 fails here: no card (decision 5A).
+- Reported, not part of any pass: each year, before costs, the long and the short side apart,
+  N6 less N4's variant 2 day by day with its t, and the placebos.
+
+THE FORWARD TEST (decision 5A)
+- The chosen variant fitted once, five seeds, on every member-day from 2016 to 9 October 2026,
+  frozen on a challenger card with its weights' SHA-256; never fitted again.
+- Each session from the card's first day: the headlines captured at 15:31 (qfin news-capture),
+  counted by N2's rule, read by PIT-4B-202412 and scaled as n6-eyes.npz scales 202412; the
+  context from data dated before the session, computed after its close; N4's variant 2's
+  portfolio: a tenth a side, equal weights, ties in, at least 20 members, 2 bps a day. A
+  session without a capture has no score and is listed.
+- The test: decision 0020's betting test of each day's score against no trade, scale 1,
+  alpha 0.00625 (wealth 160), half of what N5 left of the platform's 2.5%; the clip the
+  largest absolute daily score of the second look, rounded up to 0.1%. The null hypothesis:
+  every day, given what came before, the clipped score is expected to be at most 0; then the
+  chance of a promotion is at most 0.625%, however often it is read.
+- The first day is the first session after the card is committed. A promotion is evidence for
+  Efe's decision record, never a switch. Reviewed on 31 December 2028; Efe may retire the card
+  earlier, and its share stays spent.
+- Reported each evening, not part of the test: as N5's, and N6 less N5's frozen N4, day by
+  day, on the sessions both scored.
+
+HARDWARE
+The record runs the network in floating point. An FPGA version (int8, Arty A7) is built and
+checked against it apart; it never changes the record.

@@ -40,7 +40,7 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N6's eyes: the chosen alignment (B) frozen, and every member headline in 202412's scaled reading | `n6_eyes.py` | `models/n6-eyes.npz`, `news_reader/n6/headlines.npy`, `results_n6_eyes.txt` |
 | N6's context: each member-day's prices, market and calendar, from the closes of the session before | `n6_context.py` | `news_reader/n6/context.parquet`, `results_n6_context.txt` |
 | N6's data: each member-day's headlines one by one (with their age at 15:30), its context and its next return | `n6_data.py` | `news_reader/n6/days.parquet`, `pairs.parquet`, `results_n6_data.txt` |
-| N6's harness, network and Efe's runs: folds, target, placebos, N4's portfolio; the projection, attention and heads (PyTorch) | `n6_harness.py`, `n6_model.py`, `n6_run.py` | `news_reader/n6/dev/<name>.json`, `.html` |
+| N6's harness, network and Efe's runs: folds, target, placebos, N4's portfolio; the projection, attention and heads (PyTorch); each variant in the ledger before it runs, and the choice | `n6_harness.py`, `n6_model.py`, `n6_run.py`, `n6_ledger.py` | `news_reader/n6/dev/<name>.json`, `.html`, `variants/N6_chosen.json` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 
 Details the scripts handle:
