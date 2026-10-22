@@ -4,10 +4,11 @@ N5's record reads each session's headlines as they stood when its decision would
 that an edit after 15:30 cannot reach it. Each session, between 15:30 and 16:30 New York time,
 this asks Alpaca's news API for every article from 30 days before the window to the moment of
 asking (the API selects by creation; an older article edited inside the window counts from its
-edit, and 30 days keeps all but 0.033% of them), and keeps each one's id, its creation and last-edit times, the stocks it tags, its
-headline and its summary, with the time it was captured. Which articles count, and from when,
-is decided later by N2's rule (the window from 16:00 on the session before to 15:30, an article
-edited more than five minutes after it was created known from its edit).
+edit, and 30 days keeps all but 0.033% of them), and keeps each one's id, its creation and
+last-edit times, the stocks it tags, its headline and its summary, with the time it was
+captured. Which articles count, and from when, is decided later by N2's rule (the window from
+16:00 on the session before to 15:30, an article edited more than five minutes after it was
+created known from its edit).
 
 A session is captured once: a capture already on disk or in S3 is never written again, since
 a second one would see later edits. A day that is not a session has nothing to capture.
@@ -82,7 +83,6 @@ def fetch(start: datetime, end: datetime, get: Callable[[str], dict]) -> list[di
         }
         if token:
             query["page_token"] = token
-        if token:
             time.sleep(SPACING)
         answer = get(f"{NEWS_URL}?{urllib.parse.urlencode(query)}")
         articles.extend(answer.get("news", []))
