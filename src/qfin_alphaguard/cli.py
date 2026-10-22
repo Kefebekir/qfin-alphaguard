@@ -8,6 +8,7 @@
                       the same stocks at equal weight
     qfin live         run a session of the QQQ strategy on Alpaca's paper account
     qfin live-report  a paper session's report, against backtests of the same session
+    qfin news-capture the news as it stands at 15:31 New York time, for N5's record
 
 The nightly AWS job runs the command in infra/aws/task-definition.template.json;
 a test checks that this CLI still accepts it.
@@ -203,6 +204,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--alert-topic", help="an SNS topic's ARN to e-mail the summary to"
     )
     report.set_defaults(run=_live_report)
+
+    news = commands.add_parser(
+        "news-capture",
+        help="the news as it stands at 15:31 New York time, once a session (N5's record)",
+    )
+    news.add_argument(
+        "--day",
+        type=date.fromisoformat,
+        help="the session (YYYY-MM-DD); defaults to today in New York",
+    )
+    news.add_argument(
+        "--root", default="data/news_capture", help="where each day's capture is kept"
+    )
+    news.add_argument(
+        "--s3-bucket",
+        help="keep the capture in this bucket too, and never write it twice",
+    )
+    news.add_argument("--alert-topic", help="an SNS topic's ARN to e-mail a failure to")
+    news.set_defaults(run=_news_capture)
 
     return parser
 
@@ -451,6 +471,52 @@ def _live(args: argparse.Namespace) -> int:
     )
     print(f"session {day}: {outcome}")
     return 0 if outcome == "closed" else 1
+
+
+def _news_capture(args: argparse.Namespace) -> int:
+    from zoneinfo import ZoneInfo
+
+    from qfin_alphaguard.data.news_capture import capture, get_json
+
+    day = args.day or datetime.now(ZoneInfo("America/New_York")).date()
+
+    def in_s3(path: Path) -> bool:
+        if not args.s3_bucket:
+            return False
+        import boto3
+
+        found = boto3.client("s3").list_objects_v2(
+            Bucket=args.s3_bucket, Prefix=path.as_posix()
+        )
+        return found.get("KeyCount", 0) > 0
+
+    try:
+        keys = api_keys()
+        path = capture(
+            day,
+            Path(args.root),
+            lambda url: get_json(url, keys),
+            exists_elsewhere=in_s3,
+        )
+        if path is None:
+            print(f"{day}: no session, nothing to capture")
+            return 0
+        where = upload_to_s3(path, args.s3_bucket) if args.s3_bucket else str(path)
+    except Exception as error:  # noqa: BLE001 - every failure is told
+        message = f"the news capture of {day} failed: {error}"
+        print(message, file=sys.stderr)
+        if args.alert_topic:
+            import boto3
+
+            boto3.client("sns").publish(
+                TopicArn=args.alert_topic,
+                Subject=f"qfin news capture {day}: failed",
+                Message=message,
+            )
+        return 1
+    lines = len(path.read_text().splitlines())
+    print(f"{day}: {lines} articles captured, {where}")
+    return 0
 
 
 def _live_report(args: argparse.Namespace) -> int:

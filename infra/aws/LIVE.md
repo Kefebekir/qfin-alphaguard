@@ -13,6 +13,7 @@ job: same cluster, image, roles and log group.
 | Alerts | the SNS topic `qfin-alerts`, e-mailed to Efe; a summary when a session closes |
 | Report | `qfin-live-report`, each weekday at 16:30 New York time, once the consolidated tape serves the day's last minutes: the session against backtests of it (`qfin live-report`), its summary e-mailed, `report.txt` and `report.html` kept in the day's folder |
 | Keys | Alpaca's paper keys in SSM, `/qfin/alpaca-key-id` and `/qfin/alpaca-secret-key` |
+| News capture | `qfin-news-capture`, each weekday at 15:31 New York time: the news as it stands then, for N5's shadow record (`qfin news-capture`), to `s3://qfin-alphaguard-kefebekir/data/news_capture/<day>.jsonl`, once a session and never written again; it runs only between 15:30 and 16:30 New York time, and a failure is e-mailed |
 
 Do not run `qfin live --check` while a session runs: Alpaca's free plan allows one market
 data connection, and the check's would be refused.
@@ -50,7 +51,14 @@ number.
    with the nightly schedule's network configuration and the command overridden to
    `["live", "--check"]`; its log is in `/ecs/qfin-alphaguard`, stream `live/qfin-live/<task>`.
 
-7. **The schedules**: `aws scheduler create-schedule --name qfin-live`
+7. **The news capture** (N5): with the scheduler role's policy put again from
+   `scheduler-role-policy.json` (it names `qfin-news-capture`), `sed` on
+   `news-capture-task-definition.template.json` into `aws ecs register-task-definition`, then
+   `aws scheduler create-schedule --name qfin-news-capture` with `cron(31 15 ? * MON-FRI *)`
+   in `America/New_York`, a flexible window of `OFF`, and the same role and network
+   configuration as the others.
+
+8. **The schedules**: `aws scheduler create-schedule --name qfin-live`
    with `cron(15 9 ? * MON-FRI *)` in `America/New_York`, a flexible window of `OFF`, and as
    its target `qfin-live`'s task definition, with the nightly schedule's role and network
    configuration; and `qfin-live-report` the same way, with `cron(30 16 ? * MON-FRI *)` and

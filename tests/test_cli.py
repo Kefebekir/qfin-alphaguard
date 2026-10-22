@@ -1,5 +1,6 @@
 import json
 import shutil
+import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -366,7 +367,12 @@ def test_the_scheduler_may_run_every_task_and_the_report_s_command_parses():
         json.loads(path.read_text(encoding="utf-8"))["family"]
         for path in AWS.glob("*task-definition.template.json")
     }
-    assert families == {"qfin-alphaguard", "qfin-live", "qfin-live-report"}
+    assert families == {
+        "qfin-alphaguard",
+        "qfin-live",
+        "qfin-live-report",
+        "qfin-news-capture",
+    }
     assert set(run["Resource"]) == {
         f"arn:aws:ecs:eu-north-1:*:task-definition/{family}:*" for family in families
     }
@@ -410,3 +416,93 @@ def test_live_report_without_a_journal_says_so(capsys, tmp_path):
     assert main(["live-report", "--day", "2026-10-18", "--root", str(tmp_path)]) == 0
     assert main(["live-report", "--day", "2026-10-19", "--root", str(tmp_path)]) == 1
     assert "no journal for 2026-10-19" in capsys.readouterr().out
+
+
+def test_the_news_capture_task_s_command_parses_and_reads_alpaca_s_keys():
+    task = json.loads((AWS / "news-capture-task-definition.template.json").read_text())
+    (container,) = task["containerDefinitions"]
+    args = build_parser().parse_args(container["command"])
+    assert args.command == "news-capture" and args.s3_bucket and args.alert_topic
+    assert args.root == "data/news_capture"
+    assert {s["name"] for s in container["secrets"]} == {
+        "ALPACA_API_KEY_ID",
+        "ALPACA_API_SECRET_KEY",
+    }
+
+
+def test_a_news_capture_that_fails_is_told_and_a_holiday_is_not_a_failure(
+    tmp_path, monkeypatch, capsys
+):
+    import qfin_alphaguard.data.news_capture as nc
+
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "k")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "s")
+    sent = []
+
+    class FakeSns:
+        def publish(self, **message):
+            sent.append(message)
+
+    fake_boto3 = type(sys)("boto3")
+    fake_boto3.client = lambda service: FakeSns()
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+    root = str(tmp_path / "news")
+    # Thanksgiving: no session, nothing to capture, not a failure.
+    assert main(["news-capture", "--day", "2026-11-26", "--root", root]) == 0
+    # A session outside 15:30-16:30 New York time: refused, and told.
+    monkeypatch.setattr(
+        nc,
+        "capture",
+        lambda *a, **k: (_ for _ in ()).throw(nc.CaptureError("too early")),
+    )
+    code = main(
+        ["news-capture", "--day", "2026-11-27", "--root", root, "--alert-topic", "arn"]
+    )
+    assert code == 1
+    assert sent and "too early" in sent[0]["Message"] and sent[0]["TopicArn"] == "arn"
+    assert "failed: too early" in capsys.readouterr().err
+
+
+def test_a_news_capture_is_kept_in_s3_and_asks_s3_whether_it_exists(
+    tmp_path, monkeypatch, capsys
+):
+    import qfin_alphaguard.data.news_capture as nc
+    from qfin_alphaguard import cli
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "k")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "s")
+    asked = []
+
+    class FakeS3:
+        def list_objects_v2(self, **query):
+            asked.append(query)
+            return {"KeyCount": 0}
+
+    fake_boto3 = type(sys)("boto3")
+    fake_boto3.client = lambda service: FakeS3()
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+
+    def capture(day, root, get, exists_elsewhere):
+        path = root / f"{day}.jsonl"
+        if exists_elsewhere(path):
+            raise nc.CaptureError("held in S3 already")
+        root.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"id": 1}\n{"id": 2}\n')
+        return path
+
+    monkeypatch.setattr(nc, "capture", capture)
+    uploaded = []
+    monkeypatch.setattr(
+        cli,
+        "upload_to_s3",
+        lambda path, bucket: uploaded.append(path) or f"s3://{bucket}/x",
+    )
+    assert main(["news-capture", "--day", "2026-11-27", "--s3-bucket", "bkt"]) == 0
+    assert asked == [{"Bucket": "bkt", "Prefix": "data/news_capture/2026-11-27.jsonl"}]
+    assert uploaded == [Path("data/news_capture/2026-11-27.jsonl")]
+    assert "2 articles captured, s3://bkt/x" in capsys.readouterr().out
+    # Once S3 holds the day, the capture is refused.
+    monkeypatch.setattr(FakeS3, "list_objects_v2", lambda self, **q: {"KeyCount": 1})
+    assert main(["news-capture", "--day", "2026-11-27", "--s3-bucket", "bkt"]) == 1
+    assert "held in S3 already" in capsys.readouterr().err
