@@ -1,0 +1,8 @@
+n6_data.py, 22 October 2026: N6's member-days, their headlines one by one, context and next return.
+
+member-days and counts the same as N3's, row for row: True
+503,998 headlines, every one in the store, read by the checkpoint N3's rule gives: True
+2,000 member-days read by one checkpoint: their headlines' mean in the store against N3's feature in the same scale, cosine min 0.999993
+vol20 against N4's volatility on 260,186 member-days: largest gap 0.00e+00
+member-days with a next return to 9 October 2026: 259,967 (the frozen N4 was fitted on 259,967)
+data/news_reader/n6/days.parquet: 260,186 member-days, 41 columns; data/news_reader/n6/pairs.parquet: 503,998 headlines
