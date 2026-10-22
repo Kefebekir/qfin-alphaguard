@@ -306,3 +306,21 @@ above A's for all nine; the oldest goes from 0.57 to 0.87. **The rule chose B.**
 B's map is fitted on 202412's readings, so it may carry a little of what 202412 knows of
 later years into the older years' features. That can only flatter N6's results on the years
 already seen; it cannot reach a forward record, which 202412 reads itself.
+
+## 2026's members moved apart (22 October 2026; an observation, not a test)
+
+Found while building N6's context (`n6_context.py`, `results_n6_context.txt`). It changes
+nothing in N3's, N4's or N5's results or rules.
+
+- **The members moved with SPY far less in 2026 than before.** Their mean 60-session
+  correlation with SPY was 0.21 in 2026, against 0.35–0.61 in 2016–2025. The spread of their
+  daily returns was the widest of the eleven years, and the median beta fell to 0.55. On days
+  SPY moved more than 1%, 67% of members moved its way in 2026, against 86–89% in 2016–2022,
+  and 54–57% in June and July.
+- **The prices are right.** Alpaca's SIP daily closes, from another source, give the same
+  daily returns as EODHD's for AAPL, MSFT, JPM, NVDA and XOM from June 2025 to October 2026:
+  a correlation of 1.0, and no day more than 1% apart. In Alpaca's own closes, AAPL's 2026
+  correlation with SPY is 0.31.
+- N4's result rested on 2026, when news that is a stock's own may matter more because stocks
+  follow the market less. That is a question for N6, which sees the dispersion and comove60
+  of the session before, not a finding.
