@@ -78,3 +78,55 @@ def test_a_run_scores_the_variant_beside_its_placebos(monkeypatch):
     assert "passes the placebo gate" in page and "N4&#x27;s variant 2" not in page
     assert "N4's variant 2</td>" in page and page.count("<tr>") == 5
     json.dumps(result)  # it is stored as JSON
+
+
+def fake(name):
+    one = {"bps": 4.0, "t": 1.0, "days": 998}
+    return {
+        "name": name,
+        "settings": {"dim": 16},
+        "seeds": [0],
+        "run_utc": "2026-10-23 10:00",
+        "years": {"2018": {"model": one, "dealt": one, "silent": one}},
+        "all": {
+            "model": one,
+            "dealt": {**one, "bps": 1.0},
+            "silent": {**one, "bps": 0.5},
+        },
+        "gate": True,
+        "n4": {},
+    }
+
+
+def test_a_variant_is_in_the_ledger_before_it_runs_and_stays_if_it_fails(
+    tmp_path, monkeypatch
+):
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text("# Ledger\n")
+    monkeypatch.setattr(nr.n6_ledger, "LEDGER", ledger)
+    monkeypatch.setattr(nr.n6_ledger, "CHOSEN", tmp_path / "chosen.json")
+    monkeypatch.setattr(nr, "OUT", tmp_path / "dev")
+    seen = []
+
+    def failing(name, s):
+        seen.append(nr.n6_ledger.rows(ledger.read_text()))
+        raise RuntimeError("out of memory")
+
+    monkeypatch.setattr(nr, "run", failing)
+    with pytest.raises(RuntimeError):
+        nr.main(["v1", "dim=16"])
+    assert seen[0][0]["result"] == "running"
+    assert nr.n6_ledger.rows(ledger.read_text())[0]["result"] == "did not finish"
+
+    monkeypatch.setattr(nr, "run", lambda name, s: fake(name))
+    nr.main(["v1", "dim=16"])  # the same variant again, now finished
+    row = nr.n6_ledger.rows(ledger.read_text())[0]
+    assert row["n"] == 1 and row["result"].startswith("+4.00 bps")
+    assert (tmp_path / "dev" / "v1.json").exists() and (
+        tmp_path / "dev" / "v1.html"
+    ).exists()
+    nr.main(["choose"])
+    chosen = json.loads((tmp_path / "chosen.json").read_text())
+    assert (chosen["variant"], chosen["name"]) == (1, "v1")
+    with pytest.raises(SystemExit, match="development is over"):
+        nr.main(["v2", "dim=8"])
