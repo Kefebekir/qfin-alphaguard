@@ -291,3 +291,18 @@ nothing in N3's, N4's or N5's results or rules.
   checkpoint brings their CKA with 202412 from 0.36 and 0.67 to 0.82 and 0.97.
 - **A rotation fitted on 1,500 headlines does not help.** It scores below no rotation on the
   other 1,500, except between distant checkpoints.
+
+Then two ways to bring the nine older checkpoints to 202412's scale were compared, on
+headlines alone (`align_check.py`, `results_align_check.txt`). The rule was committed before
+the run (1bad30a).
+
+- **A** scales each dimension by its mean and spread on 20,000 anchor headlines.
+- **B** adds a ridge map to 202412's scaled reading, fitted on those anchors.
+
+On the 3,000 headlines neither had seen, B agrees with 202412 on 0.062 more of each
+headline's ten nearest neighbours than A, on average over the nine checkpoints. Its cosine is
+above A's for all nine; the oldest goes from 0.57 to 0.87. **The rule chose B.**
+
+B's map is fitted on 202412's readings, so it may carry a little of what 202412 knows of
+later years into the older years' features. That can only flatter N6's results on the years
+already seen; it cannot reach a forward record, which 202412 reads itself.
