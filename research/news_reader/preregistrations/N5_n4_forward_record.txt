@@ -1,0 +1,60 @@
+PRE-REGISTRATION N5
+Written 2026-10-21 14:23 UTC; approved by Efe at 14:24 UTC, before the record's first day.
+
+Is N4 real? N4's chosen variant failed its holdout (+6.53 bps a day after costs, t +1.86),
+and its result rested on 2026: +35.55 bps a day over 194 days, against +0.92 over 2022-2025.
+Those years have been seen. Only days not yet seen can tell whether 2026's strength lasts. N5
+runs N4's variant 2, frozen, forward, on each session from its first day, in the shadow record
+(decision 0020), and judges it by the betting test, which may be read every evening.
+
+THE CHALLENGER (frozen; a challenger card, challengers/news-n4-forward.yaml)
+- The model: N4's variant 2 (efe_model.make(64, 10.0): 64 principal components and ridge,
+  penalty 10; features base-last and log(1 + count); target scaled by volatility), fitted
+  once on every member-day from 2016 to 9 October 2026, by Efe. Its weights, a file under
+  data/models/, are pinned on the card by their SHA-256; it is never fitted again.
+- The reader: PIT-4B-202412 (SHA-256 in the ledger), the latest point-in-time checkpoint,
+  for every headline of the record, through pit.py, as N3 and N4 read 2025's and 2026's.
+- The rules: N2's articles (tagging one or two stocks, members that day; Benzinga's symbols
+  read as N2 reads them), window (16:00 on the session before to 15:30), and member-day
+  features (the mean embedding and log(1 + count)); N4's variant 2's positions: long the
+  members at or beyond the top tenth's edge, short those at or beyond the bottom's, equal
+  weights, ties included (amendment 5), no trade with fewer than 20 members or edges that
+  meet; costs of 1 bp a round trip on each side, 2 bps a day.
+
+THE RECORD
+- Headlines are captured as they stand at 15:31 New York time each session, from Alpaca's
+  news, with the time of capture, so that a later edit cannot reach a decision. An article
+  counts if it was known by 15:30 by N2's rule (from its edit when edited more than five
+  minutes after it was created).
+- After the next session's close the day is scored: the S&P 500 members that day, the
+  captured headlines read and the frozen model's forecasts, the long-short's return from the
+  day's close to the next, by the adjusted closes. A session whose capture failed has no
+  score and is listed; it is not filled in afterwards.
+- The first day is the first session after the card is committed and the capture has run
+  for a full session. Nothing is changed during the record; a change makes a new card.
+
+TEST
+- The betting test of decision 0020 (evidence.BettingTest) on each day's score against no
+  trade: scale 1, the rule's result 0 each day, clip 0.085 (the largest daily score of N4's
+  variant 2 on its holdout, 8.48%, rounded up to 0.1%), alpha 0.0125: half of the platform's
+  2.5%, Efe's choice. Promoted on the first evening its wealth reaches 80.
+- The null hypothesis: every day, given what came before, the clipped score is expected to
+  be at most 0. Then the chance of a promotion is at most 1.25%, however often it is read.
+- A promotion is evidence, not a switch (decision 0020, 6): the strategy trades only by
+  Efe's decision record, after he has seen the record, and within Guard's limits.
+- Reviewed on 31 December 2028; Efe may retire the card earlier. Its share stays spent.
+
+WHAT TO EXPECT (by resampling N4's holdout days, research only)
+- If the days to come are like 2022-2026 as a whole, the test promotes within 2 years in
+  about 1% of resampled records and within 5 in about 14%: an edge that weak cannot be
+  shown in a useful time.
+- If they are like 2026 alone, in about 41% within a year and 96% within 2, at a median of
+  about 1.1 years.
+- With no edge, in under 1% within 5 years.
+
+REPORTED EACH EVENING, NOT PART OF THE TEST
+- The days, the mean a day after costs and its t, the long and the short side apart, the
+  wealth and its threshold, the days beyond the clip, each month.
+- The observation from N4's 2026: the mean on earnings-season sessions (from the 15th of
+  January, April, July and October to the last day of the month after) against the others,
+  with the t of the difference.
