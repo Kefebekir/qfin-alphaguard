@@ -2,8 +2,9 @@
 
 N5's record reads each session's headlines as they stood when its decision would be made, so
 that an edit after 15:30 cannot reach it. Each session, between 15:30 and 16:30 New York time,
-this asks Alpaca's news API for every article from two days before the window to the moment
-of asking, and keeps each one's id, its creation and last-edit times, the stocks it tags, its
+this asks Alpaca's news API for every article from 30 days before the window to the moment of
+asking (the API selects by creation; an older article edited inside the window counts from its
+edit, and 30 days keeps all but 0.033% of them), and keeps each one's id, its creation and last-edit times, the stocks it tags, its
 headline and its summary, with the time it was captured. Which articles count, and from when,
 is decided later by N2's rule (the window from 16:00 on the session before to 15:30, an article
 edited more than five minutes after it was created known from its edit).
@@ -29,9 +30,11 @@ from qfin_alphaguard.sessions import sessions
 NEW_YORK = ZoneInfo("America/New_York")
 NEWS_URL = "https://data.alpaca.markets/v1beta1/news"
 EARLIEST, LATEST = clock(15, 30), clock(16, 30)  # New York time, when a capture may run
-MARGIN = timedelta(
-    days=2
-)  # asked for before the window, so that edits inside it are seen
+# Asked for before the window: the API selects by creation, and an article created earlier but
+# edited inside the window counts from its edit. Of the 503,998 member article-pairs of
+# 2016-2026, 0.11% were created more than 2 days before they counted, 0.033% more than 30.
+MARGIN = timedelta(days=30)
+SPACING = 0.31  # seconds between pages: the free plan allows 200 requests a minute
 
 
 class CaptureError(RuntimeError):
@@ -79,6 +82,8 @@ def fetch(start: datetime, end: datetime, get: Callable[[str], dict]) -> list[di
         }
         if token:
             query["page_token"] = token
+        if token:
+            time.sleep(SPACING)
         answer = get(f"{NEWS_URL}?{urllib.parse.urlencode(query)}")
         articles.extend(answer.get("news", []))
         token = answer.get("next_page_token")
