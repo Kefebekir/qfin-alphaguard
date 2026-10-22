@@ -187,3 +187,51 @@ uv run python research/news_reader/dev_report.py reports
 
 It adds them to the ledger and to `data/news_reader/dev/reports.html`, with a diagnostic of
 2026: each month, and how much of the result the ten best days carry.
+
+## N6: our own network on the frozen eyes
+
+N6 replaces N4's PCA and ridge with a network you train: PIT-4B stays frozen as the eyes, and
+everything after it is learned. Its rules come from the decisions page of 22 October 2026 and
+the pre-registration written from it. **Development runs wait for that pre-registration.**
+
+What it reads, built once (`n6_eyes.py`, `n6_context.py`, `n6_data.py`):
+
+- each member-day's headlines one by one, up to the last 32, in 202412's scaled reading
+  (method B), with how many hours before 15:30 each became known;
+- its context from the closes of the session before: the member's returns, volatility, traded
+  value, 52-week high, beta and sector; the market's returns, VIX family, dispersion and
+  co-movement; the scheduled FOMC, CPI and payrolls days.
+
+The network (`n6_model.py`): a learned projection of each headline to `dim` numbers (started
+from the training headlines' principal components, or at random), attention that weighs the
+headlines, a small network on the context, and a head that joins them. It is trained on N4's
+scaled target (`loss=mse`) or on the long-short Sharpe ratio (`loss=sharpe`), with a second
+head on the size of the move (`aux`).
+
+The levers, as `name=value` (defaults in brackets): `dim` (32), `attention` (16), `context`
+(32), `hidden` (32), `dropout` (0.1), `loss` (mse), `aux` (0.1), `lr` (0.001), `decay`
+(0.0001), `epochs` (10), `days_per_batch` (8), `start` (pca). A model has at most 250,000
+parameters (decision 6); `dim` 32 uses 131,000 of them.
+
+Before the first run, a check that shows no score:
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py smoke
+```
+
+A run, once the pre-registration is committed:
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py v1 dim=32 loss=mse
+```
+
+For each development year 2018-2021 it trains five seeds on the years before (less five
+sessions) and averages them, does the same for the two placebos (the day's headlines dealt
+again among its members, and the context alone), and scores all three with N4's variant 2's
+portfolio, beside N4's variant 2 itself. About 20 minutes on the RTX 5070. The page is
+`data/news_reader/n6/dev/<name>.html`.
+
+Two things the tests found. A projection learned from 4,096 numbers memorises when the
+training rows are few, so `start=pca` begins where N4 stood and learns from there. And a
+model must beat both placebos: one that does not is making money from something other than
+the headlines.
