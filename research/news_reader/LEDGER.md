@@ -273,3 +273,21 @@ Each choice run again on the holdout years by `dev_report.py reports`, reproduci
   June, July and October's first week; its best days fall in late May and late August, the
   heart of the earnings seasons. That is an observation to carry into a forward test, not a
   finding: these years have been seen.
+
+## The checkpoints seen side by side (22 October 2026; an observation, not a test)
+
+Measured for N6 on headlines alone (`eyes_check.py`, `results_eyes_check.txt`). It changes
+nothing in N3's, N4's or N5's results or rules.
+
+- **One coordinate system, drifting.** The ten PIT-4B checkpoints put the same headline in
+  nearly the same place: its vectors' cosine is 0.75–0.995 between neighbouring checkpoints
+  and about 0 between different headlines. The drift adds up. Against 202412, the
+  checkpoints that read 2016–2018 give 0.58–0.69, though the headlines' arrangement stays
+  alike (CKA 0.93–0.95).
+- **Checkpoints 202012 and 202112, which read 2021 and 2022, have one dimension that
+  dominates.** Dimension 1484 carries 34% and 18% of their variance, against 2% for 202412.
+  Fitted on all years' rows, N3's and N4's principal components gave those years' rows a
+  direction the other years hardly have. Scaling each dimension by its spread within each
+  checkpoint brings their CKA with 202412 from 0.36 and 0.67 to 0.82 and 0.97.
+- **A rotation fitted on 1,500 headlines does not help.** It scores below no rotation on the
+  other 1,500, except between distant checkpoints.
