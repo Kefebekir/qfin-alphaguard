@@ -97,6 +97,21 @@ def ridge_map(z: np.ndarray, y: np.ndarray, rng) -> tuple[np.ndarray, float, dic
     return vt.T @ ((s / (s**2 + best))[:, None] * uty), best, scores
 
 
+def fit(
+    reads: dict[str, np.ndarray],
+) -> tuple[dict[str, Scale], dict[str, tuple[np.ndarray, float]]]:
+    """Each checkpoint's scale on the anchors, and each older one's map to REFERENCE with
+    its penalty: B as the rule judged it (the penalties held out in this order, seed 3)."""
+    rng = np.random.default_rng(3)
+    scale = {name: Scale(x) for name, x in reads.items()}
+    y = scale[REFERENCE](reads[REFERENCE])
+    maps = {}
+    for name in CHECKPOINTS[:-1]:
+        w, penalty, _ = ridge_map(scale[name](reads[name]), y, rng)
+        maps[name] = (w, penalty)
+    return scale, maps
+
+
 def main() -> None:
     ids = anchors()
     path = OUT / "anchors.npy"
@@ -115,14 +130,11 @@ def main() -> None:
     judged = {name: np.load(OUT / f"{name}.npy") for name in CHECKPOINTS}
     print(f"{len(ids):,} anchors; {len(judged[REFERENCE]):,} headlines judged")
 
-    rng = np.random.default_rng(3)
-    scale = {name: Scale(x) for name, x in reads.items()}
+    scale, maps = fit(reads)
     target = scale[REFERENCE](judged[REFERENCE])
-    y = scale[REFERENCE](reads[REFERENCE])
     rows, a_knn, b_knn, b_wins = [], [], [], 0
     for name in CHECKPOINTS[:-1]:
-        z = scale[name](reads[name])
-        w, penalty, _ = ridge_map(z, y, rng)
+        w, penalty = maps[name]
         none = judged[name].astype(np.float64) - scale[name].mean
         a = scale[name](judged[name])
         b = a @ w
