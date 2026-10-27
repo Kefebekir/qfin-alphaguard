@@ -30,11 +30,8 @@ from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
-import torch
-from tokenizers import Tokenizer
 
 sys.path.insert(0, str(Path(__file__).parent))
-from pit import SHAPE, HiddenStates, batches, check, embeddings, load
 
 NEWS = Path("data/frontier/news_all")
 PIT = Path("data/news_reader/pit")
@@ -80,7 +77,11 @@ def headlines(wanted: set[int]) -> dict[int, str]:
 
 
 def read(texts: list[str], name: str) -> np.ndarray:
-    """The checkpoint's last-token states, as embed_pit.py reads a headline."""
+    """The checkpoint's last-token states, as embed_pit.py reads a headline (GPU)."""
+    import torch
+    from pit import SHAPE, HiddenStates, batches, check, embeddings, load
+    from tokenizers import Tokenizer
+
     folder = PIT / f"PIT-4B-{name}"
     check(json.loads((folder / "config.json").read_text()), SHAPE)
     tokenizer = Tokenizer.from_file(str(folder / "tokenizer.json"))

@@ -1,0 +1,18 @@
+n6_eyes.py, 22 October 2026: N6's eyes frozen, every member headline in 202412's scaled reading.
+
+data/models/n6-eyes.npz: 38 arrays, the same as fitted again from the anchors
+the frozen arrays against align_check's judged B, nine checkpoints: largest gap 0.000 at three decimals
+data/news_reader/n6/headlines.npy: 481,228 headlines; the 3,000 judged against eyes_check's reading in the one scale: cosine min 0.999999
+each checkpoint's headlines, the median spread of a dimension:
+  201511: 0.878
+  201612: 0.878
+  201712: 0.866
+  201812: 0.880
+  201912: 0.835
+  202012: 0.924
+  202112: 0.984
+  202212: 0.981
+  202312: 0.973
+  202412: 0.955
+
+data/models/n6-eyes.npz SHA-256: bc95f2ed84130e156496728ae56a56a283243c25074cb8fa9e40e3ef85f2093d
