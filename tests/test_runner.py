@@ -298,6 +298,26 @@ def replayed(run, script):
     return core, leftover
 
 
+async def until(done, what, timeout=5.0):
+    """Waits until done() holds, looking every 5 ms; fails after timeout seconds.
+
+    The runner calls Alpaca in a worker thread, so on a loaded machine a fixed sleep
+    can end before the call does.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while not done():
+        if loop.time() > deadline:
+            pytest.fail(f"waited {timeout} s for {what}")
+        await asyncio.sleep(0.005)
+
+
+def accepted(run, cid):
+    """The core has heard Alpaca accept cid: the send and its answer are done."""
+    order = run.core.orders.get(cid)
+    return order is not None and order.status is Status.ACCEPTED
+
+
 # A day.
 
 
@@ -309,7 +329,7 @@ def test_a_day_goes_through_the_journal_to_alpaca_and_back(tmp_path):
         task = asyncio.create_task(run.run(queue))
         queue.put_nowait(StreamState("trades", True, seen(29)))
         queue.put_nowait(Bars((bar(30),), seen(30)))
-        await asyncio.sleep(0.1)
+        await until(lambda: accepted(run, ID1), f"{ID1} to be accepted")
         assert alpaca.orders[ID1][1] == "accepted"  # sent, and accepted
         queue.put_nowait(Events(tuple(alpaca.fill(ID1, 40.0, 600.0)), seen(30, 0.5)))
         queue.put_nowait(Events(tuple(alpaca.fill(ID1, 100.0, 600.02)), seen(30, 0.7)))
@@ -424,9 +444,12 @@ def test_a_difference_at_the_close_stops_the_engine(tmp_path):
         queue = TimedQueue(clock)
         task = asyncio.create_task(run.run(queue))
         queue.put_nowait(Bars((bar(30),), seen(30)))
-        await asyncio.sleep(0.1)
+        await until(lambda: accepted(run, ID1), f"{ID1} to be accepted")
         queue.put_nowait(Events(tuple(alpaca.fill(ID1, 100.0, 600.0)), seen(30, 1)))
-        await asyncio.sleep(0.1)
+        await until(
+            lambda: run.core.portfolio.positions.get("QQQ") == 100.0,
+            "the engine to hold 100 QQQ",
+        )
         alpaca.held["QQQ"] = 50.0  # half sold by hand, unheard
         queue.put_nowait(CLOSED)
         return await task
@@ -442,7 +465,7 @@ def test_an_order_alpaca_has_lost_at_the_close_stops_the_engine(tmp_path):
         queue = TimedQueue(clock)
         task = asyncio.create_task(run.run(queue))
         queue.put_nowait(Bars((bar(30),), seen(30)))
-        await asyncio.sleep(0.1)
+        await until(lambda: accepted(run, ID1), f"{ID1} to be accepted")
         del alpaca.orders[ID1]
         queue.put_nowait(CLOSED)
         return await task
@@ -462,7 +485,7 @@ def test_a_position_is_closed_by_alpaca_s_numbers_after_a_stop(tmp_path):
         queue = TimedQueue(clock)
         task = asyncio.create_task(run.run(queue))
         queue.put_nowait(Bars((bar(30, close=602.0),), seen(30)))
-        await asyncio.sleep(0.1)
+        await until(lambda: accepted(run, ID1), f"{ID1} to be accepted")
         queue.put_nowait(Events(tuple(alpaca.fill(ID1, 60.0, 600.0)), seen(30, 1)))
         alpaca.held["QQQ"] = 75.0  # Alpaca holds more than the engine heard of
         queue.put_nowait(Fatal("bars: the plan does not include the feed", seen(31)))
@@ -573,7 +596,10 @@ def test_trade_updates_that_reconnect_are_caught_up(tmp_path):
         task = asyncio.create_task(run.run(queue))
         queue.put_nowait(Bars((bar(30),), seen(30)))
         queue.put_nowait(StreamState("trades", False, seen(30, 1)))
-        await asyncio.sleep(0.1)
+        await until(
+            lambda: accepted(run, ID1) and "trades" in run.down_since,
+            f"{ID1} to be accepted and the trades stream to be down",
+        )
         alpaca.fill(ID1, 100.0, 600.1)  # filled while the stream was down: not heard
         queue.put_nowait(StreamState("trades", True, seen(30, 5)))
         queue.put_nowait(Bars((bar(31),), seen(31)))
