@@ -35,9 +35,9 @@ def test_n4_s_development_years_are_read_from_its_stored_run(tmp_path, monkeypat
     stored = {
         "count_only": {},
         "variants": [
-            {"n": "1", "result": "{}"},
+            {"n": 1, "result": {}},
             {
-                "n": "2",
+                "n": 2,
                 "result": repr(
                     {
                         "mean_bps": 8.7,
@@ -54,6 +54,15 @@ def test_n4_s_development_years_are_read_from_its_stored_run(tmp_path, monkeypat
     path = tmp_path / "N4.json"
     path.write_text(json.dumps(stored))
     monkeypatch.setattr(nr, "N4_DEV", path)
+    assert nr.n4_years() == {2018: (3.97, 0.58, 246), "all": (8.7, 2.07, 998)}
+    # as dev_report stored variant 2 itself: its number an int, its result a dict
+    stored["variants"][1]["result"] = {
+        "mean_bps": 8.7,
+        "t": 2.07,
+        "days": 998,
+        "years": {"2018": {"days": 246, "mean_bps": 3.97, "t": 0.58}},
+    }
+    path.write_text(json.dumps(stored))
     assert nr.n4_years() == {2018: (3.97, 0.58, 246), "all": (8.7, 2.07, 998)}
     monkeypatch.setattr(nr, "N4_DEV", tmp_path / "none.json")
     assert nr.n4_years() == {}

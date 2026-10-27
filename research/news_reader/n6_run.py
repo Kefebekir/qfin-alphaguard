@@ -80,10 +80,14 @@ def n4_years() -> dict:
     """N4's variant 2 on the development years, as stored by dev_report.py."""
     if not N4_DEV.exists():
         return {}
+
+    def read(value):  # dev_report kept some results as their repr, others as JSON
+        return ast.literal_eval(value) if isinstance(value, str) else value
+
     for variant in json.loads(N4_DEV.read_text())["variants"]:
-        if variant["n"] == "2":
-            result = ast.literal_eval(variant["result"])
-            years = ast.literal_eval(result["years"])
+        if str(variant["n"]) == "2":
+            result = read(variant["result"])
+            years = read(result["years"])
             out = {int(y): (v["mean_bps"], v["t"], v["days"]) for y, v in years.items()}
             out["all"] = (result["mean_bps"], result["t"], result["days"])
             return out
