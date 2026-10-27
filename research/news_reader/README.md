@@ -37,6 +37,8 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N3: each member headline by the checkpoint of the year before, on the GPU | `embed_pit.py` | `news_reader/pit_emb/<model>/<checkpoint>.*` |
 | N3's features a member and session, in two sets | `features_n3.py` | `news_reader/pit_emb/n3_rows.parquet`, `n3_<set>.npy` |
 | N4: each member-day's volatility and statistical sector | `risk.py` | `news_reader/risk/risk.parquet` |
+| N6, before it: do the ten checkpoints see a headline alike? 3,000 headlines read by each | `eyes_check.py` | `news_reader/eyes/`, `results_eyes_check.txt` |
+| N6, before it: two ways to bring the older checkpoints to 202412's scale, judged on headlines alone | `align_check.py` | `news_reader/eyes/anchors_*`, `results_align_check.txt` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 | N5: N4's variant 2 fitted once, frozen as plain arrays | `forward.py` | `models/news-n4-forward.npz` |
 | N5: the record's path against the research's, on ten past sessions | `forward_check.py` | `results_forward_check.txt` |

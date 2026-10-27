@@ -291,3 +291,36 @@ Each choice run again on the holdout years by `dev_report.py reports`, reproduci
   article-member pairs and 1,364 member-days; each headline's embedding to a cosine of
   1.000000; the same sides on 10 of 10 days; scores equal to `harness.n4_days`' to 0.000000
   bps. What the record measures is what N4's holdout measured.
+
+## The checkpoints seen side by side (22 October 2026; an observation, not a test)
+
+Measured for N6 on headlines alone (`eyes_check.py`, `results_eyes_check.txt`). It changes
+nothing in N3's, N4's or N5's results or rules.
+
+- **One coordinate system, drifting.** The ten PIT-4B checkpoints put the same headline in
+  nearly the same place: its vectors' cosine is 0.75–0.995 between neighbouring checkpoints
+  and about 0 between different headlines. The drift adds up. Against 202412, the
+  checkpoints that read 2016–2018 give 0.58–0.69, though the headlines' arrangement stays
+  alike (CKA 0.93–0.95).
+- **Checkpoints 202012 and 202112, which read 2021 and 2022, have one dimension that
+  dominates.** Dimension 1484 carries 34% and 18% of their variance, against 2% for 202412.
+  Fitted on all years' rows, N3's and N4's principal components gave those years' rows a
+  direction the other years hardly have. Scaling each dimension by its spread within each
+  checkpoint brings their CKA with 202412 from 0.36 and 0.67 to 0.82 and 0.97.
+- **A rotation fitted on 1,500 headlines does not help.** It scores below no rotation on the
+  other 1,500, except between distant checkpoints.
+
+Then two ways to bring the nine older checkpoints to 202412's scale were compared, on
+headlines alone (`align_check.py`, `results_align_check.txt`). The rule was committed before
+the run (1bad30a).
+
+- **A** scales each dimension by its mean and spread on 20,000 anchor headlines.
+- **B** adds a ridge map to 202412's scaled reading, fitted on those anchors.
+
+On the 3,000 headlines neither had seen, B agrees with 202412 on 0.062 more of each
+headline's ten nearest neighbours than A, on average over the nine checkpoints. Its cosine is
+above A's for all nine; the oldest goes from 0.57 to 0.87. **The rule chose B.**
+
+B's map is fitted on 202412's readings, so it may carry a little of what 202412 knows of
+later years into the older years' features. That can only flatter N6's results on the years
+already seen; it cannot reach a forward record, which 202412 reads itself.
