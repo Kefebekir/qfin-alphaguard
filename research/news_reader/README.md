@@ -3,7 +3,7 @@
 After step 5 found that nothing built on prices beats the QQQ rule, and research/frontier
 measured why (prices tell how much the market will move, not which way), Efe chose to give
 the system a new sense: the news, read by a language model that knows nothing of the future.
-Four pre-registered tests (`preregistrations/`, `LEDGER.md`):
+Five pre-registered tests (`preregistrations/`, `LEDGER.md`):
 
 - **N1:** does the morning's news tell the QQQ rule's day? The rule sized ×1.5 / ×1 / ×0.5 by
   a forecast from the headlines known by 09:55.
@@ -14,6 +14,8 @@ Four pre-registered tests (`preregistrations/`, `LEDGER.md`):
 - **N4:** N3 read with less noise: the target scaled by volatility, more members a side,
   weights inverse to volatility, statistical sectors neutral; designed after N2's and N3's
   holdouts.
+- **N5:** N4's variant 2, frozen, run forward on each session from the headlines as they
+  stood at 15:31 (`qfin news-capture`), judged by decision 0020's betting test.
 
 The language model is **ChronoBERT** (He, Lv, Manela and Wu, "Chronologically Consistent
 Large Language Models"): a ModernBERT encoder retrained every year on text from before that
@@ -36,6 +38,9 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N3's features a member and session, in two sets | `features_n3.py` | `news_reader/pit_emb/n3_rows.parquet`, `n3_<set>.npy` |
 | N4: each member-day's volatility and statistical sector | `risk.py` | `news_reader/risk/risk.parquet` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
+| N5: N4's variant 2 fitted once, frozen as plain arrays | `forward.py` | `models/news-n4-forward.npz` |
+| N5: the record's path against the research's, on ten past sessions | `forward_check.py` | `results_forward_check.txt` |
+| N5: the record, each session from its 15:31 capture, scored after the next close | `forward_record.py` | `news_reader/forward/days.parquet`, `record.html` |
 
 Details the scripts handle:
 
@@ -86,6 +91,13 @@ uv run python research/news_reader/features.py data/news_reader/emb data/raw/pri
 ```
 
 Then `GUIDE.md`.
+
+N5's record, each evening after the nightly job has stored the next session's close (it
+copies the captures and the prices from S3 first; PIT-4B on the GPU):
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/forward_record.py
+```
 
 Before N2, `architecture_checks.py` measured what news tells in the development years only
 (`results_architecture_checks.txt`), for the note on news and the FPGA's network
