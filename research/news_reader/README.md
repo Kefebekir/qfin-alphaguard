@@ -40,6 +40,7 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N6, before it: do the ten checkpoints see a headline alike? 3,000 headlines read by each | `eyes_check.py` | `news_reader/eyes/`, `results_eyes_check.txt` |
 | N6, before it: two ways to bring the older checkpoints to 202412's scale, judged on headlines alone | `align_check.py` | `news_reader/eyes/anchors_*`, `results_align_check.txt` |
 | N6's eyes: the chosen alignment (B) frozen, and every member headline in 202412's scaled reading | `n6_eyes.py` | `models/n6-eyes.npz`, `news_reader/n6/headlines.npy`, `results_n6_eyes.txt` |
+| N6's context: each member-day's prices, market and calendar, from the closes of the session before | `n6_context.py` | `news_reader/n6/context.parquet`, `results_n6_context.txt` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 | N5: N4's variant 2 fitted once, frozen as plain arrays | `forward.py` | `models/news-n4-forward.npz` |
 | N5: the record's path against the research's, on ten past sessions | `forward_check.py` | `results_forward_check.txt` |
