@@ -2,8 +2,11 @@
 
 Each file here is the card of one frozen challenger, `<name>.yaml`,
 committed before its record's first day
-([decision 0020](../docs/decisions/0020-the-shadow-record.md)). There are
-none yet.
+([decision 0020](../docs/decisions/0020-the-shadow-record.md)).
+
+| Card | What | Record kept by | `alpha` |
+| --- | --- | --- | --- |
+| `news-n4-forward.yaml` | N4's news long-short, frozen; judged against no trade, its scale and clip set by pre-registration N5 | `research/news_reader/forward_record.py` | 0.0125 |
 
 A card is never edited after it is committed, except to set `retired_on`.
 It is never deleted: its share of the chance of error stays spent.
