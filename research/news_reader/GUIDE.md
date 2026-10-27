@@ -191,8 +191,10 @@ It adds them to the ledger and to `data/news_reader/dev/reports.html`, with a di
 ## N6: our own network on the frozen eyes
 
 N6 replaces N4's PCA and ridge with a network you train: PIT-4B stays frozen as the eyes, and
-everything after it is learned. Its rules come from the decisions page of 22 October 2026 and
-the pre-registration written from it. **Development runs wait for that pre-registration.**
+everything after it is learned. Its rules are pre-registration N6 (approved 22 October 2026):
+at most ten variants on 2018-2021, each written in the ledger before it runs; a variant has to
+beat both its placebos; the best of those that do is chosen, then looks once at 2022-2026,
+then is judged forward.
 
 What it reads, built once (`n6_eyes.py`, `n6_context.py`, `n6_data.py`):
 
@@ -219,10 +221,18 @@ Before the first run, a check that shows no score:
 PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py smoke
 ```
 
-A run, once the pre-registration is committed:
+A run (it writes its row in `LEDGER.md` first, and refuses an eleventh, a name or settings
+already run):
 
 ```bash
 PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py v1 dim=32 loss=mse
+```
+
+When you are done (ten at most), the choice by the rule, written to
+`variants/N6_chosen.json`, after which no variant runs:
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py choose
 ```
 
 For each development year 2018-2021 it trains five seeds on the years before (less five
