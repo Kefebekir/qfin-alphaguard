@@ -274,6 +274,24 @@ Each choice run again on the holdout years by `dev_report.py reports`, reproduci
   heart of the earnings seasons. That is an observation to carry into a forward test, not a
   finding: these years have been seen.
 
+## N5's record, before its first day (22 October 2026)
+
+- **Frozen** at 10:44 UTC: `data/models/news-n4-forward.npz`, SHA-256
+  `eafc16cd647c3f2ec545d2eb35d810a6fe1d04ef3032b41837b2fbe7fc4bcb15`, N4's variant 2 fitted
+  by Efe on 259,967 member-days, 5 January 2016 to 9 October 2026. Its card,
+  `challengers/news-n4-forward.yaml`, names the scorer's commit and the first day, 23
+  October 2026.
+- **The capture** (`qfin news-capture`, 15:31 New York time each session) asks for the
+  articles created from 30 days before the window. An article created earlier and edited
+  inside the window counts from its edit, and the record cannot see it: of 2016-2026's
+  503,998 member article-pairs, 0.033% were created more than 30 days before they counted.
+  The first margin, 2 days, missed 4 of 2,325 pairs in ten sessions (PR #72).
+- **The record's path against the research's** (`forward_check.py`,
+  `results_forward_check.txt`), ten sessions, 25 September to 8 October 2026: the same 2,325
+  article-member pairs and 1,364 member-days; each headline's embedding to a cosine of
+  1.000000; the same sides on 10 of 10 days; scores equal to `harness.n4_days`' to 0.000000
+  bps. What the record measures is what N4's holdout measured.
+
 ## The checkpoints seen side by side (22 October 2026; an observation, not a test)
 
 Measured for N6 on headlines alone (`eyes_check.py`, `results_eyes_check.txt`). It changes
