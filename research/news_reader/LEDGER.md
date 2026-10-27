@@ -343,3 +343,11 @@ nothing in N3's, N4's or N5's results or rules.
 - N4's result rested on 2026, when news that is a stock's own may matter more because stocks
   follow the market less. That is a question for N6, which sees the dispersion and comove60
   of the session before, not a finding.
+
+## N6's variants on the development years (2018-2021)
+
+Each written before it runs (n6_run.py); at most 10. The mean a day after costs over the four years, beside its two placebos.
+
+| # | Name | Run (UTC) | Settings | The variant (t) | Dealt | Context alone | Gate |
+|---|---|---|---|---|---|---|---|
+| 1 | `v1` | 2026-10-27 23:19 | dim=32, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.001, decay=0.0001, epochs=10, days_per_batch=8, start=pca | −1.52 bps (t −0.32) | +3.96 bps (t +0.99) | −5.97 bps (t −0.89) | not passed |
