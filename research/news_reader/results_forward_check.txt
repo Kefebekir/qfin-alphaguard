@@ -1,0 +1,9 @@
+forward_check.py, 22 October 2026: N5's record against N3's and N4's research, ten sessions.
+
+10 sessions, 2026-09-25 to 2026-10-08
+1. article-member pairs: record 2,325, research 2,325, same: True
+2. member-days: 1,364; tickers and counts the same each day: True
+3. headline embeddings: 2,168; cosine min 1.000000, largest gap 0.0000
+4. features: largest gap 0.0059 (float16 storage: about 0.03)
+5. forecasts' sides the same on 10 of 10 days; largest score gap 0.0000 bps
+6. against harness.n4_days: the same 10 days scored: True; largest gap in score, sides and mean 0.000000 bps
