@@ -28,15 +28,23 @@ week alongside university.
   record now judges challengers forward (decision 0020): each frozen on a
   card before its record starts, each in its own account, judged by a bet
   against the rule that stays valid however often it is read.
-- **Next: the news reader, the first challengers.** Prices tell how much the
-  market will move, not which way (research/frontier, #38), so the first
-  challengers read the news: two pre-registered tests (`research/news_reader`),
-  N1 the QQQ rule's day from the morning's headlines and N2 members' next day,
-  read by ChronoBERT of the year before, so the model cannot know the year it
-  is tested on. The data (2.09 million Benzinga headlines, 2016 – October 2026)
-  and the harness are ready. **N1 failed** (Efe's model, six variants, holdout
-  run once): the morning's headlines do not tell the rule's day (−1.52 bps a
-  day against the rule on 2022 – October 2026, t −1.75).
+- **The news reader, the first challengers** (`research/news_reader`, its `LEDGER.md`).
+  Prices tell how much the market will move, not which way (research/frontier, #38), so
+  the first challengers read the news: 2.09 million Benzinga headlines, 2016 – October
+  2026, each read by a language model that knows nothing after the year before it.
+  - **N1 to N4 failed** their pre-registered holdouts on 2022 – 9 October 2026. N1 (the
+    QQQ rule's day from the morning's headlines): −1.52 bps a day. N2 (a member's next day,
+    ChronoBERT): −2.22. N3 (the same, read by PIT-4B, 4 billion parameters): +4.24, t
+    +1.18. N4 (N3 with less noise): +6.53, t +1.86, resting on 2026 (+35.55 a day).
+  - **N5 runs:** N4's variant 2, frozen, scored forward on each session from the
+    headlines captured at 15:31 (`qfin news-capture` on AWS), from 23 October 2026. Its
+    card is `challengers/news-n4-forward.yaml`; it is judged by the betting test against
+    no trade (alpha 1.25%).
+  - **N6 is pre-registered** (22 October 2026): a network Efe trains on PIT-4B's frozen
+    eyes, with a learned projection, attention over each member-day's headlines and its
+    context from the session before. The data and the skeleton are built and checked;
+    Efe's development runs on 2018-2021 come next. Every year has been seen, so N6 is
+    tested forward, like N5.
 - **The rule on other markets: F1 failed.** The QQQ rule, unchanged, on CME Nikkei 225
   futures over the Tokyo session (`research/futures`, pre-registered): −5.4% a year after
   one tick a fill (t −1.82), 0.0% at half a tick. Uncorrelated with the QQQ rule, but
@@ -44,7 +52,7 @@ week alongside university.
 - **A network trained by evolution: G1 failed** (#42). A GPU simulator of the rule (6,500
   times the CPU's speed) and a gym of 16 ETFs trained Efe's network by evolution
   strategies, pre-registered: −7.88 bps a day against the rule on 2022 – October 2026
-  (t −2.92). N2 waits, ready.
+  (t −2.92).
 - **Now: Phase 3, paper trading (decision 0021).** The rule decides as well on Alpaca's
   free IEX feed as on the consolidated tape (`research/phase3`: the same position at 98.4%
   of decisions, 17.3% a year against 16.4%, t +0.78). The live engine runs on a small AWS
@@ -242,7 +250,7 @@ January exams.
 | 3. The decision log, and the day book reading it | Claude | done, #34 |
 | 4. Guard's limits for an intraday strategy | Efe: the rules, and the limits in `guard_qqq.yaml` | done |
 | 5. The shadow record for ML challengers | Claude; Efe's models | research and platform done |
-| 6. The news reader: pre-registered tests N1 and N2 | Efe's model; Claude's data and harness | N1 failed; N2 to decide |
+| 6. The news reader: pre-registered tests N1 to N6 | Efe's model; Claude's data and harness | N1–N4 failed; N5's record from 23 October 2026; N6 pre-registered, in development |
 
 2. [x] **The QQQ strategy in our engine** (`momentum.py`, #33): the noise
    band, VWAP, decisions at 10:00 and every half hour to 15:30, a size of
@@ -336,6 +344,16 @@ January exams.
      The variant with the best development mean (2 components, +0.98 bps a day, all of
      it 2018) lost 1.52 bps a day to the rule on the holdout (t −1.75); sizing by the
      count alone lost 3.35 (t −3.29).
+   - **N2, N3 and N4 failed** (21 October 2026): a member's next day, read by ChronoBERT
+     (−2.22 bps a day after costs), by PIT-4B (+4.24, t +1.18), and by PIT-4B with less
+     noise (+6.53, t +1.86; +0.92 without 2026). The bar was t ≥ 2.50 after 1 bp a round
+     trip each side (amendments 2 and 3).
+   - **N5** (from 23 October 2026): N4's variant 2 frozen and scored forward each session,
+     from the headlines as they stood at 15:31, in the shadow record.
+   - **N6** (pre-registered 22 October 2026): Efe's own network on PIT-4B's frozen eyes,
+     the checkpoints brought to one scale first (`eyes_check.py`, `align_check.py`). At most
+     ten variants on 2018-2021, each beating two placebos; a second look at 2022-2026;
+     then a forward record, alpha 0.625%.
 
 **Gate M2:**
 - the engine's backtest reproduces the research result for every day;

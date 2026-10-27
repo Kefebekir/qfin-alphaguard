@@ -14,7 +14,7 @@ tried on them is listed here before its holdout run.
 | N2 | 2026-10-16 13:43:43 | `N2_member_news_next_day.txt` | `ea92212a00d072e7bc294aeb4e6cb607aee3fedfab4a6c3c86fe8e2ac698190a` | A member's news to 15:30 tells its next close-to-close return against the other members with news; long the top tenth, short the bottom tenth | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (amendments 2 and 3; it was t ≥ 2.24 after 10 bps) | **Failed.** Variant 2 (64 components): −2.22 bps a day after costs, t −0.78, over 1,197 days; −4.19 / +5.03 / −5.87 / −1.46 / −5.26 in 2022-2026. The count alone: −3.10, t −1.19 |
 | N3 | 2026-10-18 17:07 | `N3_member_news_pit4b.txt` | `1e3cd2b547670b44218ab1eec68ddb9a69eb0015ab974d05635883f11e79264c` | N2 read by PIT-4B, a 4-billion-parameter point-in-time model, its last token's state or its mean (amendment 4: the base model only) | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 | **Failed.** Variant 1 (64 components, base-last): +4.24 bps a day after costs, t +1.18, over 1,197 days; +0.84 / +7.67 / +5.33 / −11.34 / +22.88 in 2022-2026. The count alone: −3.10, t −1.19 |
 | N4 | 2026-10-21 13:05 | `N4_member_news_less_noise.txt` | `e9027c6b00801b2ddcede19fc3fc5618076234eae02d19bcdb6c4f405d788bd5` | N3 read with less noise: the target scaled by volatility, a fifth or a third per side, weights inverse to volatility, statistical sectors neutral; tuned on 2018-2021. Designed after N2's and N3's holdouts were seen, so its run on those years is a second look, and a pass leads only to the shadow record | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (its own 0.625%) | **Failed.** Variant 2 (64 components, base-last, target scaled): +6.53 bps a day after costs, t +1.86, over 1,197 days; +1.32 / +5.78 / +5.97 / −9.42 / +35.55 in 2022-2026; without 2026, +0.92. Explored beside it (amendment 6): variants 6, 10 and 8, +3.09, +1.03 and +0.97 |
-| N5 | 2026-10-21 14:23 | `N5_n4_forward_record.txt` | `2e9395f7d7c6f826d5234e900084abd554c1c557ec2d52aeceff22e32ce68c60` | N4's variant 2, frozen (fitted once on 2016 – 9 October 2026), run forward each session in the shadow record: headlines captured at 15:31, read by PIT-4B-202412, scored after the next close | the betting test against no trade, clip 0.085, alpha 1.25% (wealth 80); reviewed 31 December 2028 | pending: the record has not started |
+| N5 | 2026-10-21 14:23 | `N5_n4_forward_record.txt` | `2e9395f7d7c6f826d5234e900084abd554c1c557ec2d52aeceff22e32ce68c60` | N4's variant 2, frozen (fitted once on 2016 – 9 October 2026), run forward each session in the shadow record: headlines captured at 15:31, read by PIT-4B-202412, scored after the next close | the betting test against no trade, clip 0.085, alpha 1.25% (wealth 80); reviewed 31 December 2028 | running: the record from 23 October 2026 |
 | N6 | 2026-10-22 18:55 | `N6_own_network.txt` | `4a0b768901705b4db2b87e8237728ebca5b893cd6edc3b6e5d98bdc184106fd0` | A network trained by Efe on PIT-4B's frozen eyes (method B): a learned projection, attention over the member-day's last 32 headlines, its context from the session before; designed after every year was seen, so tested forward | development: above both placebos, the highest of at most 10 variants on 2018-2021; second look 2022-2026 above 0; then the betting test against no trade, alpha 0.625% (wealth 160) | pending: no development run yet |
 
 ## Amendments
@@ -292,6 +292,12 @@ Each choice run again on the holdout years by `dev_report.py reports`, reproduci
   article-member pairs and 1,364 member-days; each headline's embedding to a cosine of
   1.000000; the same sides on 10 of 10 days; scores equal to `harness.n4_days`' to 0.000000
   bps. What the record measures is what N4's holdout measured.
+
+- **The card's commit and its first day.** The card (commit 45f808c) went to GitHub with PR
+  #73 at 11:19 UTC on 22 October 2026, and the first full capture with the 30-day margin ran
+  at 15:32 New York time that day (27,045 articles). The pre-registration's first day is the
+  first session after both: 23 October, as the card says. The pull request was merged into
+  main on 27 October; the card's content is the one fixed on 22 October.
 
 ## The checkpoints seen side by side (22 October 2026; an observation, not a test)
 
