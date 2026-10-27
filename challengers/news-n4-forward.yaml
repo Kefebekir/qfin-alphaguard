@@ -1,0 +1,20 @@
+name: news-n4-forward
+description: >-
+  N4's variant 2, frozen: each S&P 500 member's headlines to 15:30, as captured at 15:31 and
+  read by PIT-4B-202412, through 64 principal components and ridge; long the top tenth of
+  the members with news, short the bottom tenth, close to close, less 2 bps a day.
+  Pre-registration N5 (research/news_reader/preregistrations/N5_n4_forward_record.txt):
+  judged against no trade, not against the QQQ rule, so its scale and clip are the
+  pre-registration's; research/news_reader/forward_record.py keeps its record.
+owner: Efe
+code_commit: 9d44c221b33ed2e1543781c5ef53d95f470d809d
+weights: data/models/news-n4-forward.npz
+weights_sha256: eafc16cd647c3f2ec545d2eb35d810a6fe1d04ef3032b41837b2fbe7fc4bcb15
+trained_from: 2016-01-05
+trained_to: 2026-10-09
+frozen_at: 2026-10-22 10:44:09+00:00
+record_from: 2026-10-23
+scale: 1.0
+clip: 0.085
+alpha: 0.0125
+retired_on: null
