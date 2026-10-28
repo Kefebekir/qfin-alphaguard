@@ -107,6 +107,10 @@ def run(name: str, s: nm.Settings, a=None, store=None, seeds=SEEDS) -> dict:
         years[year] = {}
         for label in LABELS:
             forecast = nm.ensemble(arrays[label], trained, validated, s, seeds, store)
+            if not np.isfinite(forecast).all():
+                raise FloatingPointError(
+                    f"{year}, {label}: forecasts that are not finite; nothing is scored"
+                )
             scored = nh.score(a, validated, forecast)
             days[label] += scored
             years[year][label] = nh.summary(scored)

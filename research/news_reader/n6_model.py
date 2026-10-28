@@ -248,6 +248,8 @@ def fit(a: Arrays, trained: np.ndarray, s: Settings, seed: int, store, x=None) -
     model.train()
     for _ in range(s.epochs):
         for rows in batches(a.day, trained, s.days_per_batch, rng):
+            if s.loss == "sharpe" and len(np.unique(a.day[rows])) < 2:
+                continue  # a Sharpe ratio needs two days: an epoch's last single day waits
             batch = take(x, torch.as_tensor(rows, device=device))
             forecast, size = model(store, batch)
             loss = loss_of(s, forecast, size, batch)
