@@ -94,14 +94,23 @@ def n4_years() -> dict:
     return {}
 
 
-def run(name: str, s: nm.Settings, a=None, store=None, seeds=SEEDS) -> dict:
-    """The variant and its placebos on every development year."""
+def run(
+    name: str,
+    s: nm.Settings,
+    a=None,
+    store=None,
+    seeds=SEEDS,
+    years_run=None,
+    keep_days: bool = False,
+) -> dict:
+    """The variant and its placebos on every year of `years_run` (the development years
+    unless told), with the variant's days when `keep_days` (the second look)."""
     a = a if a is not None else nh.load()
     store = store if store is not None else gpu_store()
     arrays = {"model": a, "dealt": None, "silent": nh.silent(a)}
     days = {label: [] for label in LABELS}
     years = {}
-    for year in nh.DEVELOPMENT:
+    for year in years_run or nh.DEVELOPMENT:
         trained, validated = nh.fold(a, year)
         arrays["dealt"] = nh.deal(a, seed=year)
         years[year] = {}
@@ -120,7 +129,12 @@ def run(name: str, s: nm.Settings, a=None, store=None, seeds=SEEDS) -> dict:
             flush=True,
         )
     total = {label: nh.summary(days[label]) for label in LABELS}
-    return {
+    kept = (
+        {"days": [d | {"day": str(d["day"])} for d in days["model"]]}
+        if keep_days
+        else {}
+    )
+    return kept | {
         "name": name,
         "settings": asdict(s),
         "seeds": list(seeds),
