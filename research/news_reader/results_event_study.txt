@@ -1,0 +1,44 @@
+event_study.py: member-days by the kinds of their headlines, returns beyond all
+S&P 500 members' mean that day, in bps a day (t over days; member-days).
+
+2016-2021
+kind                               the day             night after            next session                next day              5 sessions
+all with news          +4.4 ( +4.9; 109828)     +0.0 ( +0.1; 109813)     -1.1 ( -1.8; 109813)     -1.1 ( -1.5; 109813)     -0.1 ( -0.1; 109759)
+upgrade              +126.2 (+33.9;  7534)     +1.2 ( +1.0;  7534)     +1.1 ( +0.5;  7534)     +2.2 ( +0.9;  7534)     -3.4 ( -0.6;  7534)
+downgrade            -160.1 (-26.4;  7112)     -0.9 ( -0.4;  7111)     -6.9 ( -2.0;  7111)     -7.8 ( -1.9;  7111)     -5.0 ( -0.5;  7108)
+target raised         +63.7 (+11.3; 14347)     -0.1 ( -0.1; 14347)     -0.1 ( -0.0; 14347)     -0.4 ( -0.1; 14347)     +0.8 ( +0.1; 14345)
+target lowered       -111.2 (-14.5;  7856)     -0.6 ( -0.3;  7856)     +3.2 ( +0.9;  7856)     +2.4 ( +0.6;  7856)     +1.3 ( +0.2;  7856)
+earnings beat         +86.9 ( +5.7;  4435)     +2.6 ( +1.1;  4435)     -5.7 ( -1.0;  4435)     -3.3 ( -0.5;  4435)     +0.6 ( +0.1;  4435)
+earnings miss        -276.5 (-10.6;   956)     -7.5 ( -1.9;   956)     +7.8 ( +0.8;   956)     +0.3 ( +0.0;   956)    -13.9 ( -0.7;   956)
+guidance raised      +122.7 ( +7.1;  1280)    +10.1 ( +3.7;  1280)    -14.1 ( -2.4;  1280)     -4.0 ( -0.6;  1280)     +5.9 ( +0.5;  1280)
+guidance lowered     -385.4 (-10.7;   419)    -20.3 ( -3.8;   419)     +1.5 ( +0.1;   419)    -18.5 ( -1.5;   419)    +12.2 ( +0.5;   419)
+
+2022-2026
+kind                               the day             night after            next session                next day              5 sessions
+all with news          +2.8 ( +3.5; 150358)     -0.2 ( -0.5; 150159)     +0.1 ( +0.2; 150159)     -0.1 ( -0.2; 150159)     +4.8 ( +3.2; 149491)
+upgrade              +148.3 (+24.5;  4949)     -2.2 ( -1.1;  4941)     +2.2 ( +0.7;  4941)     -0.1 ( -0.0;  4941)     +8.5 ( +1.1;  4926)
+downgrade            -191.8 (-19.8;  4667)     -2.3 ( -0.6;  4665)     +0.4 ( +0.1;  4665)     -2.0 ( -0.4;  4665)     -5.2 ( -0.6;  4651)
+target raised         +46.5 (+16.9; 26960)     +2.4 ( +1.9; 26927)     -0.6 ( -0.3; 26927)     +1.7 ( +0.8; 26927)     +7.1 ( +1.5; 26815)
+target lowered        -52.9 (-15.3; 20502)     -1.8 ( -1.3; 20423)     +0.7 ( +0.4; 20423)     -1.1 ( -0.5; 20423)     -3.1 ( -0.6; 20230)
+earnings beat         +95.1 ( +6.0;  5804)     -2.1 ( -0.8;  5804)     +6.1 ( +1.1;  5804)     +3.9 ( +0.6;  5804)     +6.1 ( +0.5;  5800)
+earnings miss        -301.6 (-11.6;  1184)     -4.6 ( -1.0;  1184)    +11.3 ( +1.3;  1184)     +6.7 ( +0.7;  1184)    +24.9 ( +1.5;  1183)
+guidance raised      +162.5 ( +7.7;  1445)     +6.3 ( +1.8;  1445)     -5.8 ( -0.8;  1445)     +0.3 ( +0.0;  1445)     -6.2 ( -0.4;  1444)
+guidance lowered     -244.2 ( -6.8;   509)    -16.8 ( -2.3;   509)    +23.8 ( +1.9;   509)     +6.5 ( +0.5;   509)     +8.8 ( +0.4;   506)
+
+The next day and 5 sessions by when the headline came: in the session (within 6 hours of 15:30) or before it; 2016-2026.
+upgrade           in the session    next day   +0.1 (t  +0.0;  3032)  5 sessions   +1.7 (t  +0.2;  3029)
+upgrade           before it         next day   +2.1 (t  +0.9;  9443)  5 sessions   +6.5 (t  +1.2;  9431)
+downgrade         in the session    next day   +4.8 (t  +0.9;  2767)  5 sessions  -10.4 (t  -0.8;  2764)
+downgrade         before it         next day   -7.8 (t  -2.1;  9009)  5 sessions   -1.1 (t  -0.2;  8995)
+target raised     in the session    next day   -4.7 (t  -1.7; 20366)  5 sessions   -7.7 (t  -1.4; 20303)
+target raised     before it         next day   +2.0 (t  +1.0; 20908)  5 sessions   +6.4 (t  +1.3; 20857)
+target lowered    in the session    next day   +4.7 (t  +1.5; 13625)  5 sessions   +3.8 (t  +0.5; 13504)
+target lowered    before it         next day   -2.7 (t  -1.0; 14654)  5 sessions   -4.0 (t  -0.7; 14582)
+earnings beat     in the session    next day  -23.5 (t  -1.5;   218)  5 sessions  -26.2 (t  -0.7;   218)
+earnings beat     before it         next day   +1.5 (t  +0.3; 10021)  5 sessions   +5.1 (t  +0.6; 10017)
+earnings miss     in the session    next day  +13.5 (t  +0.5;    85)  5 sessions  +25.9 (t  +0.5;    85)
+earnings miss     before it         next day   +3.2 (t  +0.5;  2055)  5 sessions   +4.7 (t  +0.4;  2054)
+guidance raised   in the session    next day   -8.2 (t  -0.7;   374)  5 sessions  -13.3 (t  -0.6;   374)
+guidance raised   before it         next day   -1.9 (t  -0.3;  2351)  5 sessions   +1.6 (t  +0.2;  2350)
+guidance lowered  in the session    next day   +4.3 (t  +0.2;   226)  5 sessions  +22.0 (t  +0.6;   226)
+guidance lowered  before it         next day  -13.1 (t  -1.3;   702)  5 sessions   -1.2 (t  -0.1;   699)
