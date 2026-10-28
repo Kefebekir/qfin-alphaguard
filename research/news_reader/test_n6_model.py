@@ -81,8 +81,9 @@ def test_the_recommended_model_fits_the_hardware_cap():
     a, _ = world(days=2)
     model = model_for(a, nm.Settings())
     assert nm.WIDTH * 32 < nm.parameters(model) < nm.MAX_PARAMETERS
-    big = nm.Settings(dim=64)
-    with pytest.raises(ValueError, match="decision 6"):
+    assert nm.parameters(model_for(a, nm.Settings(dim=256))) < nm.MAX_PARAMETERS
+    big = nm.Settings(dim=300)  # 4,096 x 300 = 1.23 million: above amendment 8's cap
+    with pytest.raises(ValueError, match="amendment 8"):
         nm.fit(a, np.ones(len(a.day), bool), big, 0, world(days=2)[1])
 
 
