@@ -1,0 +1,20 @@
+AMENDMENT 7 TO N6
+Written 2026-10-27 23:42 UTC, after variant 1 ran and before any variant uses it; approved by
+Efe at 2026-10-28 00:15 UTC.
+
+Variant 1 changed three things from N4 at once: a learned projection, attention over the
+headlines, and the context. It made -1.52 bps a day after costs on 2018-2021 (t -0.32), below
+its dealt placebo, and the context alone lost 5.97 a day. Which of the three hurt cannot be
+told from it. So one lever is added:
+
+- inputs: "all", as before (the headlines, their count and the context), or "news" (the
+  headlines and their count; the context network is not built). A variant written in the
+  ledger before this amendment has inputs "all".
+
+With "news", the second placebo has nothing to read: its forecasts are all equal, it never
+trades, and it makes 0. The placebo gate then asks the variant's mean a day after costs over
+the four years to be above its dealt placebo's and above 0.
+
+Nothing else changes: at most ten variants in all (one has run), each in the ledger before it
+runs; the choice of the highest mean of those through the gate; the second look; the forward
+test, its alpha of 0.625% and its clip.

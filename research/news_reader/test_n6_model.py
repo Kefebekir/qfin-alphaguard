@@ -192,3 +192,37 @@ def test_settings_are_checked():
         nm.Settings(dropout=1.0)
     with pytest.raises(ValueError, match="start is one of"):
         nm.Settings(start="zeros")
+    with pytest.raises(ValueError, match="inputs is one of"):
+        nm.Settings(inputs="context")
+
+
+def test_a_model_on_the_news_alone_reads_no_context():
+    a, store = world(days=2)
+    s = replace(SMALL, inputs="news")
+    model = model_for(a, s)
+    assert not hasattr(model, "context")
+    assert nm.parameters(model) < nm.parameters(model_for(a))
+    rows = np.arange(20)
+    before = forward(model, a, store, rows)
+    g = np.random.default_rng(9)
+    other = replace(
+        a,
+        member=g.normal(size=a.member.shape).astype(np.float32),
+        market=g.normal(size=a.market.shape).astype(np.float32),
+        sector=(a.sector + 1) % 10,
+        weekday=(a.weekday + 1) % 5,
+    )
+    np.testing.assert_array_equal(before, forward(model, other, store, rows))
+    quiet = forward(model, nh.silent(a), store, rows)
+    assert np.ptp(quiet) == 0  # nothing to read: one forecast for all
+
+
+def test_the_news_alone_still_learns_the_headlines_signal():
+    a, store = world(days=200, signal=1.0)
+    s = nm.Settings(
+        dim=8, attention=4, hidden=16, dropout=0.0, epochs=8, lr=3e-3, inputs="news"
+    )
+    trained = a.day < 150
+    validated = (a.day >= 150) & (a.count > 0)
+    forecast = nm.ensemble(a, trained, validated, s, [0], store)
+    assert np.corrcoef(forecast, a.y[validated])[0, 1] > 0.8

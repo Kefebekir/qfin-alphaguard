@@ -212,7 +212,8 @@ head on the size of the move (`aux`).
 
 The levers, as `name=value` (defaults in brackets): `dim` (32), `attention` (16), `context`
 (32), `hidden` (32), `dropout` (0.1), `loss` (mse), `aux` (0.1), `lr` (0.001), `decay`
-(0.0001), `epochs` (10), `days_per_batch` (8), `start` (pca). A model has at most 250,000
+(0.0001), `epochs` (10), `days_per_batch` (8), `start` (pca), and, by amendment 7, `inputs`
+(all; `news` leaves the context out). A model has at most 250,000
 parameters (decision 6); `dim` 32 uses 131,000 of them.
 
 Before the first run, a check that shows no score:

@@ -23,6 +23,7 @@ def test_settings_come_as_name_value_pairs_of_their_own_types():
     assert name == "v1"
     assert (s.dim, s.lr, s.loss, s.start) == (16, 0.003, "sharpe", "random")
     assert nr.parse(["v2"])[1] == nm.Settings()
+    assert nr.parse(["v3", "inputs=news"])[1].inputs == "news"
     with pytest.raises(SystemExit, match="unknown setting"):
         nr.parse(["v1", "depth=3"])
     with pytest.raises(SystemExit, match="usage"):
@@ -139,3 +140,11 @@ def test_a_variant_is_in_the_ledger_before_it_runs_and_stays_if_it_fails(
     assert (chosen["variant"], chosen["name"]) == (1, "v1")
     with pytest.raises(SystemExit, match="development is over"):
         nr.main(["v2", "dim=8"])
+
+
+def test_a_news_alone_variant_s_page_names_its_second_placebo():
+    result = fake("v3")
+    result["settings"]["inputs"] = "news"
+    assert "nothing to read" in nr.page(result)
+    assert "the context alone" not in nr.page(result)
+    assert "the context alone" in nr.page(fake("v1"))

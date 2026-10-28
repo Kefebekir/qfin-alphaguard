@@ -102,3 +102,19 @@ def test_the_choice_is_the_best_of_those_above_both_placebos(tmp_path):
             ),
             {"x": result("x", 1, 2, 0, {})},
         )
+
+
+def test_a_row_from_before_amendment_7_is_the_same_settings_with_inputs_all(tmp_path):
+    ledger, _ = nl.start(LEDGER, "v1", {"dim": 32, "loss": "mse"}, "t", tmp_path / "c")
+    with pytest.raises(SystemExit, match="variant 1, v1, already"):
+        nl.start(
+            ledger,
+            "v9",
+            {"dim": 32, "loss": "mse", "inputs": "all"},
+            "t",
+            tmp_path / "c",
+        )
+    _, n = nl.start(
+        ledger, "v2", {"dim": 32, "loss": "mse", "inputs": "news"}, "t", tmp_path / "c"
+    )
+    assert n == 2
