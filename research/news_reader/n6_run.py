@@ -143,8 +143,11 @@ def page(result: dict) -> str:
                 out += f"<td class='num'>{signed(bps)} <span class='t'>t {signed(t)}</span></td>"
         return out
 
+    labels = dict(LABELS)
+    if result["settings"].get("inputs") == "news":  # amendment 7: no context to keep
+        labels["silent"] = "Placebo: nothing to read (this variant has no context)"
     rows = ""
-    for label, text in LABELS.items():
+    for label, text in labels.items():
         per_year = [(v[label]["bps"], v[label]["t"]) for v in result["years"].values()]
         total = (result["all"][label]["bps"], result["all"][label]["t"])
         rows += f"<tr><td>{html.escape(text)}</td>{cells(per_year, total)}</tr>"

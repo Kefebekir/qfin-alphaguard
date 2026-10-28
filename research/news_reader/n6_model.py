@@ -7,7 +7,7 @@ A member-day's headlines, each a row of N6's eyes (4,096 numbers in 202412's sca
 - with each headline's log(1 + age), edit and two-tag flags, attention pools them into one
   vector: a learned score a headline, softmaxed over the member-day's headlines;
 - the member's and the market's context through a small network, the weekday and the sector
-  embedded;
+  embedded; with inputs="news" (amendment 7) the context is left out;
 - a head on the pooled news, log(1 + count) and the context gives the forecast; a second head
   the size of the move (|target|), weighted by `aux` in the loss.
 
@@ -36,6 +36,7 @@ WIDTH = 4096
 MAX_PARAMETERS = 250_000  # decision 6, recommended: fits an Arty A7 in int8
 LOSSES = ("mse", "sharpe")
 STARTS = ("pca", "random")
+INPUTS = ("all", "news")  # amendment 7: "news" leaves the context out
 PCA_ROWS = 50_000  # training headlines the starting components are taken from
 
 
@@ -55,12 +56,15 @@ class Settings:
     epochs: int = 10
     days_per_batch: int = 8
     start: str = "pca"
+    inputs: str = "all"
 
     def __post_init__(self) -> None:
         if self.loss not in LOSSES:
             raise ValueError(f"loss is one of {LOSSES}, got {self.loss!r}")
         if self.start not in STARTS:
             raise ValueError(f"start is one of {STARTS}, got {self.start!r}")
+        if self.inputs not in INPUTS:
+            raise ValueError(f"inputs is one of {INPUTS}, got {self.inputs!r}")
         for name in (
             "dim",
             "attention",
@@ -82,16 +86,18 @@ class N6(nn.Module):
         self.score = nn.Sequential(
             nn.Linear(s.dim + 3, s.attention), nn.Tanh(), nn.Linear(s.attention, 1)
         )
-        self.weekday = nn.Embedding(5, 2)
-        self.sector = nn.Embedding(NO_SECTOR + 1, 4)
-        self.context = nn.Sequential(
-            nn.Linear(members + markets + events + 2 + 4, s.context),
-            nn.GELU(),
-            nn.Dropout(s.dropout),
-            nn.Linear(s.context, s.context),
-            nn.GELU(),
-        )
-        fused = s.dim + 3 + 1 + s.context
+        self.uses_context = s.inputs == "all"
+        if self.uses_context:  # made in the same order as before amendment 7
+            self.weekday = nn.Embedding(5, 2)
+            self.sector = nn.Embedding(NO_SECTOR + 1, 4)
+            self.context = nn.Sequential(
+                nn.Linear(members + markets + events + 2 + 4, s.context),
+                nn.GELU(),
+                nn.Dropout(s.dropout),
+                nn.Linear(s.context, s.context),
+                nn.GELU(),
+            )
+        fused = s.dim + 3 + 1 + (s.context if self.uses_context else 0)
         self.head = nn.Sequential(
             nn.Dropout(s.dropout),
             nn.Linear(fused, s.hidden),
@@ -115,19 +121,23 @@ class N6(nn.Module):
 
     def forward(self, store, x: dict) -> tuple[torch.Tensor, torch.Tensor]:
         news = self.pool(store, x["heads"], x["info"])
-        context = self.context(
-            torch.cat(
-                [
-                    x["member"],
-                    x["market"],
-                    x["events"],
-                    self.weekday(x["weekday"]),
-                    self.sector(x["sector"]),
-                ],
-                dim=1,
+        parts = [news, x["count"].unsqueeze(1)]
+        if self.uses_context:
+            parts.append(
+                self.context(
+                    torch.cat(
+                        [
+                            x["member"],
+                            x["market"],
+                            x["events"],
+                            self.weekday(x["weekday"]),
+                            self.sector(x["sector"]),
+                        ],
+                        dim=1,
+                    )
+                )
             )
-        )
-        z = torch.cat([news, x["count"].unsqueeze(1), context], dim=1)
+        z = torch.cat(parts, dim=1)
         return self.head(z).squeeze(1), self.size(z).squeeze(1)
 
 

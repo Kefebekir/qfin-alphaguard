@@ -91,6 +91,10 @@ def start(
     if chosen.exists():
         raise SystemExit(f"{chosen} is written: N6's development is over")
     text = settings_text(settings)
+    # rows written before amendment 7 have no inputs: theirs were all
+    older = settings_text(
+        {k: v for k, v in settings.items() if (k, v) != ("inputs", "all")}
+    )
     known = rows(ledger)
     for r in known:
         if r["name"] == name:
@@ -98,7 +102,7 @@ def start(
                 row = _row(r["n"], name, when, text, [RUNNING, "", "", ""])
                 return _replace(ledger, r["n"], row), r["n"]
             raise SystemExit(f"{name} is variant {r['n']} already: a name runs once")
-        if r["settings"] == text:
+        if r["settings"] in (text, older):
             raise SystemExit(
                 f"these settings are variant {r['n']}, {r['name']}, already"
             )
