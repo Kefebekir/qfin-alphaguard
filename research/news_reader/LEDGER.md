@@ -359,4 +359,5 @@ Each written before it runs (n6_run.py); at most 10. The mean a day after costs 
 | # | Name | Run (UTC) | Settings | The variant (t) | Dealt | Context alone | Gate |
 |---|---|---|---|---|---|---|---|
 | 1 | `v1` | 2026-10-27 23:19 | dim=32, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.001, decay=0.0001, epochs=10, days_per_batch=8, start=pca | −1.52 bps (t −0.32) | +3.96 bps (t +0.99) | −5.97 bps (t −0.89) | not passed |
-| 2 | `v2` | 2026-10-28 00:19 | dim=64, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.0001, decay=0.01, epochs=3, days_per_batch=8, start=pca, inputs=all | did not finish |  |  |  |
+| 2 | `v2` | 2026-10-28 12:35 | dim=64, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.0001, decay=0.01, epochs=3, days_per_batch=8, start=pca, inputs=all | +0.11 bps (t +0.03) | +4.56 bps (t +1.24) | −2.13 bps (t −0.28) | not passed |
+| 3 | `v3` | 2026-10-28 12:41 | dim=64, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.0001, decay=0.01, epochs=3, days_per_batch=8, start=pca, inputs=news | +6.77 bps (t +1.61) | +2.65 bps (t +0.70) | +0.00 bps (t +0.00) | passed |
