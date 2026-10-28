@@ -1,0 +1,19 @@
+AMENDMENT 8 TO N6
+Written 2026-10-28 12:16 UTC, after variant 2 stopped at the cap before any model was trained;
+approved by Efe at 2026-10-28 12:22 UTC.
+
+Pre-registration N6 capped a model at 250,000 trainable parameters (decision 6A), so that it
+fits an Arty A7's on-chip memory in int8. Almost all of them are the projection's 4,096 x dim
+weights: dim 32 uses about 135,000 in all, dim 64, N4's number of principal components, about
+269,000. Variant 2 (dim 64) stopped at the cap before any model was trained; nothing of it
+was seen.
+
+The cap becomes 1,100,000, so that the projection can have up to 256 numbers a headline
+(about 1.06 million parameters in all), Efe's choice: about 600,000 and about a million are
+both to be tried. A model of up to about 600,000 parameters still fits an Arty A7-100T's
+on-chip memory in int8; a larger one keeps its weights in the board's DDR memory, slower but
+enough for one decision a session.
+
+Variant 2 runs again under its name and settings, as variant 2. Nothing else changes: at most
+ten variants in all, each in the ledger before it runs; the placebo gate, the choice, the
+second look and the forward test.

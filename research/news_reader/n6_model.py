@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from n6_harness import NO_SECTOR, Arrays, market_scaled
 
 WIDTH = 4096
-MAX_PARAMETERS = 250_000  # decision 6, recommended: fits an Arty A7 in int8
+MAX_PARAMETERS = 1_100_000  # decision 6, amendment 8: up to dim 256
 LOSSES = ("mse", "sharpe")
 STARTS = ("pca", "random")
 INPUTS = ("all", "news")  # amendment 7: "news" leaves the context out
@@ -233,7 +233,8 @@ def fit(a: Arrays, trained: np.ndarray, s: Settings, seed: int, store, x=None) -
     model = N6(s, a.member.shape[1], a.market.shape[1], a.events.shape[1]).to(device)
     if parameters(model) > MAX_PARAMETERS:
         raise ValueError(
-            f"{parameters(model):,} parameters, more than {MAX_PARAMETERS:,} (decision 6)"
+            f"{parameters(model):,} parameters, more than {MAX_PARAMETERS:,} "
+            "(decision 6, amendment 8)"
         )
     rows = a.heads[trained]
     rows = rows[rows >= 0]

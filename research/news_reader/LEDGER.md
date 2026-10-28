@@ -28,6 +28,7 @@ tried on them is listed here before its holdout run.
 | 5 | 2026-10-19 10:22 | `N_amendment_5.txt` | `1d2dd258bc192f7be47dbfbb4e9f87fecc8a6d7b08bd0effee1f3aeb1e5e4ffb` | N2 and N3: members tied at a tenth's edge are all in (the breakpoint convention), not chosen by the order of rows, which was alphabetical: counting alone's −7.06 bps a day was the alphabet's. Efe chose this rule among four scored on counting alone; it is not changed again |
 | 6 | 2026-10-21 13:39 | `N_amendment_6.txt` | `1a9495bc571202c596bc6d61629f496f114cbaa7d7dcaa7c0f494d95ba38d7b6` | N4: the test unchanged (variant 2 once, t ≥ 2.50); by Efe's decision variants 6, 10 and 8 also run once on the same years, as exploration, not tests, beside the bar four tries sharing N4's 0.625% would need, t ≥ 2.96 |
 | 7 | 2026-10-27 23:42 | `N_amendment_7.txt` | `1e873bbaeb8b486355a85f43b2b4df755e8a4bd8349f7eb867df4f3af9167077` | N6: a lever, inputs, "all" (the headlines, their count and the context, as variant 1) or "news" (no context); with "news" the gate asks the variant to beat its dealt placebo and 0. Written after variant 1, before any variant used it |
+| 8 | 2026-10-28 12:16 | `N_amendment_8.txt` | `2582837353258344ee63a59285804e8bcaaaeabac1f32057fd4b5195bada1992` | N6: the cap on a model's trainable parameters from 250,000 to 1,100,000 (the projection up to 256 a headline), Efe's choice to try about 600,000 and about a million; above about 600,000 an FPGA keeps the weights in DDR. Written after variant 2 stopped at the cap before any model was trained |
 
 ## N3's checkpoints
 
@@ -358,3 +359,4 @@ Each written before it runs (n6_run.py); at most 10. The mean a day after costs 
 | # | Name | Run (UTC) | Settings | The variant (t) | Dealt | Context alone | Gate |
 |---|---|---|---|---|---|---|---|
 | 1 | `v1` | 2026-10-27 23:19 | dim=32, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.001, decay=0.0001, epochs=10, days_per_batch=8, start=pca | −1.52 bps (t −0.32) | +3.96 bps (t +0.99) | −5.97 bps (t −0.89) | not passed |
+| 2 | `v2` | 2026-10-28 00:19 | dim=64, attention=16, context=32, hidden=32, dropout=0.1, loss=mse, aux=0.1, lr=0.0001, decay=0.01, epochs=3, days_per_batch=8, start=pca, inputs=all | did not finish |  |  |  |
