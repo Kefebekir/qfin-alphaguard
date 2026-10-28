@@ -367,3 +367,25 @@ Each written before it runs (n6_run.py); at most 10. The mean a day after costs 
 | 7 | `v7` | 2026-10-28 16:01 | dim=64, attention=16, context=32, hidden=32, dropout=0.1, loss=sharpe, aux=0.1, lr=0.0001, decay=0.01, epochs=3, days_per_batch=8, start=pca, inputs=news | did not finish |  |  |  |
 
 Variant 7's first run, on 28 October at 16:01 UTC, gave no number: under the Sharpe loss its 2018 models trained on a batch of one day (the last of each epoch), whose Sharpe ratio has no spread, and the weights became NaN. That was the harness's error, not the settings': a batch of one day is now skipped under that loss, and a run whose forecasts are not finite stops before anything is scored. 2019-2021 had printed (-7.14, +20.95, +7.71 bps a day). It did not finish: it runs again under its name and settings as variant 7.
+
+## When member news is priced (28 October 2026; an observation, not a test)
+
+Measured on the seen years, with no model, to decide what comes after N6
+(`event_study.py`, `intraday_reaction.py`, their results files).
+
+- **The news is priced on its own day.** By the wording of their headlines, the members' news
+  moved them on the day it was known, beyond all members' mean. Each figure is 2016-2021 and
+  2022-2026:
+  - upgrades +126 and +148 bps, downgrades −160 and −192;
+  - earnings misses −277 and −302;
+  - guidance lowered −385 and −244.
+
+  The next day, close to close, which N2 to N6 hold, kept almost nothing of it: no kind beyond
+  about two standard errors, and most within one. Five sessions on, the same.
+- **In the session, Benzinga's headline comes after the move.** For the most liquid members,
+  in the 30 minutes before the headline the stock had moved its way by +3.4 bps on average in
+  2016-2021 (t +2.2). Downgrades led the most: the stock had already fallen 9.6 bps (t +3.3).
+  In the arrival minute it moved 0 to 1 bps. After it, it drifted 1 to 2 bps in 5 to 30
+  minutes in 2022-2026 (t about 2), less than a round trip's cost.
+- **What N3 to N6 find is subtler than these kinds.** Their few bps a day come from what
+  remains after the day's reaction.

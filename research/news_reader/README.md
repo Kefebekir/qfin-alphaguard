@@ -43,6 +43,7 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N6's context: each member-day's prices, market and calendar, from the closes of the session before | `n6_context.py` | `news_reader/n6/context.parquet`, `results_n6_context.txt` |
 | N6's data: each member-day's headlines one by one (with their age at 15:30), its context and its next return | `n6_data.py` | `news_reader/n6/days.parquet`, `pairs.parquet`, `results_n6_data.txt` |
 | N6's harness, network and Efe's runs: folds, target, placebos, N4's portfolio; the projection, attention and heads (PyTorch); each variant in the ledger before it runs, and the choice | `n6_harness.py`, `n6_model.py`, `n6_run.py`, `n6_ledger.py` | `news_reader/n6/dev/<name>.json`, `.html`, `variants/N6_chosen.json` |
+| Before N7: which kinds of member news move prices, and when, by day and by minute (seen years, no model) | `event_study.py`, `intraday_reaction.py` | `results_event_study.txt`, `results_intraday_reaction.txt` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 | N5: N4's variant 2 fitted once, frozen as plain arrays | `forward.py` | `models/news-n4-forward.npz` |
 | N5: the record's path against the research's, on ten past sessions | `forward_check.py` | `results_forward_check.txt` |
