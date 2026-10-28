@@ -148,3 +148,31 @@ def test_a_news_alone_variant_s_page_names_its_second_placebo():
     assert "nothing to read" in nr.page(result)
     assert "the context alone" not in nr.page(result)
     assert "the context alone" in nr.page(fake("v1"))
+
+
+def test_forecasts_that_are_not_finite_stop_the_run_and_it_does_not_finish(
+    tmp_path, monkeypatch
+):
+    a, store = world(days=300, first=date(2017, 6, 1))
+    monkeypatch.setattr(nh, "DEVELOPMENT", (2018,))
+    monkeypatch.setattr(nr, "n4_years", dict)
+    monkeypatch.setattr(
+        nm,
+        "ensemble",
+        lambda arrays, trained, validated, *rest: np.full(validated.sum(), np.nan),
+    )
+    with pytest.raises(
+        FloatingPointError, match="2018, model: forecasts that are not finite"
+    ):
+        nr.run("t", nm.Settings(dim=8), a, store, seeds=(0,))
+    ledger = tmp_path / "LEDGER.md"
+    ledger.write_text("# Ledger\n")
+    monkeypatch.setattr(nr.n6_ledger, "LEDGER", ledger)
+    monkeypatch.setattr(nr.n6_ledger, "CHOSEN", tmp_path / "chosen.json")
+    monkeypatch.setattr(nr, "OUT", tmp_path / "dev")
+    monkeypatch.setattr(nh, "load", lambda: a)
+    monkeypatch.setattr(nr, "gpu_store", lambda: store)
+    with pytest.raises(FloatingPointError):
+        nr.main(["v7", "dim=8"])
+    assert nr.n6_ledger.rows(ledger.read_text())[0]["result"] == "did not finish"
+    assert not (tmp_path / "dev" / "v7.json").exists()

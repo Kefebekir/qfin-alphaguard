@@ -227,3 +227,17 @@ def test_the_news_alone_still_learns_the_headlines_signal():
     validated = (a.day >= 150) & (a.count > 0)
     forecast = nm.ensemble(a, trained, validated, s, [0], store)
     assert np.corrcoef(forecast, a.y[validated])[0, 1] > 0.8
+
+
+def test_the_sharpe_loss_skips_a_batch_of_one_day():
+    a, store = world(days=17)  # 17 days in batches of 8: the last batch is one day
+    groups = nm.batches(a.day, np.ones(len(a.day), bool), 8, np.random.default_rng(0))
+    assert sorted(len(np.unique(a.day[g])) for g in groups) == [1, 8, 8]
+    one = torch.tensor([0.5, -0.5])
+    assert torch.isnan(
+        nm.sharpe_loss(one, one, torch.tensor([3, 3]))
+    )  # why it is skipped
+    s = replace(SMALL, loss="sharpe", days_per_batch=8, epochs=2)
+    rows = np.ones(len(a.day), bool)
+    forecast = nm.ensemble(a, rows, rows, s, [0], store)
+    assert np.isfinite(forecast).all()
