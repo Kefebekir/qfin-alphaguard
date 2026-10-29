@@ -390,3 +390,18 @@ Measured on the seen years, with no model, to decide what comes after N6
   minutes in 2022-2026 (t about 2), less than a round trip's cost.
 - **What N3 to N6 find is subtler than these kinds.** Their few bps a day come from what
   remains after the day's reaction.
+
+## N6's second look (run once, 2026-10-29, commit 7df7214; seen years, not a test)
+
+Variant 3, `v3`, on 2022 to 9 October 2026:
++6.11 bps a day (t +1.99) after costs over 1,197 days. **Above 0: a card may be made.**
+
+- Each year: 2022 +10.54, 2023 +0.03, 2024 +4.97, 2025 −3.34, 2026 +21.87.
+- Before costs +8.11 bps a day (t +2.65); the long side +2.74 bps a day (t +1.30) and the short side
+  +5.38 bps a day (t +2.68), each against the mean of the day's members with news.
+- The placebos: headlines dealt within each day −3.01, the second
+  +0.00.
+- N6 less N4's variant 2, day by day: −0.42 bps a day (t −0.12) over 1,197 days
+  (N4's variant 2 +6.53 on them).
+- The forward test's clip, the largest absolute daily score rounded up to 0.1%:
+  0.092.
