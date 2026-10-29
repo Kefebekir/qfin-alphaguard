@@ -238,6 +238,16 @@ When you are done (ten at most), the choice by the rule, written to
 PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_run.py choose
 ```
 
+Then, with `variants/N6_chosen.json` committed, the second look on 2022 to 9 October 2026,
+once (it locks its result and adds it to the ledger; run again, it only writes the page):
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_second.py
+```
+
+It must make more than 0 a day after costs, or no card is made; it also fixes the forward
+test's clip.
+
 For each development year 2018-2021 it trains five seeds on the years before (less five
 sessions) and averages them, does the same for the two placebos (the day's headlines dealt
 again among its members, and the context alone), and scores all three with N4's variant 2's

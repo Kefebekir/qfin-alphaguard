@@ -88,6 +88,10 @@ def test_a_run_scores_the_variant_beside_its_placebos(monkeypatch):
     assert "passes the placebo gate" in page and "N4&#x27;s variant 2" not in page
     assert "N4's variant 2</td>" in page and page.count("<tr>") == 5
     json.dumps(result)  # it is stored as JSON
+    again = nr.run("t", s, a, store, seeds=(0,), years_run=(2018,), keep_days=True)
+    assert len(again["days"]) == again["all"]["model"]["days"]
+    assert all(isinstance(d["day"], str) for d in again["days"])
+    json.dumps(again)
 
 
 def fake(name):
