@@ -15,7 +15,7 @@ tried on them is listed here before its holdout run.
 | N3 | 2026-10-18 17:07 | `N3_member_news_pit4b.txt` | `1e3cd2b547670b44218ab1eec68ddb9a69eb0015ab974d05635883f11e79264c` | N2 read by PIT-4B, a 4-billion-parameter point-in-time model, its last token's state or its mean (amendment 4: the base model only) | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 | **Failed.** Variant 1 (64 components, base-last): +4.24 bps a day after costs, t +1.18, over 1,197 days; +0.84 / +7.67 / +5.33 / −11.34 / +22.88 in 2022-2026. The count alone: −3.10, t −1.19 |
 | N4 | 2026-10-21 13:05 | `N4_member_news_less_noise.txt` | `e9027c6b00801b2ddcede19fc3fc5618076234eae02d19bcdb6c4f405d788bd5` | N3 read with less noise: the target scaled by volatility, a fifth or a third per side, weights inverse to volatility, statistical sectors neutral; tuned on 2018-2021. Designed after N2's and N3's holdouts were seen, so its run on those years is a second look, and a pass leads only to the shadow record | one-sided t ≥ 2.50 after 1 bp a round trip a side, 2022 – 9 October 2026 (its own 0.625%) | **Failed.** Variant 2 (64 components, base-last, target scaled): +6.53 bps a day after costs, t +1.86, over 1,197 days; +1.32 / +5.78 / +5.97 / −9.42 / +35.55 in 2022-2026; without 2026, +0.92. Explored beside it (amendment 6): variants 6, 10 and 8, +3.09, +1.03 and +0.97 |
 | N5 | 2026-10-21 14:23 | `N5_n4_forward_record.txt` | `2e9395f7d7c6f826d5234e900084abd554c1c557ec2d52aeceff22e32ce68c60` | N4's variant 2, frozen (fitted once on 2016 – 9 October 2026), run forward each session in the shadow record: headlines captured at 15:31, read by PIT-4B-202412, scored after the next close | the betting test against no trade, clip 0.085, alpha 1.25% (wealth 80); reviewed 31 December 2028 | running: the record from 23 October 2026 |
-| N6 | 2026-10-22 18:55 | `N6_own_network.txt` | `4a0b768901705b4db2b87e8237728ebca5b893cd6edc3b6e5d98bdc184106fd0` | A network trained by Efe on PIT-4B's frozen eyes (method B): a learned projection, attention over the member-day's last 32 headlines, its context from the session before; designed after every year was seen, so tested forward | development: above both placebos, the highest of at most 10 variants on 2018-2021; second look 2022-2026 above 0; then the betting test against no trade, alpha 0.625% (wealth 160) | pending: no development run yet |
+| N6 | 2026-10-22 18:55 | `N6_own_network.txt` | `4a0b768901705b4db2b87e8237728ebca5b893cd6edc3b6e5d98bdc184106fd0` | A network trained by Efe on PIT-4B's frozen eyes (method B): a learned projection, attention over the member-day's last 32 headlines, its context from the session before; designed after every year was seen, so tested forward | development: above both placebos, the highest of at most 10 variants on 2018-2021; second look 2022-2026 above 0; then the betting test against no trade, alpha 0.625% (wealth 160) | running: the record from 30 October 2026 (variant 3, second look +6.11 bps a day) |
 
 ## Amendments
 
@@ -405,3 +405,22 @@ Variant 3, `v3`, on 2022 to 9 October 2026:
   (N4's variant 2 +6.53 on them).
 - The forward test's clip, the largest absolute daily score rounded up to 0.1%:
   0.092.
+
+## N6's record, before its first day (29 October 2026)
+
+- **Frozen** at 10:26 UTC by Efe (`n6_freeze.py`): variant 3's five seeds, fitted on 259,967
+  member-days, 5 January 2016 to 9 October 2026, `data/models/news-n6-forward.npz`, SHA-256
+  `e68301a53fad3229810c89f858b88f5e9e4ac389bd48b32224505ee185fd0164`. Loaded again, the
+  arrays give the fitted networks' forecasts exactly. Its card,
+  `challengers/news-n6-forward.yaml`, names the record's commit (be3a370) and its first day,
+  30 October 2026, the first session whose window opens after the card is committed.
+- **The record's path against N6's research** (`n6_record_check.py`,
+  `results_n6_record_check.txt`), ten sessions to 8 October 2026:
+  - the same member-days, counts and headlines, in order;
+  - the flags to 4.8e-07, and each vector to a cosine of 1.000000;
+  - the frozen networks' forecasts to 1.6e-08, against a spread of 0.054;
+  - the days' scores to 0.0000 bps.
+
+  What the record measures is what the second look measured.
+- **Its test:** the betting test against no trade, clip 0.092 and alpha 0.00625 (wealth 160).
+  With N5's 0.0125, the cards hold 0.01875 of the platform's 0.025.
