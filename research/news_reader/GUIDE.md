@@ -248,6 +248,13 @@ PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_second.py
 It must make more than 0 a day after costs, or no card is made; it also fixes the forward
 test's clip.
 
+If it does, the chosen variant is frozen once, five seeds fitted on every member-day from 2016
+to 9 October 2026, and its file's SHA-256 goes on the card:
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_freeze.py
+```
+
 For each development year 2018-2021 it trains five seeds on the years before (less five
 sessions) and averages them, does the same for the two placebos (the day's headlines dealt
 again among its members, and the context alone), and scores all three with N4's variant 2's
