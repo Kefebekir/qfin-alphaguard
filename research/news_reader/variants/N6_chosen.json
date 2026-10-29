@@ -1,0 +1,32 @@
+{
+ "variant": 3,
+ "name": "v3",
+ "settings": {
+  "dim": 64,
+  "attention": 16,
+  "context": 32,
+  "hidden": 32,
+  "dropout": 0.1,
+  "loss": "mse",
+  "aux": 0.1,
+  "lr": 0.0001,
+  "decay": 0.01,
+  "epochs": 3,
+  "days_per_batch": 8,
+  "start": "pca",
+  "inputs": "news"
+ },
+ "seeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ],
+ "development": {
+  "bps": 6.774399415788703,
+  "t": 1.6082007146114687,
+  "days": 998
+ },
+ "rule": "the highest mean a day after costs over 2018-2021 of the variants above both their placebos (pre-registration N6)"
+}
