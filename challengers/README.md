@@ -7,6 +7,7 @@ committed before its record's first day
 | Card | What | Record kept by | `alpha` |
 | --- | --- | --- | --- |
 | `news-n4-forward.yaml` | N4's news long-short, frozen; judged against no trade, its scale and clip set by pre-registration N5 | `research/news_reader/forward_record.py` | 0.0125 |
+| `news-n6-forward.yaml` | N6's network on PIT-4B's frozen eyes, the same long-short; judged against no trade, its clip from its second look (pre-registration N6) | `research/news_reader/n6_record.py` | 0.00625 |
 
 A card is never edited after it is committed, except to set `retired_on`.
 It is never deleted: its share of the chance of error stays spent.

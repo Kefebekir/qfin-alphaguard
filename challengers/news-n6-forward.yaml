@@ -1,0 +1,22 @@
+name: news-n6-forward
+description: >-
+  N6's chosen variant 3, frozen: Efe's network on PIT-4B's frozen eyes. Each S&P 500 member's
+  last 32 headlines to 15:30, as captured at 15:31, read by PIT-4B-202412 and put in N6's scale
+  (n6-eyes.npz), with their age, edit and two-tag flags and their count, through a learned
+  projection to 64 numbers and attention; five seeds averaged. Long the top tenth of the
+  members with news, short the bottom tenth, close to close, less 2 bps a day.
+  Pre-registration N6 (research/news_reader/preregistrations/N6_own_network.txt, amendments
+  7 and 8): judged against no trade, its clip from the second look;
+  research/news_reader/n6_record.py keeps its record.
+owner: Efe
+code_commit: be3a3708e64d7bcd28c2f1d7aa130bbf4db7cac2
+weights: data/models/news-n6-forward.npz
+weights_sha256: e68301a53fad3229810c89f858b88f5e9e4ac389bd48b32224505ee185fd0164
+trained_from: 2016-01-05
+trained_to: 2026-10-09
+frozen_at: 2026-10-29 10:26:01+00:00
+record_from: 2026-10-30
+scale: 1.0
+clip: 0.092
+alpha: 0.00625
+retired_on: null
