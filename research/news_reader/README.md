@@ -45,6 +45,8 @@ tested on (vintage 2024 for 2026: amendment 1). Efe trains the model on top of i
 | N6's harness, network and Efe's runs: folds, target, placebos, N4's portfolio; the projection, attention and heads (PyTorch); each variant in the ledger before it runs, and the choice | `n6_harness.py`, `n6_model.py`, `n6_run.py`, `n6_ledger.py` | `news_reader/n6/dev/<name>.json`, `.html`, `variants/N6_chosen.json` |
 | N6's second look, once: the chosen variant on 2022 to 9 October 2026, beside N4 and its placebos | `n6_second.py` | `news_reader/n6/second_look.json`, `.html` |
 | N6's challenger frozen once: the chosen variant, five seeds, on every member-day to 9 October 2026 | `n6_freeze.py` | `models/news-n6-forward.npz` |
+| N6's record's path against N6's research, on ten past sessions | `n6_record_check.py` | `results_n6_record_check.txt` |
+| N6's record, each session from its 15:31 capture, scored after the next close, beside N5 | `n6_record.py` | `news_reader/forward_n6/days.parquet`, `record.html` |
 | Before N7: which kinds of member news move prices, and when, by day and by minute (seen years, no model) | `event_study.py`, `intraday_reaction.py` | `results_event_study.txt`, `results_intraday_reaction.txt` |
 | The splits, policies, scores and the holdout lock | `harness.py` | `news_reader/holdout_<test>.json` |
 | N5: N4's variant 2 fitted once, frozen as plain arrays | `forward.py` | `models/news-n4-forward.npz` |
@@ -106,6 +108,12 @@ copies the captures and the prices from S3 first; PIT-4B on the GPU):
 
 ```bash
 PYTHONPATH=src data/llmenv/bin/python research/news_reader/forward_record.py
+```
+
+N6's record the same way, after N5's (it copies the same captures):
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python research/news_reader/n6_record.py
 ```
 
 Before N2, `architecture_checks.py` measured what news tells in the development years only

@@ -1,0 +1,9 @@
+n6_record_check.py, 29 October 2026: N6's record against N6's research, ten sessions.
+
+10 sessions, 2026-09-25 to 2026-10-08
+1. member-days, their tickers and counts the same each day: True
+2. each member-day's headlines, in order, the same articles: True
+3. age, edit and two-tag flags: largest gap 4.77e-07
+4. each headline's vector against N6's store: cosine min 1.000000
+5. the frozen networks' forecasts: largest gap 1.64e-08 (their spread about 5.38e-02)
+6. the days' scores: largest gap 0.0000 bps
