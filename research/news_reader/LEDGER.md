@@ -424,3 +424,7 @@ Variant 3, `v3`, on 2022 to 9 October 2026:
   What the record measures is what the second look measured.
 - **Its test:** the betting test against no trade, clip 0.092 and alpha 0.00625 (wealth 160).
   With N5's 0.0125, the cards hold 0.01875 of the platform's 0.025.
+- **The card's commit and its first day.** The card (commit 323c89b) went to GitHub with PR #94
+  at 10:35 UTC on 29 October 2026, before 30 October's window opened. The pull request was
+  merged into main on 3 November, and no day of the record had been scored before that. The
+  first day stays 30 October, as the card says; its content is the one fixed on 29 October.

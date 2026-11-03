@@ -42,9 +42,11 @@ week alongside university.
     no trade (alpha 1.25%).
   - **N6 is pre-registered** (22 October 2026): a network Efe trains on PIT-4B's frozen
     eyes, with a learned projection, attention over each member-day's headlines and its
-    context from the session before. The data and the skeleton are built and checked;
-    Efe's development runs on 2018-2021 come next. Every year has been seen, so N6 is
-    tested forward, like N5.
+    context from the session before. Every year has been seen, so it is tested forward,
+    like N5. Efe ran eight variants on 2018-2021: the context hurt and a larger projection
+    did worse. He chose variant 3 by the rule (the news alone, 64 numbers), and its second
+    look made +6.11 bps a day (t +1.99), level with N4 day by day. It was frozen on 29
+    October, and its record runs from 30 October (`challengers/news-n6-forward.yaml`).
 - **The rule on other markets: F1 failed.** The QQQ rule, unchanged, on CME Nikkei 225
   futures over the Tokyo session (`research/futures`, pre-registered): −5.4% a year after
   one tick a fill (t −1.82), 0.0% at half a tick. Uncorrelated with the QQQ rule, but
@@ -57,6 +59,10 @@ week alongside university.
   free IEX feed as on the consolidated tape (`research/phase3`: the same position at 98.4%
   of decisions, 17.3% a year against 16.4%, t +0.78). The live engine runs on a small AWS
   server with 30,000 USD on paper; Efe writes the order state machine's transitions.
+  **Its record so far is thin:** of its 12 sessions from 19 October to 3 November 2026, it
+  stopped before the open on 9, because IEX's minute bars from before the open reached the
+  core. Nothing was held; only 20 and 26 October traded. The fix is `in_the_session` in
+  `live/runner.py`.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:
