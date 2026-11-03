@@ -12,10 +12,16 @@ be a clean holdout, run once, as in `research/news_reader/LEDGER.md`.
 | Step | Script | Output (git-ignored `data/filings/`) |
 |---|---|---|
 | Which company filed for each member, over its own years | `members.py` | `members.parquet` |
+| Every member's 10-K and 10-Q as plain text | `download.py` | `filings.parquet`, `text/<cik>/<accession>.txt.gz` |
+| How much each report changed from a year before | `change.py` | `change.parquet` |
+| A first look, on 2016-2021 only, its rule fixed before its first run | `first_look.py` | `results_first_look.txt` |
 
 ```bash
 set -a && source <(grep -E "^SEC_USER_AGENT=" .env) && set +a
 uv run python research/filings/members.py
+uv run python research/filings/download.py
+uv run python research/filings/change.py
+uv run python research/filings/first_look.py
 ```
 
 SEC asks for a contact in `SEC_USER_AGENT`, and at most 10 requests a second.
