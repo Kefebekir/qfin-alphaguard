@@ -1,0 +1,22 @@
+first_look.py: lazy prices among S&P 500 members, on 2016-2021 only.
+Nothing after 2021-12-31 was read. Last month held to 2021-12-31.
+
+THE NUMBER: long the fifth that changed least, short the fifth that changed most.
+After costs                           +14.2 bps a month  t +0.61  months  71
+Annual Sharpe ratio +0.25; each side's turnover a month 21%; 464 names ranked on average.
+
+Beside it, not to be chosen among:
+Before costs                          +14.6 bps a month  t +0.63  months  71
+Long side, against everyone ranked    +12.7 bps a month  t +1.02  months  71
+Short side, against everyone ranked     +1.9 bps a month  t +0.14  months  71
+2016                                  +71.5 bps a month  t +1.38  months  12
+2017                                  +54.0 bps a month  t +1.27  months  12
+2018                                  +36.4 bps a month  t +0.77  months  12
+2019                                   +4.8 bps a month  t +0.15  months  12
+2020                                  -85.3 bps a month  t -1.07  months  12
+2021                                   +2.6 bps a month  t +0.03  months  11
+10-K reports only                     +25.0 bps a month  t +0.59  months  71
+10-Q reports only                     +26.7 bps a month  t +1.05  months  71
+Jaccard for cosine                    +27.3 bps a month  t +1.24  months  71
+Held three months                     +12.1 bps a month  t +0.49  months  71
+Held six months                       +19.6 bps a month  t +0.83  months  71

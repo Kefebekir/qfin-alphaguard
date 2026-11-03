@@ -25,3 +25,22 @@ uv run python research/filings/first_look.py
 ```
 
 SEC asks for a contact in `SEC_USER_AGENT`, and at most 10 requests a second.
+
+## The first look
+
+24,721 reports were downloaded with none failed, and 21,828 have a report a year before to
+compare with. Over 2016-2021, long the fifth that changed least and short the fifth that changed
+most made **+14.2 bps a month after costs, t +0.61** (annual Sharpe ratio +0.25, 71 months).
+
+The first three years carry it (+71.5, +54.0, +36.4), then +4.8, -85.3 and +2.6. Almost all of it
+is the long side (+12.7, t +1.02); the short side, which is the study's claim, makes +1.9 (t
++0.14). Nothing beside it reaches a t of 2: the best is Jaccard, +27.3 (t +1.24), and those
+variations are not to be chosen among. January 2016 ranks only 29 names, since reports filed in
+2015 have no score; leaving out the first three months gives +11.6 (t +0.48).
+
+The look reads each whole report, and its raw word counts are mostly common words, so a median
+cosine is 0.999 for a 10-K. The study's strongest results are in single sections, which this does
+not read.
+
+No test on 2022-2026 has been written, and those years remain unread. `results_first_look.txt`
+holds the full output.
