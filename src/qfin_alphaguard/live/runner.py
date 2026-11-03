@@ -35,6 +35,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import boto3
 import polars as pl
@@ -68,6 +69,7 @@ from qfin_alphaguard.sessions import Session
 log = logging.getLogger("qfin.live")
 
 TICKER = "QQQ"
+NEW_YORK = ZoneInfo("America/New_York")
 STREAM_GRACE = timedelta(minutes=2)  # a stream down this long stops the engine
 LAST_MINUTE_TICK = timedelta(seconds=55)  # before the close: the day's last decision
 END_WAIT = timedelta(minutes=2)  # after the close: Alpaca has expired the day's orders
@@ -269,6 +271,19 @@ class Fatal:
 Input = Bars | Events | StreamState | Clock | Fatal
 
 
+def in_the_session(bars: Sequence[Bar], session: Session) -> tuple[Bar, ...]:
+    """The bars the session is made of. IEX also reports the minutes traded before the open
+    and from the close on: those of the session's own day are left out here, before anything
+    is written. A bar of another day stays, for the core to refuse."""
+
+    def around(bar: Bar) -> bool:
+        return bar.start.astimezone(NEW_YORK).date() == session.day and (
+            bar.end <= session.open or bar.start >= session.close
+        )
+
+    return tuple(bar for bar in bars if not around(bar))
+
+
 # The day.
 
 
@@ -312,9 +327,14 @@ class Runner:
 
     async def handle(self, item: Input) -> None:
         if isinstance(item, Bars):
-            for bar in item.bars:
+            bars = in_the_session(item.bars, self.core.session)
+            if len(bars) < len(item.bars):
+                log.info("left out, outside the session: %s", item.bars)
+            if not bars:
+                return
+            for bar in bars:
                 self.journal.write(bar, at=item.at)
-            await self.take(self.core.on_bars(list(item.bars), item.at), item.at)
+            await self.take(self.core.on_bars(list(bars), item.at), item.at)
         elif isinstance(item, Events):
             for event in item.events:
                 await self.event(event, item.at)

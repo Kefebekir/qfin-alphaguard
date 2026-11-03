@@ -47,6 +47,7 @@ from qfin_alphaguard.live.runner import (
     check_session,
     feed_bars,
     feed_trades,
+    in_the_session,
     keep_time,
     past_sessions,
     prepare,
@@ -435,6 +436,71 @@ def test_a_position_carried_from_yesterday_agrees_and_the_day_goes_on(tmp_path):
     alpaca.held = {"QQQ": 10.0}
     assert play(run, clock, Bars((bar(30),), seen(30)), CLOSED) == "closed"
     assert alerts == ["held overnight, to be closed at the next open: {'QQQ': 10.0}"]
+
+
+def test_the_minutes_around_the_session_are_left_out_and_the_day_goes_on(tmp_path):
+    script = once(lambda v: [buy(100, v)])
+    run, alpaca, alerts, clock, _ = runner(tmp_path, script)
+
+    async def day():
+        queue = TimedQueue(clock)
+        task = asyncio.create_task(run.run(queue))
+        queue.put_nowait(StreamState("trades", True, seen(-20)))
+        # IEX reports the minutes traded before the open: 19 October 2026 stopped here.
+        queue.put_nowait(Bars((bar(-14),), seen(-14)))
+        queue.put_nowait(Bars((bar(-1),), seen(-1)))
+        queue.put_nowait(Bars((bar(30),), seen(30)))
+        await until(lambda: accepted(run, ID1), f"{ID1} to be accepted")
+        queue.put_nowait(Events(tuple(alpaca.fill(ID1, 100.0, 600.0)), seen(30, 1)))
+        queue.put_nowait(Bars((bar(389),), seen(389)))
+        # And the minute after the close: 26 October 2026 stopped here.
+        queue.put_nowait(Bars((bar(390),), seen(390)))
+        queue.put_nowait(CLOSED)
+        return await task
+
+    assert asyncio.run(day()) == "closed"
+    assert run.core.portfolio.positions["QQQ"] == 100.0
+    assert alerts == ["held overnight, to be closed at the next open: {'QQQ': 100.0}"]
+    assert run.core.last_prices["QQQ"] == 600.0
+    assert run.core.price_times["QQQ"] == bar(389).end  # the last one kept
+    core, leftover = replayed(run, once(lambda v: [buy(100, v)]))
+    assert core.orders.keys() == run.core.orders.keys() and not leftover
+
+
+def test_only_the_same_day_s_minutes_around_the_session_are_left_out():
+    late = Bar("QQQ", CLOSE, 60, 600.0, 600.5, 599.5, 600.0, 1000)
+    kept = [bar(0), bar(389)]
+    got = in_the_session((bar(-1), *kept, late), SESSION)
+    assert got == tuple(kept)  # the first and the last minute stay
+    half = sessions(date(2026, 11, 27), date(2026, 11, 27))[0]
+    last = Bar("QQQ", half.close - timedelta(minutes=1), 60, 1.0, 1.0, 1.0, 1.0, 1)
+    after = Bar("QQQ", half.close, 60, 1.0, 1.0, 1.0, 1.0, 1)
+    assert in_the_session((last, after), half) == (last,)  # a half day's own close
+    other = bar(-1440 * 3)  # the Friday before: not this day's, so the core's to refuse
+    assert in_the_session((other,), SESSION) == (other,)
+
+
+def test_a_bar_left_out_is_neither_written_nor_seen_by_the_core(tmp_path):
+    run, _, alerts, clock, _ = runner(tmp_path)
+    mixed = Bars((bar(-1), bar(30)), seen(30))
+    assert play(run, clock, mixed, CLOSED) == "closed"
+    assert alerts == []
+    bars = [e.record for e in written(run) if isinstance(e.record, Bar)]
+    assert bars == [bar(30)]
+    assert run.core.price_times["QQQ"] == bar(30).end
+
+
+def test_a_bar_of_another_day_still_stops_the_engine(tmp_path):
+    run, _, alerts, clock, _ = runner(tmp_path)
+
+    async def day():
+        queue = TimedQueue(clock)
+        task = asyncio.create_task(run.run(queue))
+        queue.put_nowait(Bars((bar(-1440 * 3),), seen(10)))
+        return await task
+
+    assert asyncio.run(day()) == "stopped"
+    assert "lies outside the session" in alerts[0]
 
 
 def test_a_difference_at_the_close_stops_the_engine(tmp_path):
