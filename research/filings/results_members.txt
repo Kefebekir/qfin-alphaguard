@@ -1,0 +1,35 @@
+members.py, 3 November 2026: which company filed for each S&P 500 member since 2015.
+
+
+768 member tickers since 2015:
+│ how                           ┆ len │
+│ ---                           ┆ --- │
+│ str                           ┆ u32 │
+│ today's list                  ┆ 505 │
+│ filings                       ┆ 249 │
+│ by hand                       ┆ 9   │
+│ filings, against today's list ┆ 3   │
+│ none                          ┆ 2   │
+│ year ┆ member_days_with_a_company │
+│ ---  ┆ ---                        │
+│ i32  ┆ f64                        │
+│ 2015 ┆ 1.0                        │
+│ 2016 ┆ 1.0                        │
+│ 2017 ┆ 1.0                        │
+│ 2018 ┆ 1.0                        │
+│ 2019 ┆ 0.998                      │
+│ …    ┆ …                          │
+│ 2022 ┆ 0.996                      │
+│ 2023 ┆ 0.999                      │
+│ 2024 ┆ 1.0                        │
+│ 2025 ┆ 1.0                        │
+│ 2026 ┆ 1.0                        │
+
+Left the index, and today's list names another company, 3:
+  BBT 2015-01-02 to 2019-12-06: BB&T CORP (92230)
+  NAVI 2015-01-02 to 2018-06-04: NAVIENT CORP (1593538)
+  XRX 2015-01-02 to 2021-03-19: XEROX CORP (108772)
+
+Without a company, 2:
+  FRC 2019-01-02 to 2023-05-01
+  SBNY 2021-12-20 to 2023-03-13
