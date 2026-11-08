@@ -77,10 +77,10 @@ knows nothing after the year before it. I train the models myself.
 
 | Test | What it tried | Result |
 | --- | --- | --- |
-| N1 | The morning's headlines size the rule's day | failed: −1.52 bps a day against the rule |
-| N2 | A member's next day, read by ChronoBERT | failed: −2.22 bps a day |
-| N3 | The same, read by PIT-4B (4 billion parameters) | failed: +4.24, t +1.18 |
-| N4 | N3 with less noise | failed its bar of t ≥ 2.50: +6.53, t +1.86, resting on 2026 |
+| N1 | The morning's headlines size the rule's day | not the expected result: −1.52 bps a day against the rule |
+| N2 | A member's next day, read by ChronoBERT | not the expected result: −2.22 bps a day |
+| N3 | The same, read by PIT-4B (4 billion parameters) | not the expected result: +4.24, t +1.18 |
+| N4 | N3 with less noise | not the expected result: +6.53, t +1.86, under its bar of t ≥ 2.50 and resting on 2026 |
 | N5 | N4's variant 2, frozen and scored forward | recording since 23 October 2026 |
 | N6 | My own network on PIT-4B's frozen readings | second look +6.11, t +1.99; recording since 30 October 2026 |
 
