@@ -1,0 +1,25 @@
+section_look.py: lazy prices in the risk factors and MD&A, on 2016-2021 only.
+Nothing after 2021-12-31 was read. Last month held to 2021-12-31.
+
+THE NUMBER: long the fifth whose two sections changed least, short the fifth that changed most.
+After costs                           +36.6 bps a month  t +1.86  months  71
+Annual Sharpe ratio +0.76; each side's turnover a month 21%; 417 names ranked on average.
+t +1.86 is below the gate of 2.0: B is closed, and 2022-2026 stay unread.
+
+Beside it, not to be chosen among:
+Before costs                          +37.0 bps a month  t +1.88  months  71
+Long side, against everyone ranked    +19.2 bps a month  t +1.47  months  71
+Short side, against everyone ranked    +17.8 bps a month  t +1.68  months  71
+2016                                  +93.0 bps a month  t +2.00  months  12
+2017                                  +68.8 bps a month  t +1.88  months  12
+2018                                  +28.4 bps a month  t +0.62  months  12
+2019                                  +23.3 bps a month  t +0.63  months  12
+2020                                  -57.2 bps a month  t -0.87  months  12
+2021                                  +65.8 bps a month  t +1.36  months  11
+Risk factors alone                    +50.9 bps a month  t +1.74  months  71
+MD&A alone                            +10.4 bps a month  t +0.50  months  71
+10-K reports only                     -13.5 bps a month  t -0.27  months  71
+10-Q reports only                     +64.9 bps a month  t +2.76  months  71
+Jaccard for cosine                    +37.6 bps a month  t +1.86  months  71
+Held three months                     +38.7 bps a month  t +2.03  months  71
+Held six months                       +49.7 bps a month  t +2.73  months  71

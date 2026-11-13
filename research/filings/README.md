@@ -60,3 +60,13 @@ Below that, B is closed and 2022-2026 stay unread.
 item's, skipping the table of contents and references to them (`results_sections.txt`). A 10-Q
 often has no risk factors of its own, or only says nothing has changed since the 10-K, so its
 pooled text is mostly its MD&A.
+
+**The result** (`results_section_look.txt`). Over 2016-2021 the two sections made **+36.6 bps
+a month after costs, t +1.86** (annual Sharpe ratio +0.76, 71 months). That is below the gate
+of 2.0, so by the rule B is closed and 2022-2026 stay unread.
+- It is stronger than the first look's +14.2 (t +0.61), and the short side now adds too
+  (+17.8 a month, t +1.68), as the study says it should.
+- Beside it, not to be chosen among: Jaccard +37.6 (t +1.86); the risk factors alone +50.9
+  (t +1.74); the MD&A alone +10.4 (t +0.50); 10-Qs only +64.9 (t +2.76); 10-Ks only -13.5;
+  held six months +49.7 (t +2.73). These were seen after the result, and choosing one of
+  them now would be choosing by the result.
