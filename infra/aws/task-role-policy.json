@@ -9,7 +9,10 @@
     {
       "Effect": "Allow",
       "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::qfin-alphaguard-kefebekir/data/live/*"
+      "Resource": [
+        "arn:aws:s3:::qfin-alphaguard-kefebekir/data/live/*",
+        "arn:aws:s3:::qfin-alphaguard-kefebekir/data/raw/prices_eodhd.parquet"
+      ]
     },
     {
       "Effect": "Allow",

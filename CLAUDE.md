@@ -43,8 +43,8 @@ uv run pytest                         # run the tests
 uv run ruff check .                   # lint
 uv run ruff format .                  # format
 uv run qfin ingest --synthetic        # run the data pipeline without network access
-uv run --env-file .env qfin ingest    # real data; needs EODHD_API_KEY in .env
-uv run --env-file .env qfin intraday  # 1-minute bars from EODHD and Alpaca, after ingest
+uv run --env-file .env qfin ingest    # real data: EODHD's frozen history continued by Alpaca (decision 0022)
+uv run --env-file .env qfin intraday  # 1-minute bars from EODHD and Alpaca; EODHD's part stopped with its subscription
 uv run --env-file .env qfin etf-minutes QQQ  # QQQ's 1-minute bars from Alpaca
 uv run qfin plan                      # the next session's target portfolio, after ingest
 uv run qfin backtest                  # the plan on the stored minutes, against SPY; after intraday
@@ -91,7 +91,8 @@ Both ruff commands must pass before a commit.
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
-- `src/qfin_alphaguard/data/`: downloads from EODHD and Alpaca, validation,
+- `src/qfin_alphaguard/data/`: EODHD's history to 10 November 2026 continued by
+  Alpaca's bars (decision 0022), downloads, validation,
   S&P 500 membership by date, splits and dividends, Parquet and DuckDB
 - `src/qfin_alphaguard/features/`, `estimation/`, `optimize/`: returns,
   covariance and the optimiser

@@ -30,12 +30,14 @@ from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.alpaca import AlpacaClient, api_keys
 from qfin_alphaguard.data.eodhd import EodhdClient, api_key
 from qfin_alphaguard.data.ingest import (
+    EODHD_HISTORY,
     load_prices,
     repair_broken_bars,
     sp500_coverage,
 )
 from qfin_alphaguard.data.intraday import YearOfMinutes, backfill_minutes
 from qfin_alphaguard.data.store import (
+    download_from_s3,
     prices_path,
     read_prices,
     upload_to_s3,
@@ -65,7 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.add_argument(
         "--s3-bucket",
-        help="also upload the result to this S3 bucket",
+        help="also upload the result to this S3 bucket, and take EODHD's history "
+        "from it if it is not here",
     )
     ingest.add_argument(
         "--end-date",
@@ -241,6 +244,15 @@ def _ingest(args: argparse.Namespace) -> int:
         end_date = datetime.now(UTC).date().isoformat()
 
     config = Config(synthetic=args.synthetic, end_date=end_date)
+    history = config.raw_dir / EODHD_HISTORY
+    if not args.synthetic and not history.exists():
+        # The history Alpaca's bars continue (decision 0022).
+        if not args.s3_bucket:
+            print(
+                f"{history} not found: EODHD's history is kept in S3", file=sys.stderr
+            )
+            return 1
+        print(f"downloaded {download_from_s3(history, args.s3_bucket)}")
 
     df, broken = repair_broken_bars(load_prices(config))
     print(f"Loaded {len(df)} rows for {df['ticker'].n_unique()} tickers")

@@ -191,10 +191,11 @@ uv run pytest
 # run the data pipeline on generated data (no network needed)
 uv run qfin ingest --synthetic
 
-# real data: needs EODHD_API_KEY in .env
+# real data: EODHD's history to 10 November 2026 (data/raw/prices_eodhd.parquet),
+# continued with Alpaca's daily bars; needs Alpaca's keys in .env
 uv run --env-file .env qfin ingest
 
-# 1-minute bars: needs Alpaca's keys in .env too
+# 1-minute bars: these still ask EODHD, whose subscription ended (decision 0022)
 uv run --env-file .env qfin intraday
 uv run --env-file .env qfin etf-minutes QQQ
 
@@ -212,7 +213,7 @@ Docker image in **Amazon ECR**.
 
 | Task | When | What it does |
 | --- | --- | --- |
-| `qfin ingest` | 06:45 London, Tuesday to Saturday | Downloads and validates the daily prices |
+| `qfin ingest` | 06:45 London, Tuesday to Saturday | Continues the daily prices with Alpaca's and validates them |
 | `qfin live` | 09:15 New York, weekdays | Runs the session on the paper account |
 | `qfin news-capture` | 15:31 New York, weekdays | Stores the news as it stands, for the forward records |
 | `qfin live-report` | 16:30 New York, weekdays | Writes and e-mails the session's report |

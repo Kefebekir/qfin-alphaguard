@@ -31,3 +31,11 @@ def upload_to_s3(path: Path, bucket: str) -> str:
     key = path.as_posix()
     boto3.client("s3").upload_file(str(path), bucket, key)
     return f"s3://{bucket}/{key}"
+
+
+def download_from_s3(path: Path, bucket: str) -> str:
+    """Download a file from S3 to the same relative path, as upload_to_s3 put it."""
+    key = path.as_posix()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    boto3.client("s3").download_file(bucket, key, str(path))
+    return f"s3://{bucket}/{key}"

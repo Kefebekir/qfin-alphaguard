@@ -21,8 +21,12 @@
       ],
       "secrets": [
         {
-          "name": "EODHD_API_KEY",
-          "valueFrom": "arn:aws:ssm:eu-north-1:ACCOUNT_ID:parameter/qfin/eodhd-api-key"
+          "name": "ALPACA_API_KEY_ID",
+          "valueFrom": "arn:aws:ssm:eu-north-1:ACCOUNT_ID:parameter/qfin/alpaca-key-id"
+        },
+        {
+          "name": "ALPACA_API_SECRET_KEY",
+          "valueFrom": "arn:aws:ssm:eu-north-1:ACCOUNT_ID:parameter/qfin/alpaca-secret-key"
         }
       ],
       "logConfiguration": {
