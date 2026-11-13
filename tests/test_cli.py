@@ -9,6 +9,7 @@ import pytest
 
 from qfin_alphaguard import cli
 from qfin_alphaguard.cli import build_parser, main
+from qfin_alphaguard.config import Config
 from qfin_alphaguard.data.eodhd import MINUTE_SCHEMA
 from qfin_alphaguard.plan import plan_from_json
 from qfin_alphaguard.sessions import session_days, sessions
@@ -101,8 +102,8 @@ def test_aws_task_definition_runs_a_valid_command():
 
 
 def test_aws_tasks_get_the_keys_they_may_read_and_no_other():
-    # qfin ingest needs EODHD_API_KEY, qfin live Alpaca's two keys; ECS reads them from
-    # SSM with the execution role, which may read those parameters and nothing else.
+    # qfin ingest and qfin live need Alpaca's two keys (decision 0022); ECS reads them
+    # from SSM with the execution role, which may read those parameters and nothing else.
     policy = json.loads(
         (AWS / "execution-role-secrets-policy.json").read_text(encoding="utf-8")
     )
@@ -110,7 +111,10 @@ def test_aws_tasks_get_the_keys_they_may_read_and_no_other():
     assert statement["Action"] == "ssm:GetParameters"
     read = set()
     for name, keys in (
-        ("task-definition.template.json", {"EODHD_API_KEY"}),
+        (
+            "task-definition.template.json",
+            {"ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"},
+        ),
         (
             "live-task-definition.template.json",
             {"ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"},
@@ -121,6 +125,45 @@ def test_aws_tasks_get_the_keys_they_may_read_and_no_other():
         assert {s["name"] for s in secrets} == keys
         read |= {s["valueFrom"].replace("ACCOUNT_ID", "*") for s in secrets}
     assert read == set(statement["Resource"])
+
+
+def test_ingest_takes_eodhd_s_history_from_the_bucket_when_it_is_not_here(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    history = Path("data/raw/prices_eodhd.parquet")
+    assert main(["ingest"]) == 1  # nowhere to take it from
+    assert "prices_eodhd.parquet not found" in capsys.readouterr().err
+
+    asked = []
+
+    def download(path, bucket):
+        asked.append((path, bucket))
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"")
+        return f"s3://{bucket}/{path}"
+
+    synthetic = cli.load_prices
+
+    def load(config):
+        assert history.exists() and not config.synthetic
+        return synthetic(Config(synthetic=True))
+
+    monkeypatch.setattr(cli, "download_from_s3", download)
+    monkeypatch.setattr(cli, "load_prices", load)
+    monkeypatch.setattr(
+        cli, "upload_to_s3", lambda path, bucket: f"s3://{bucket}/{path}"
+    )
+    monkeypatch.setattr(cli, "sp500_coverage", lambda prices, history: 1.0)
+
+    assert main(["ingest", "--s3-bucket", "bucket"]) == 0
+    assert asked == [(history, "bucket")]
+    assert (
+        "downloaded s3://bucket/data/raw/prices_eodhd.parquet"
+        in capsys.readouterr().out
+    )
+    assert main(["ingest", "--s3-bucket", "bucket"]) == 0
+    assert len(asked) == 1  # it is here now
 
 
 def test_intraday_needs_the_daily_prices_first(tmp_path, monkeypatch, capsys):

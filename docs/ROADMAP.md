@@ -63,6 +63,10 @@ week alongside university.
   stopped before the open on 9, because IEX's minute bars from before the open reached the
   core. Nothing was held; only 20 and 26 October traded. The fix is `in_the_session` in
   `live/runner.py`.
+- **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
+  subscription ended; its history to 10 November is kept as it is and continued each night
+  with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
+  2025–2026 rebuilt this way 99.84% of member-days' returns agree with EODHD's within 1 bp.
 - **Phase 1's result.** `qfin backtest` replays the nightly plan on the
   stored minutes since 2016 (decision 0015, #29). The minimum-variance plan
   loses to both baselines, at the same risk too:

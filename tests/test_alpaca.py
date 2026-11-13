@@ -207,3 +207,108 @@ def test_a_missing_key_says_how_to_set_it(monkeypatch):
     monkeypatch.delenv("ALPACA_API_SECRET_KEY", raising=False)
     with pytest.raises(RuntimeError, match="--env-file .env"):
         api_keys()
+
+
+def day_bar(day, close, volume=1000):
+    """A daily bar as Alpaca sends it: labelled with midnight in New York, in UTC."""
+    return {
+        "t": f"{day}T05:00:00Z",
+        "o": close - 1,
+        "h": close + 1,
+        "l": close - 2,
+        "c": close,
+        "v": volume,
+        "n": 9,
+        "vw": close,
+    }
+
+
+END = datetime(2026, 11, 13, 21, 30, tzinfo=UTC)
+
+
+def test_daily_bars_come_for_several_symbols_over_pages_labelled_by_new_york_day():
+    first = {"bars": {"AAPL": [day_bar("2026-11-10", 270.0)]}, "next_page_token": "p2"}
+    second = {
+        "bars": {
+            "AAPL": [day_bar("2026-11-11", 271.0)],
+            "BRK.B": [day_bar("2026-11-11", 480.0, 50)],
+        },
+        "next_page_token": None,
+    }
+    alpaca, fake = client(first, second)
+
+    bars = alpaca.daily_bars(["AAPL", "BRK.B"], date(2026, 11, 10), END)
+
+    assert bars.sort("ticker", "date").rows() == [
+        (date(2026, 11, 10), "AAPL", 269.0, 271.0, 268.0, 270.0, 1000),
+        (date(2026, 11, 11), "AAPL", 270.0, 272.0, 269.0, 271.0, 1000),
+        (date(2026, 11, 11), "BRK.B", 479.0, 481.0, 478.0, 480.0, 50),
+    ]
+    assert fake.query(0) == {
+        "symbols": "AAPL,BRK.B",
+        "timeframe": "1Day",
+        "start": "2026-11-10",
+        "end": "2026-11-13T21:30:00Z",
+        "feed": "sip",
+        "adjustment": "raw",
+        "sort": "asc",
+        "limit": str(PAGE_SIZE),
+    }
+    assert fake.query(1)["page_token"] == "p2"
+
+
+def test_daily_bars_ask_a_hundred_symbols_at_a_time():
+    symbols = [f"S{n}" for n in range(150)]
+    alpaca, fake = client({"bars": {}}, {"bars": {}})
+
+    bars = alpaca.daily_bars(symbols, date(2026, 11, 10), END, adjustment="spin-off")
+
+    assert bars.is_empty() and bars.columns[:2] == ["date", "ticker"]
+    assert [len(fake.query(n)["symbols"].split(",")) for n in (0, 1)] == [100, 50]
+    assert fake.query(1)["adjustment"] == "spin-off"
+
+
+def test_a_failed_request_for_many_symbols_names_the_first_and_counts_the_rest():
+    alpaca, _ = client((403, "forbidden"))
+    with pytest.raises(RuntimeError, match="Alpaca request for S0 and 2 more failed"):
+        alpaca.daily_bars(["S0", "S1", "S2"], date(2026, 11, 10), END)
+
+
+def test_corporate_actions_come_with_their_kind_and_the_company_they_belong_to():
+    dividend = {"symbol": "AAPL", "ex_date": "2026-11-12", "rate": 0.27, "id": "1"}
+    spun = {
+        "source_symbol": "GE",
+        "new_symbol": "GEV",
+        "ex_date": "2024-04-02",
+        "new_rate": 0.25,
+        "source_rate": 1,
+        "id": "2",
+    }
+    created = {**spun, "source_symbol": "XYZ", "new_symbol": "GE", "id": "3"}
+    first = {
+        "corporate_actions": {"cash_dividends": [dividend], "spin_offs": [spun]},
+        "next_page_token": "p2",
+    }
+    second = {"corporate_actions": {"spin_offs": [created]}, "next_page_token": None}
+    alpaca, fake = client(first, second)
+
+    actions = alpaca.corporate_actions(
+        ["AAPL", "GE"], date(2024, 1, 1), date(2027, 1, 1)
+    )
+
+    assert [(a["kind"], a["symbol"], a["id"]) for a in actions] == [
+        ("cash_dividends", "AAPL", "1"),
+        ("spin_offs", "GE", "2"),
+    ]
+    assert fake.requests[0].full_url.startswith(
+        "https://data.alpaca.markets/v1/corporate-actions?"
+    )
+    assert fake.query(0) == {
+        "symbols": "AAPL,GE",
+        "types": "forward_split,reverse_split,stock_dividend,cash_dividend,spin_off",
+        "start": "2024-01-01",
+        "end": "2027-01-01",
+        "limit": "1000",
+    }
+    assert fake.query(1)["page_token"] == "p2"
+    assert "secret" not in fake.requests[0].full_url

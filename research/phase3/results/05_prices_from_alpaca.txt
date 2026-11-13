@@ -1,0 +1,48 @@
+prices_from_alpaca.py on data/raw/prices_eodhd.parquet, 2015-01-02 to 2026-11-10
+
+1. THE PAST, REBUILT: EODHD cut at 2024-12-31, continued by Alpaca to 2026-11-10
+Rows after the cut: rebuilt 283,168, EODHD 284,726, in both 282,683; member-days in both 233,297 of EODHD's 234,329.
+Members agree on 100.00% of member-days.
+Traded close, Alpaca's against EODHD's, member-days: within 1 bp 99.94%, within 10 bps 100.00%.
+Daily return, rebuilt against EODHD's, member-days: within 1 bp 99.84%, within 10 bps 99.98%, mean gap +0.018 bps, mean absolute gap 0.034 bps.
+The ten largest gaps (ticker, day, rebuilt, EODHD, in %):
+  APTV 2026-04-01 +5.56 -10.58
+  FTV 2025-06-30 +8.72 -3.38
+  WDC 2025-02-24 +4.72 -5.61
+  TDG 2025-09-02 +6.55 +0.19
+  LEN 2025-01-21 +2.74 -2.83
+  ARES 2025-12-15 -0.63 -0.15
+  ACN 2026-07-09 +2.27 +2.58
+  SW 2025-11-14 -1.34 -1.04
+  SW 2026-05-15 -5.55 -5.28
+  SW 2025-08-15 -1.63 -1.38
+Adjustment factor, rebuilt against EODHD's: within 0.1% 97.12%, within 1% 99.32%.
+Splits and dividends compared on 613 tickers; left out, for an adjustment corporate_actions refuses: CHTR, DLR, FERG, HON, JCI, NVDA, SLG, VTR.
+Splits after the cut: rebuilt 26, EODHD 23, on the same day 23, of those within 1% 21; only rebuilt 3, only EODHD 0.
+  only rebuilt: LEN 2025-01-21 1.092
+  only rebuilt: APTV 2026-04-01 1.181
+  only rebuilt: SPGI 2026-07-01 1.057
+Dividends after the cut: rebuilt 3318, EODHD 3331, on the same day 3303, of those within 1% 3188; only rebuilt 15, only EODHD 28.
+  only EODHD: VMRK 2025-01-02 0.675
+  only rebuilt: BNY 2025-01-15 0.051
+  only EODHD: LEN 2025-01-21 4.522
+  only EODHD: BNY 2025-01-27 0.47
+  only EODHD: MRSH 2025-01-30 0.815
+  only rebuilt: BNY 2025-02-14 0.051
+  only EODHD: BBT 2025-02-20 0.18
+  only rebuilt: BNY 2025-03-14 0.051
+Shares traded, Alpaca's over EODHD's: median 1.000, within 5% 99.56%.
+
+2. THE SWITCH: EODHD's history continued by Alpaca, run at 2026-11-13 22:17 UTC
+New sessions: 2026-11-11, 2026-11-12, 2026-11-13; rows 1,960,977 against 1,959,195.
+Rows to 2026-11-10: EODHD 1,959,195, after the switch 1,959,195; largest change in a daily return 2.22e-16.
+Splits and dividends to 2026-11-10 the same, to 1e-9: True.
+Validation: passed; [warning] equal_row_counts: tickers have different row counts: min 19 (SWY), max 2985; [warning] large_moves: 10 index-member days moved more than 50% in a day; latest MRNA on 2026-08-19
+  2026-11-11: 500 members with a bar, 594 tickers; SPY +131.9 bps; with a bar on 2026-11-10 and none now: SBNY
+  2026-11-12: 500 members with a bar, 594 tickers; SPY -35.4 bps; with a bar on 2026-11-10 and none now: SBNY
+  2026-11-13: 500 members with a bar, 594 tickers; SPY -36.3 bps; with a bar on 2026-11-10 and none now: SBNY
+Splits and dividends since: Dividend AAPL 2026-11-12 0.27, Dividend AWK 2026-11-12 0.895, Dividend DHI 2026-11-12 0.5, Dividend EXE 2026-11-12 0.575, Dividend FANG 2026-11-12 1.18, Dividend FIX 2026-11-12 1, Dividend IR 2026-11-12 0.02, Dividend RMD 2026-11-12 0.66, Dividend SBAC 2026-11-12 1.25, Dividend TJX 2026-11-12 0.48, Dividend ZION 2026-11-12 0.48, Dividend CHD 2026-11-13 0.3075, Dividend COR 2026-11-13 0.66, Dividend CRH 2026-11-13 0.2925, Dividend CTAS 2026-11-13 0.52, Dividend CTSH 2026-11-13 0.33, Dividend DOC 2026-11-13 0.1017, Dividend DUK 2026-11-13 1.085, Dividend EMR 2026-11-13 0.595, Dividend ETR 2026-11-13 0.68, Dividend GLW 2026-11-13 0.28, Dividend HONA 2026-11-13 0.4, Dividend IVZ 2026-11-13 0.215, Dividend LLY 2026-11-13 1.73, Dividend MMM 2026-11-13 0.78, Dividend MSCI 2026-11-13 2.05, Dividend OTIS 2026-11-13 0.44, Dividend PH 2026-11-13 2, Dividend SBUX 2026-11-13 0.63, Dividend SCHW 2026-11-13 0.32, Dividend SHW 2026-11-13 0.8, Dividend SJM 2026-11-13 1.12, Dividend SW 2026-11-13 0.3392, Dividend TECH 2026-11-13 0.08, Dividend TFC 2026-11-13 0.52, Dividend WEC 2026-11-13 0.9525
+N5's and N6's scored days (2026-10-23 to 2026-11-09): members and next returns the same on 12 of 12.
+  2026-11-10: next returns for 500 of its 500 members, mean +98.0 bps
+  2026-11-11: next returns for 500 of its 500 members, mean -92.6 bps
+  2026-11-12: next returns for 500 of its 500 members, mean +18.4 bps
