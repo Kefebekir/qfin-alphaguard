@@ -47,6 +47,14 @@ week alongside university.
     did worse. He chose variant 3 by the rule (the news alone, 64 numbers), and its second
     look made +6.11 bps a day (t +1.99), level with N4 day by day. It was frozen on 29
     October, and its record runs from 30 October (`challengers/news-n6-forward.yaml`).
+- **What companies write in their reports (B), set aside** (`research/filings`). Does a member
+  whose 10-K or 10-Q changed much from last year's do worse ("lazy prices")? Model-free, on
+  2016-2021 only, each rule fixed before its run:
+  - the whole report: +14.2 bps a month after costs, t +0.61;
+  - its risk factors and MD&A: +36.6, t +1.86, below the gate of 2.0.
+
+  2022-2026 stay unread. Efe keeps them for a later model that reads what changed in the
+  reports, rather than spending them on this simple measure.
 - **The rule on other markets: F1 failed.** The QQQ rule, unchanged, on CME Nikkei 225
   futures over the Tokyo session (`research/futures`, pre-registered): −5.4% a year after
   one tick a fill (t −1.82), 0.0% at half a tick. Uncorrelated with the QQQ rule, but

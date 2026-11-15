@@ -63,7 +63,9 @@ pooled text is mostly its MD&A.
 
 **The result** (`results_section_look.txt`). Over 2016-2021 the two sections made **+36.6 bps
 a month after costs, t +1.86** (annual Sharpe ratio +0.76, 71 months). That is below the gate
-of 2.0, so by the rule B is closed and 2022-2026 stay unread.
+of 2.0, so by the rule B is closed and 2022-2026 stay unread. Efe keeps those years for a later
+model that reads what changed in the reports (13 November 2026), rather than testing this
+measure on them.
 - It is stronger than the first look's +14.2 (t +0.61), and the short side now adds too
   (+17.8 a month, t +1.68), as the study says it should.
 - Beside it, not to be chosen among: Jaccard +37.6 (t +1.86); the risk factors alone +50.9
