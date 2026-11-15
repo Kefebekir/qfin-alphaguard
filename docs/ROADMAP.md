@@ -71,6 +71,13 @@ week alongside university.
   stopped before the open on 9, because IEX's minute bars from before the open reached the
   core. Nothing was held; only 20 and 26 October traded. The fix is `in_the_session` in
   `live/runner.py`.
+- **KUTBIT, Efe's own intraday model with leverage, is decided** (decision 0023, 15 November
+  2026). It is separate from the QQQ rule, which stays as it is.
+  - It reads each stock's and ETF's minute chart.
+  - It forecasts the distribution of the next 5-60 minutes, and the worst move on the way.
+  - It trades only when its account's expected growth after costs clears Efe's threshold.
+  - It runs at up to 4x on a second Alpaca paper account, and at 10x in a virtual account.
+  - Next: its data and labels, then the simulator, each in its own pull request.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
