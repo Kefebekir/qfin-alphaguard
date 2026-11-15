@@ -101,5 +101,7 @@ The largest gaps:
 - **`qfin intraday` and `qfin etf-minutes` still ask EODHD,** so they no longer work. The
   stored minutes stay. They are needed only for the nightly plan's backtest and QQQ's check
   against daily closes.
-- **A failed nightly job still raises no alert.** That remains an open item.
+- **A failed nightly job raised no alert.** Since 15 November 2026 a failed task of any qfin
+  job is e-mailed (`infra/aws/LIVE.md`, step 9), and the nightly task has 2 GB of memory,
+  since continuing the history peaked at 906 MB of 1 GB in a test under Fargate's CPU quota.
 - **Renewing EODHD would not undo this.** The frozen file would be continued the same way.
