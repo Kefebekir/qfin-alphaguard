@@ -1,0 +1,12 @@
+{
+  "source": ["aws.ecs"],
+  "detail-type": ["ECS Task State Change"],
+  "detail": {
+    "clusterArn": ["arn:aws:ecs:eu-north-1:ACCOUNT_ID:cluster/qfin"],
+    "lastStatus": ["STOPPED"],
+    "$or": [
+      { "containers": { "exitCode": [{ "anything-but": 0 }] } },
+      { "stopCode": ["TaskFailedToStart"] }
+    ]
+  }
+}

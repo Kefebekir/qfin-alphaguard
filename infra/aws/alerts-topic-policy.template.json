@@ -1,0 +1,35 @@
+{
+  "Version": "2008-10-17",
+  "Id": "__default_policy_ID",
+  "Statement": [
+    {
+      "Sid": "__default_statement_ID",
+      "Effect": "Allow",
+      "Principal": { "AWS": "*" },
+      "Action": [
+        "SNS:GetTopicAttributes",
+        "SNS:SetTopicAttributes",
+        "SNS:AddPermission",
+        "SNS:RemovePermission",
+        "SNS:DeleteTopic",
+        "SNS:Subscribe",
+        "SNS:ListSubscriptionsByTopic",
+        "SNS:Publish"
+      ],
+      "Resource": "arn:aws:sns:eu-north-1:ACCOUNT_ID:qfin-alerts",
+      "Condition": { "StringEquals": { "AWS:SourceOwner": "ACCOUNT_ID" } }
+    },
+    {
+      "Sid": "qfin-task-failures",
+      "Effect": "Allow",
+      "Principal": { "Service": "events.amazonaws.com" },
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:eu-north-1:ACCOUNT_ID:qfin-alerts",
+      "Condition": {
+        "ArnEquals": {
+          "aws:SourceArn": "arn:aws:events:eu-north-1:ACCOUNT_ID:rule/qfin-task-failed"
+        }
+      }
+    }
+  ]
+}

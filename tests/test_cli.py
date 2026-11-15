@@ -127,6 +127,44 @@ def test_aws_tasks_get_the_keys_they_may_read_and_no_other():
     assert read == set(statement["Resource"])
 
 
+def test_a_failed_task_of_any_qfin_job_is_e_mailed():
+    # An EventBridge rule on the qfin cluster: a task that stops with an exit code other
+    # than 0, killed for memory (137) too, or that never starts, as when a secret cannot
+    # be read, goes to the alert topic. It is matched by AWS's own test-event-pattern.
+    detail = json.loads((AWS / "task-failure-rule.template.json").read_text())["detail"]
+    assert detail["clusterArn"] == ["arn:aws:ecs:eu-north-1:ACCOUNT_ID:cluster/qfin"]
+    assert detail["lastStatus"] == ["STOPPED"]
+    assert detail["$or"] == [
+        {"containers": {"exitCode": [{"anything-but": 0}]}},
+        {"stopCode": ["TaskFailedToStart"]},
+    ]
+    topic = "arn:aws:sns:eu-north-1:ACCOUNT_ID:qfin-alerts"
+    (target,) = json.loads((AWS / "task-failure-target.template.json").read_text())
+    assert target["Arn"] == topic
+    shown = target["InputTransformer"]
+    assert all(f"<{name}>" in shown["InputTemplate"] for name in shown["InputPathsMap"])
+    # The topic takes the rule's messages, and only the rule's.
+    policy = json.loads((AWS / "alerts-topic-policy.template.json").read_text())
+    (statement,) = [
+        s
+        for s in policy["Statement"]
+        if s["Principal"] == {"Service": "events.amazonaws.com"}
+    ]
+    assert statement["Action"] == "sns:Publish" and statement["Resource"] == topic
+    assert statement["Condition"] == {
+        "ArnEquals": {
+            "aws:SourceArn": "arn:aws:events:eu-north-1:ACCOUNT_ID:rule/qfin-task-failed"
+        }
+    }
+
+
+def test_the_nightly_task_has_room_to_continue_the_history():
+    # Continuing EODHD's history peaked at 906 MB of 1 GB under Fargate's CPU quota
+    # (decision 0022); 0.25 vCPU allows up to 2 GB.
+    template = json.loads(TASK_DEFINITION.read_text(encoding="utf-8"))
+    assert (template["cpu"], template["memory"]) == ("256", "2048")
+
+
 def test_ingest_takes_eodhd_s_history_from_the_bucket_when_it_is_not_here(
     tmp_path, monkeypatch, capsys
 ):

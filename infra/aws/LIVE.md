@@ -11,6 +11,7 @@ job: same cluster, image, roles and log group.
 | Size | 0.25 vCPU, 1 GB: about 2 USD a month |
 | Journal | the task's disk lasts as long as the task, so the day's folder goes to `s3://qfin-alphaguard-kefebekir/data/live/<day>/` every minute and at the end; a task started again that day fetches it first and replays it |
 | Alerts | the SNS topic `qfin-alerts`, e-mailed to Efe; a summary when a session closes |
+| Failures | any task of the cluster, the nightly job's too, that stops with an exit code other than 0 or never starts: e-mailed by the EventBridge rule `qfin-task-failed` (step 9) |
 | Report | `qfin-live-report`, each weekday at 16:30 New York time, once the consolidated tape serves the day's last minutes: the session against backtests of it (`qfin live-report`), its summary e-mailed, `report.txt` and `report.html` kept in the day's folder |
 | Keys | Alpaca's paper keys in SSM, `/qfin/alpaca-key-id` and `/qfin/alpaca-secret-key` |
 | News capture | `qfin-news-capture`, each weekday at 15:31 New York time: the news as it stands then, for N5's shadow record (`qfin news-capture`), to `s3://qfin-alphaguard-kefebekir/data/news_capture/<day>.jsonl`, once a session and never written again; it runs only between 15:30 and 16:30 New York time, and a failure is e-mailed |
@@ -63,6 +64,17 @@ number.
    its target `qfin-live`'s task definition, with the nightly schedule's role and network
    configuration; and `qfin-live-report` the same way, with `cron(30 16 ? * MON-FRI *)` and
    `qfin-live-report`'s task definition.
+
+9. **Failures e-mailed** (after the nightly job stopped unseen on 12 and 13 November 2026):
+   - `sed s/ACCOUNT_ID/<number>/g` on `alerts-topic-policy.template.json`, into
+     `aws sns set-topic-attributes --topic-arn <qfin-alerts> --attribute-name Policy --attribute-value file://...`;
+     its second statement lets EventBridge publish, for this rule alone;
+   - `aws events put-rule --name qfin-task-failed --event-pattern file://...`, from
+     `task-failure-rule.template.json`;
+   - `aws events put-targets --rule qfin-task-failed --targets file://...`, from
+     `task-failure-target.template.json`: one line saying which task stopped, when and why.
+   - A check: run a task whose command fails, such as the nightly one with its command
+     overridden to `["no-such-command"]`; the e-mail comes within a minute.
 
 A change to `qfin live`'s command line needs a new revision of `qfin-live` and the
 schedule pointed at it, as for the nightly job.

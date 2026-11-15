@@ -1,0 +1,17 @@
+[
+  {
+    "Id": "email-efe",
+    "Arn": "arn:aws:sns:eu-north-1:ACCOUNT_ID:qfin-alerts",
+    "InputTransformer": {
+      "InputPathsMap": {
+        "group": "$.detail.group",
+        "stopped": "$.detail.stoppedAt",
+        "code": "$.detail.stopCode",
+        "reason": "$.detail.stoppedReason",
+        "exit": "$.detail.containers[0].exitCode",
+        "task": "$.detail.taskArn"
+      },
+      "InputTemplate": "\"qfin task failed: <group> stopped at <stopped> UTC (<code>, exit code <exit>): <reason>. Task <task>; its log is in /ecs/qfin-alphaguard.\""
+    }
+  }
+]
