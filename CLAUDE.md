@@ -88,6 +88,9 @@ Both ruff commands must pass before a commit.
   before today each morning; `runner.py`, a session from the morning to the
   close (`qfin live`), and the stop that closes by Alpaca's positions;
   `report.py`, a session against backtests of it (`qfin live-report`)
+- `src/qfin_alphaguard/kutbit/`, `research/kutbit/`: KUTBIT, Efe's own intraday model with
+  leverage (decision 0023), separate from the QQQ rule; `features.py`, what it sees at each
+  minute, shared by training and live
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
