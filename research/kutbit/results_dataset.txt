@@ -14,6 +14,7 @@ year  stocks  instruments  sessions  usable  minutes seen  news before the open
 2026      50           66    12,819   98.9%        99.98%                 34.0%
 
 On 200 usable sessions drawn at random, a 30-minute long position moved 24.8 bps on average, up or down, and its worst moment along the way was -24.9 bps.
+In the inputs, a move of the first five minutes has the size 0.77 on average and one between 12:00 and 13:00 0.76, each in its minute's usual moves.
 The inputs at a minute drawn at random in each, from the session cut at that minute, equal those from the whole session on 200 of 200.
 
 Notes:

@@ -9,7 +9,18 @@ import pytest
 from qfin_alphaguard.kutbit import features as kf
 from qfin_alphaguard.kutbit.features import CHANNELS, SCALARS, WINDOW, Day, inputs
 
-MINUTE_FIELDS = ("open", "high", "low", "close", "volume", "seen", "profile", "news")
+MINUTE_FIELDS = (
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "seen",
+    "profile",
+    "news",
+    "swing",
+    "habit",
+)
 
 
 def day(close, open_=None, **given) -> Day:
@@ -29,6 +40,10 @@ def day(close, open_=None, **given) -> Day:
         "seen": np.ones(n, dtype=bool),
         "profile": np.full(n, 1000.0),
         "news": np.zeros(n),
+        # by default every minute's usual move is the day's volatility spread evenly
+        "swing": np.full(n, given.get("vol", 0.02) / math.sqrt(390)),
+        "habit": np.zeros(n),
+        "beta": 1.0,
         "minutes": 390,
         "prev_close": 100.0,
         "vol": 0.02,
@@ -53,6 +68,9 @@ def random_day(rng, n=390) -> Day:
         volume=rng.integers(0, 5000, n).astype(float),
         profile=rng.uniform(500, 3000, n),
         news=rng.poisson(0.05, n).astype(float),
+        swing=rng.uniform(5e-4, 3e-3, n),
+        habit=rng.normal(0, 1e-3, n),
+        beta=1.3,
         prev_close=99.0,
         vix=18.0,
         news_before=2,
@@ -70,6 +88,10 @@ def random_day(rng, n=390) -> Day:
         {"vol": float("nan")},
         {"vix": -1.0},
         {"news_before": -1},
+        {"swing": [0.001, 0.0, 0.001]},  # a minute that usually does not move at all
+        {"swing": [0.001, 0.001]},
+        {"habit": [0.0, float("nan"), 0.0]},
+        {"beta": float("inf")},
     ],
 )
 def test_a_day_refuses_what_cannot_be(broken):
@@ -85,6 +107,7 @@ def test_each_channel_by_hand():
         profile=[1000.0, 1000.0, 1000.0],
         news=[0.0, 2.0, 0.0],
         seen=[True, True, False],
+        beta=0.5,
     )
     market = day([400.0, 404.0, 402.0], vol=0.01)  # in its own units, not the stock's
     rows = kf.channels(d, market)
@@ -95,6 +118,10 @@ def test_each_channel_by_hand():
     np.testing.assert_allclose(
         column["market"], np.log([1, 404 / 400, 402 / 404]) / (0.01 / math.sqrt(390))
     )
+    # the market's part taken out at the instrument's beta, in the instrument's units
+    np.testing.assert_allclose(
+        column["apart"], (moves - 0.5 * np.log([1, 404 / 400, 402 / 404])) / unit
+    )
     np.testing.assert_allclose(column["range"], np.log(d.high / d.low) / unit)
     np.testing.assert_allclose(
         column["volume"], np.log1p([1000, 3000, 0]) - np.log1p(1000)
@@ -104,6 +131,22 @@ def test_each_channel_by_hand():
     np.testing.assert_allclose(column["vwap"], np.log(d.close / vwap) / 0.02)
     np.testing.assert_allclose(column["news"], np.log1p([0, 2, 0]))
     assert column["seen"].tolist() == [1.0, 1.0, 0.0]
+
+
+def test_a_move_is_read_against_the_usual_move_at_its_own_minute():
+    swing = np.array([0.004, 0.001, 0.002])  # the open usually moves four times as much
+    d = day([100.0, 101.0, 99.0], open_=[100.0, 100.5, 101.0], swing=swing, beta=0.5)
+    market = day([400.0, 404.0, 402.0], swing=[0.003, 0.002, 0.001])
+    column = {name: kf.channels(d, market)[:, i] for i, name in enumerate(CHANNELS)}
+    moves = np.log([100 / 100, 101 / 100, 99 / 101])
+    of_market = np.log([1, 404 / 400, 402 / 404])
+    np.testing.assert_allclose(column["move"], moves / swing)
+    np.testing.assert_allclose(column["range"], np.log(d.high / d.low) / swing)
+    np.testing.assert_allclose(column["market"], of_market / [0.003, 0.002, 0.001])
+    np.testing.assert_allclose(column["apart"], (moves - 0.5 * of_market) / swing)
+    s = {name: kf.scalars(d)[:, i] for i, name in enumerate(SCALARS)}
+    typical = np.sqrt(np.cumsum((moves / swing) ** 2) / [1, 2, 3])
+    np.testing.assert_allclose(s["day_vol"][1:], np.log(typical[1:]))
 
 
 def test_before_the_first_trade_the_vwap_is_the_bar_s_typical_price():
@@ -122,6 +165,8 @@ def test_each_scalar_by_hand():
         vix=25.0,
         news_before=3,
         etf=True,
+        beta=0.8,
+        habit=[0.001, -0.002, 0.0],
     )
     s = {name: kf.scalars(d)[:, i] for i, name in enumerate(SCALARS)}
     np.testing.assert_allclose(s["time"], np.array([1, 2, 3]) / 390)
@@ -133,6 +178,11 @@ def test_each_scalar_by_hand():
     np.testing.assert_allclose(s["vix"], math.log(25))
     np.testing.assert_allclose(s["news_before"], math.log1p(3))
     np.testing.assert_allclose(s["etf"], 1.0)
+    np.testing.assert_allclose(s["beta"], 0.8)
+    # in units of what the instrument usually moves in 30 minutes
+    np.testing.assert_allclose(
+        s["habit"], np.array([0.001, -0.002, 0.0]) / (0.02 * math.sqrt(30 / 390))
+    )
     unit = 0.02 / math.sqrt(390)
     moves = np.log([100 / 101, 102 / 100, 101 / 102])
     typical = np.sqrt(np.cumsum(moves**2) / [1, 2, 3]) / unit

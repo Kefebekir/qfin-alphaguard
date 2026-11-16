@@ -14,7 +14,11 @@ For each instrument and session it keeps:
 - from the LOOKBACK sessions before it, on the session's own basis, splits taken into account:
   - the previous close;
   - the volatility of daily close-to-close log returns;
-  - the median volume at each minute.
+  - the median volume at each minute;
+  - the usual size of a move at each minute (`swing`);
+  - its beta to QQQ, from half-hour returns;
+  - what it did apart from QQQ over the 30 minutes after each minute, in the last
+    HABIT_SESSIONS of them (`habit`).
   A stock's splits come from the daily prices; an ETF's are found where its price jumps
   overnight by a clean ratio.
 - the headlines naming it (Benzinga, data/frontier/news_all), counted by the minute they were
@@ -23,14 +27,14 @@ For each instrument and session it keeps:
 - the VIX's close on the day before (data/raw/cboe).
 
 A session is `usable` when the LOOKBACK sessions before it, and the one just before, all have
-minutes, and the VIX is known. A stock that joins the universe in January is therefore usable
+minutes, QQQ's too, and the VIX is known. A stock that joins the universe in January is therefore usable
 from its 22nd session.
 
 Output, under data/kutbit/ (git-ignored):
 - days.parquet: one row for each instrument's session: day, year, row, ticker, etf, minutes,
-  prev_close, vol, vix, news_before, split and usable;
-- <year>.npz: that year's open, high, low, close, volume and profile as [rows, 390] float32,
-  seen as bool and news as uint16. A half day's 210 minutes are followed by its last close.
+  prev_close, vol, beta, vix, news_before, split and usable;
+- <year>.npz: that year's open, high, low, close, volume, profile, swing and habit as
+  [rows, 390] float32, seen as bool and news as uint16. A half day's 210 minutes are followed by its last close.
 - results_dataset.txt beside this file: what the data set holds, year by year.
 
 Usage: uv run python research/kutbit/dataset.py [DATA]   (DATA, the data folder, is data/)
@@ -51,7 +55,16 @@ sys.path.insert(0, str(Path(__file__).parent))
 from labels import labels
 
 from qfin_alphaguard.data.universe import trading_universes
-from qfin_alphaguard.kutbit.features import FULL_SESSION, LOOKBACK, Day, inputs
+from qfin_alphaguard.kutbit.features import (
+    CHANNELS,
+    FULL_SESSION,
+    HABIT_MINUTES,
+    HABIT_SESSIONS,
+    LOOKBACK,
+    Day,
+    channels,
+    inputs,
+)
 from qfin_alphaguard.sessions import Session, sessions
 
 DATA = Path("data")
@@ -79,7 +92,10 @@ ETFS = (
 )
 MARKET = "QQQ"
 PRICE_FIELDS = ("open", "high", "low", "close")
-MINUTE_FIELDS = (*PRICE_FIELDS, "volume", "seen", "profile", "news")
+MINUTE_FIELDS = (*PRICE_FIELDS, "volume", "seen", "profile", "news", "swing", "habit")
+HALF_HOUR = 30  # minutes; the returns a beta is measured on
+SMOOTH = 7  # minutes on each side over which the usual move is averaged
+SWING_FLOOR = 0.25  # the least usual move, as a share of the session's median
 SPLIT_JUMP = math.log(1.3)  # an ETF's overnight move this large is checked for a split
 SPLIT_RATIOS = (2, 3, 4, 5, 10, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 10)
 
@@ -140,12 +156,77 @@ def etf_splits(
     return out, sorted(found)
 
 
+def minute_moves(grid: dict[str, np.ndarray]) -> np.ndarray:
+    """Each minute's log return, as features.moves reads it."""
+    previous = np.concatenate([[grid["open"][0]], grid["close"][:-1]])
+    return np.log(grid["close"] / previous)
+
+
+def usual_moves(history: list[dict]) -> np.ndarray | None:
+    """The usual size of a move at each minute of a full session: the root mean square of
+    that minute's log returns over the sessions, averaged over SMOOTH minutes on each side.
+    It is never below SWING_FLOOR of its median; None if nothing moved at all."""
+    squares = np.full((len(history), FULL_SESSION), np.nan)
+    for i, grid in enumerate(history):
+        moves = minute_moves(grid)
+        squares[i, : len(moves)] = moves**2
+    mean = np.nanmean(squares, axis=0)
+    width = 2 * SMOOTH + 1
+    smooth = np.convolve(np.pad(mean, SMOOTH, mode="edge"), np.ones(width) / width)
+    swing = np.sqrt(smooth[width - 1 : -width + 1])
+    if not np.median(swing) > 0:
+        return None
+    return np.maximum(swing, SWING_FLOOR * np.median(swing))
+
+
+def half_hours(grid: dict[str, np.ndarray]) -> np.ndarray:
+    """The session's log return over each HALF_HOUR minutes, the first from the open."""
+    ends = grid["close"][HALF_HOUR - 1 :: HALF_HOUR]
+    return np.diff(np.log(np.concatenate([[grid["open"][0]], ends])))
+
+
+def beta_to(history: list[dict], market: list[dict | None]) -> float | None:
+    """The slope, through zero, of the sessions' half-hour returns on the market's; None if
+    the market lacks one of the sessions or did not move."""
+    if any(
+        m is None or len(m["close"]) != len(h["close"])
+        for h, m in zip(history, market, strict=True)
+    ):
+        return None
+    own = np.concatenate([half_hours(h) for h in history])
+    of_market = np.concatenate([half_hours(m) for m in market])
+    squares = float(of_market @ of_market)
+    return float(own @ of_market) / squares if squares > 0 else None
+
+
+def habit_of(
+    history: list[dict], market: list[dict | None], beta: float
+) -> np.ndarray | None:
+    """At each minute of a full session, the mean over the sessions of the log return apart
+    from the market from that minute's close to HABIT_MINUTES later, or to the close if that
+    comes first; None if the market lacks one of the sessions."""
+    if any(
+        m is None or len(m["close"]) != len(h["close"])
+        for h, m in zip(history, market, strict=True)
+    ):
+        return None
+    apart = np.full((len(history), FULL_SESSION), np.nan)
+    for i, (h, m) in enumerate(zip(history, market, strict=True)):
+        n = len(h["close"])
+        later = np.minimum(np.arange(n) + HABIT_MINUTES, n - 1)
+        own = np.log(h["close"][later] / h["close"])
+        apart[i, :n] = own - beta * np.log(m["close"][later] / m["close"])
+    seen = (~np.isnan(apart)).any(axis=0)
+    return np.where(seen, np.nanmean(np.where(seen, apart, 0.0), axis=0), 0.0)
+
+
 def lookback(
     history: list[dict | None], factors: list[float], target: float
-) -> tuple[float, float, np.ndarray] | None:
+) -> tuple[float, float, np.ndarray, np.ndarray] | None:
     """From the LOOKBACK + 1 sessions before a session: its previous close, the volatility of
-    daily log returns and the median volume at each minute, on its basis (`target` is its split
-    factor); None unless every one of those sessions has minutes."""
+    daily log returns, the median volume at each minute and the usual move at each minute, on
+    its basis (`target` is its split factor); None unless every one of those sessions has
+    minutes and prices moved in them."""
     if len(history) < LOOKBACK + 1 or any(h is None for h in history):
         return None
     closes = np.array(
@@ -155,7 +236,10 @@ def lookback(
     volumes = np.full((LOOKBACK, FULL_SESSION), np.nan)
     for i, (h, f) in enumerate(zip(history[1:], factors[1:], strict=True)):
         volumes[i, : len(h["volume"])] = h["volume"] * f / target
-    return float(closes[-1]), vol, np.nanmedian(volumes, axis=0)
+    swing = usual_moves(history[1:])
+    if swing is None:
+        return None
+    return float(closes[-1]), vol, np.nanmedian(volumes, axis=0), swing
 
 
 def news_symbol(ticker: str) -> str:
@@ -257,24 +341,11 @@ def build(raw: Path = RAW, news: Path = NEWS, years=None):
     vix_days, vix_values = vix_closes(raw / "cboe" / "VIX_History.csv")
     headlines = headline_minutes({news_symbol(t) for t in included}, news)
     rows, arrays, notes = [], defaultdict(lambda: defaultdict(list)), []
+    market_grids, _ = stored_grids(raw, MARKET, calendar)
     for ticker in sorted(included):
-        paths = sorted((raw / "intraday" / ticker).glob("*.parquet"))
-        if not paths:
+        grids, widened = stored_grids(raw, ticker, calendar)
+        if not grids:
             continue
-        minutes = pl.concat([pl.read_parquet(p) for p in paths]).sort("start")
-        by_day = minutes.with_columns(
-            pl.col("start")
-            .dt.convert_time_zone("America/New_York")
-            .dt.date()
-            .alias("day")
-        ).partition_by("day", as_dict=True)
-        grids, widened = {}, 0
-        for session in calendar:
-            part = by_day.get((session.day,))
-            grid = on_grid(part, session) if part is not None else None
-            if grid is not None:
-                widened += repaired(grid)
-                grids[session.day] = grid
         days = [s.day for s in calendar if s.day in grids]
         etf = ticker in ETFS
         if etf:
@@ -294,11 +365,18 @@ def build(raw: Path = RAW, news: Path = NEWS, years=None):
                 continue
             grid = grids[session.day]
             back = calendar[max(0, i - LOOKBACK - 1) : i]
+            before = [grids.get(b.day) for b in back]
             known = lookback(
-                [grids.get(b.day) for b in back],
-                [factor.get(b.day, 1.0) for b in back],
-                factor[session.day],
+                before, [factor.get(b.day, 1.0) for b in back], factor[session.day]
             )
+            beta = habit = None
+            if known:
+                of_market = [market_grids.get(b.day) for b in back]
+                beta = beta_to(before[1:], of_market[1:])
+            if beta is not None:
+                habit = habit_of(
+                    before[-HABIT_SESSIONS:], of_market[-HABIT_SESSIONS:], beta
+                )
             per_minute, before_open = counted(
                 times, session, calendar[i - 1] if i else None
             )
@@ -313,6 +391,13 @@ def build(raw: Path = RAW, news: Path = NEWS, years=None):
             store["news"].append(padded(per_minute, 0).astype(np.uint16))
             profile = known[2] if known else np.zeros(FULL_SESSION)
             store["profile"].append(profile.astype(np.float32))
+            swing = known[3] if known else np.zeros(FULL_SESSION)
+            store["swing"].append(swing.astype(np.float32))
+            store["habit"].append(
+                (habit if habit is not None else np.zeros(FULL_SESSION)).astype(
+                    np.float32
+                )
+            )
             rows.append(
                 {
                     "day": session.day,
@@ -323,10 +408,14 @@ def build(raw: Path = RAW, news: Path = NEWS, years=None):
                     "minutes": session.minutes,
                     "prev_close": known[0] if known else None,
                     "vol": known[1] if known else None,
+                    "beta": beta,
                     "vix": vix,
                     "news_before": before_open,
                     "split": factor[session.day],
-                    "usable": known is not None and known[1] > 0 and vix is not None,
+                    "usable": known is not None
+                    and known[1] > 0
+                    and habit is not None
+                    and vix is not None,
                 }
             )
     found = defaultdict(set)
@@ -345,6 +434,25 @@ def build(raw: Path = RAW, news: Path = NEWS, years=None):
     return pl.DataFrame(rows).sort("day", "ticker"), stacked, notes
 
 
+def stored_grids(raw: Path, ticker: str, calendar: list[Session]) -> tuple[dict, int]:
+    """An instrument's stored sessions on their grids, by day, and how many bars were widened."""
+    paths = sorted((raw / "intraday" / ticker).glob("*.parquet"))
+    if not paths:
+        return {}, 0
+    minutes = pl.concat([pl.read_parquet(p) for p in paths]).sort("start")
+    by_day = minutes.with_columns(
+        pl.col("start").dt.convert_time_zone("America/New_York").dt.date().alias("day")
+    ).partition_by("day", as_dict=True)
+    grids, widened = {}, 0
+    for session in calendar:
+        part = by_day.get((session.day,))
+        grid = on_grid(part, session) if part is not None else None
+        if grid is not None:
+            widened += repaired(grid)
+            grids[session.day] = grid
+    return grids, widened
+
+
 def day_of(days: pl.DataFrame, arrays: dict, ticker: str, day: date) -> Day:
     """One stored session as features.Day."""
     row = days.filter((pl.col("ticker") == ticker) & (pl.col("day") == day)).row(
@@ -357,6 +465,9 @@ def day_of(days: pl.DataFrame, arrays: dict, ticker: str, day: date) -> Day:
         seen=a["seen"][i, :n],
         profile=a["profile"][i, :n].astype(float),
         news=a["news"][i, :n].astype(float),
+        swing=a["swing"][i, :n].astype(float),
+        habit=a["habit"][i, :n].astype(float),
+        beta=row["beta"],
         minutes=n,
         prev_close=row["prev_close"],
         vol=row["vol"],
@@ -404,7 +515,8 @@ def report(
     sample = days.filter(pl.col("usable")).sample(
         min(checks, days["usable"].sum()), seed=1
     )
-    moves, worst, same = [], [], 0
+    moves, worst, same, early, midday = [], [], 0, [], []
+    move = CHANNELS.index("move")
     rng = np.random.default_rng(1)
     for row in sample.iter_rows(named=True):
         day = day_of(days, arrays, row["ticker"], row["day"])
@@ -413,6 +525,10 @@ def report(
         moves.append(np.nanmean(np.abs(found["ret"])))
         worst.append(np.nanmean(found["worst"]))
         t = int(rng.integers(0, row["minutes"]))
+        if row["minutes"] == FULL_SESSION:
+            size = np.abs(channels(day, market)[:, move])
+            early.append(size[:5].mean())
+            midday.append(size[150:210].mean())
         full = inputs(day, market)
         part = inputs(upto(day, t), upto(market, t))
         same += int(
@@ -425,6 +541,11 @@ def report(
             f"On {len(sample)} usable sessions drawn at random, a 30-minute long position "
             f"moved {np.mean(moves) * 1e4:.1f} bps on average, up or down, and its worst "
             f"moment along the way was {np.mean(worst) * 1e4:.1f} bps."
+        ),
+        (
+            "In the inputs, a move of the first five minutes has the size "
+            f"{np.mean(early):.2f} on average and one between 12:00 and 13:00 "
+            f"{np.mean(midday):.2f}, each in its minute's usual moves."
         ),
         (
             "The inputs at a minute drawn at random in each, from the session cut at that "
