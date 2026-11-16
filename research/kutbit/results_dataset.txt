@@ -1,0 +1,25 @@
+dataset.py: KUTBIT's data set (decision 0023)
+
+year  stocks  instruments  sessions  usable  minutes seen  news before the open
+2016      50           66    16,632   91.7%        99.60%                 20.0%
+2017      49           65    16,315   99.0%        99.21%                 18.4%
+2018      50           66    16,566   99.2%        99.43%                 17.9%
+2019      50           66    16,484   98.9%        99.43%                 18.6%
+2020      50           66    16,698   99.2%        99.46%                 21.2%
+2021      50           66    16,632   99.1%        99.23%                 23.9%
+2022      50           66    16,303   98.7%        99.90%                 28.3%
+2023      50           66    16,500   99.1%        99.85%                 30.3%
+2024      50           66    16,632   99.2%        98.72%                 27.9%
+2025      50           66    16,500   99.0%        99.69%                 31.1%
+2026      50           66    12,819   98.9%        99.98%                 34.0%
+
+On 200 usable sessions drawn at random, a 30-minute long position moved 24.8 bps on average, up or down, and its worst moment along the way was -24.9 bps.
+The inputs at a minute drawn at random in each, from the session cut at that minute, equal those from the whole session on 200 of 200.
+
+Notes:
+- XLB: a 2-for-1 split on 2025-12-05
+- XLE: a 2-for-1 split on 2025-12-05
+- XLK: a 2-for-1 split on 2025-12-05
+- XLU: a 2-for-1 split on 2025-12-05
+- XLY: a 2-for-1 split on 2025-12-05
+- AVGO: in 2017's instruments, but no minutes stored then

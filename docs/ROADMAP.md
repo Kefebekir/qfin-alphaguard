@@ -77,7 +77,8 @@ week alongside university.
   - It forecasts the distribution of the next 5-60 minutes, and the worst move on the way.
   - It trades only when its account's expected growth after costs clears Efe's threshold.
   - It runs at up to 4x on a second Alpaca paper account, and at 10x in a virtual account.
-  - Next: its data and labels, then the simulator, each in its own pull request.
+  - Its data set is built (`research/kutbit`): every instrument's sessions of 2016-2026, minute
+    by minute, with its inputs and labels. Next: the simulator, whose broker rules Efe writes.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
