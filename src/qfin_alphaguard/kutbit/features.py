@@ -7,8 +7,15 @@ session exactly what it was trained on. The input at minute t comes only from:
   LOOKBACK sessions before, the VIX's last close and the headlines since the previous close.
 
 Each input is a window of the last WINDOW minutes, one row a minute and one column a
-CHANNEL, and a few SCALARS. Moves are scaled by the instrument's own volatility, so a
-quiet utility and a jumpy chip maker are read in the same units.
+CHANNEL, and a few SCALARS. Three things keep the model from spending itself on what is
+already known:
+- A minute's move is divided by the instrument's usual move at that minute of the session
+  (`swing`), so a quiet utility and a jumpy chip maker, the open and midday, are read in the
+  same units. The first five minutes move about four times as much as a midday minute.
+- `apart` is the move with the market's part taken out, at a beta known before the open. About
+  29% of the variance of a stock's 30-minute moves is QQQ's.
+- `habit` is what the instrument did over the same 30 minutes of the sessions before, apart
+  from the market (Heston, Korajczyk and Sadka 2010).
 """
 
 import math
@@ -18,15 +25,18 @@ import numpy as np
 
 WINDOW = 120  # minutes of chart in each input
 FULL_SESSION = 390  # minutes from 09:30 to 16:00
-LOOKBACK = 20  # sessions before, for the volatility and the volume profile
+LOOKBACK = 20  # sessions before, for the volatility, the profiles and the beta
+HABIT_SESSIONS = 5  # sessions before, for `habit`
+HABIT_MINUTES = 30  # the stretch after each minute that `habit` describes
 
 CHANNELS = (
-    "move",  # this minute's log return, in units of a typical minute's move
+    "move",  # this minute's log return, over the usual move at this minute of the session
     "range",  # this minute's log high over low, in the same units
     "volume",  # log volume over the volume usual at this minute of the session
     "vwap",  # log distance of the close from the session's VWAP, in units of a day's move
     "news",  # log(1 + headlines first published this minute naming the instrument)
     "market",  # QQQ's move this minute, in QQQ's units
+    "apart",  # the move less beta times QQQ's, in the instrument's units
     "seen",  # 1 if the minute had a trade, 0 if its bar only carries the last close
 )
 SCALARS = (
@@ -35,10 +45,12 @@ SCALARS = (
     "gap",  # log open over the previous close, in units of a day's move
     "since_open",  # log close over the open, in units of a day's move
     "place",  # where the close stands in the session's range so far, 0 to 1
-    "day_vol",  # log of this session's typical minute move so far over the usual one
+    "day_vol",  # log of this session's typical move so far, in the minutes' usual moves
     "vix",  # log of the VIX's last close
     "news_before",  # log(1 + headlines between the previous close and the open)
     "etf",  # 1 for an ETF, 0 for a stock
+    "beta",  # how much of QQQ's move the instrument usually makes
+    "habit",  # its usual move apart from the market over the next HABIT_MINUTES, in a day's
 )
 
 
@@ -63,12 +75,20 @@ class Day:
         np.ndarray
     )  # the median volume at each minute over the LOOKBACK sessions before
     news: np.ndarray  # headlines first published in each minute naming the instrument
+    # the usual size of a move at each minute: the root mean square of the minute's log
+    # returns over the LOOKBACK sessions before
+    swing: np.ndarray
+    # the mean log return apart from the market over the HABIT_MINUTES after each minute, in
+    # the HABIT_SESSIONS sessions before
+    habit: np.ndarray
     minutes: int  # the session's length: 390, or 210 on a half day
     prev_close: float
     vol: float  # std of daily close-to-close log returns over the LOOKBACK sessions before
     vix: float
     news_before: int
     etf: bool
+    # the slope of its half-hour returns on QQQ's over the LOOKBACK sessions before
+    beta: float
 
     def __post_init__(self) -> None:
         arrays = (
@@ -80,6 +100,8 @@ class Day:
             self.seen,
             self.profile,
             self.news,
+            self.swing,
+            self.habit,
         )
         n = len(self.open)
         if not 1 <= n <= self.minutes or any(len(a) != n for a in arrays):
@@ -97,6 +119,13 @@ class Day:
             raise ValueError("volumes cannot be negative")
         if (np.asarray(self.news) < 0).any() or self.news_before < 0:
             raise ValueError("headline counts cannot be negative")
+        swing = np.asarray(self.swing)
+        if not (np.isfinite(swing).all() and (swing > 0).all()):
+            raise ValueError(
+                "the usual move at each minute must be finite and positive"
+            )
+        if not (np.isfinite(self.habit).all() and math.isfinite(self.beta)):
+            raise ValueError("the habit and the beta must be finite")
         for name in ("prev_close", "vol", "vix"):
             value = getattr(self, name)
             if not (math.isfinite(value) and value > 0):
@@ -107,7 +136,7 @@ def channels(day: Day, market: Day) -> np.ndarray:
     """Every minute's CHANNELS, [minutes so far, len(CHANNELS)]; row m uses bars 0..m."""
     if len(market.open) != len(day.open):
         raise ValueError("the market's day must cover the same minutes")
-    minute = day.vol / math.sqrt(FULL_SESSION)
+    own, of_market = moves(day), moves(market)
     vwap = np.cumsum((day.high + day.low + day.close) / 3 * day.volume) / np.maximum(
         np.cumsum(day.volume), 1e-12
     )
@@ -115,12 +144,13 @@ def channels(day: Day, market: Day) -> np.ndarray:
     traded = np.cumsum(day.volume) > 0
     vwap = np.where(traded, vwap, (day.high + day.low + day.close) / 3)
     columns = [
-        moves(day) / minute,
-        np.log(day.high / day.low) / minute,
+        own / day.swing,
+        np.log(day.high / day.low) / day.swing,
         np.log1p(day.volume) - np.log1p(day.profile),
         np.log(day.close / vwap) / day.vol,
         np.log1p(day.news),
-        moves(market) / (market.vol / math.sqrt(FULL_SESSION)),
+        of_market / market.swing,
+        (own - day.beta * of_market) / day.swing,
         day.seen.astype(float),
     ]
     return np.stack(columns, axis=1)
@@ -137,11 +167,10 @@ def scalars(day: Day) -> np.ndarray:
     """Every minute's SCALARS, [minutes so far, len(SCALARS)]; row m uses bars 0..m."""
     n = len(day.open)
     m = np.arange(n)
-    minute = day.vol / math.sqrt(FULL_SESSION)
     high, low = np.maximum.accumulate(day.high), np.minimum.accumulate(day.low)
     span = high - low
     place = np.where(span > 0, (day.close - low) / np.where(span > 0, span, 1), 0.5)
-    typical = np.sqrt(np.cumsum(moves(day) ** 2) / (m + 1)) / minute
+    typical = np.sqrt(np.cumsum((moves(day) / day.swing) ** 2) / (m + 1))
     columns = [
         (m + 1) / FULL_SESSION,
         (day.minutes - 1 - m) / FULL_SESSION,
@@ -152,6 +181,8 @@ def scalars(day: Day) -> np.ndarray:
         np.full(n, math.log(day.vix)),
         np.full(n, math.log1p(day.news_before)),
         np.full(n, float(day.etf)),
+        np.full(n, day.beta),
+        day.habit / (day.vol * math.sqrt(HABIT_MINUTES / FULL_SESSION)),
     ]
     return np.stack(columns, axis=1)
 

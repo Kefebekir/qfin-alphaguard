@@ -24,6 +24,10 @@ uv run python research/kutbit/dataset.py
   last close with no volume and is marked unseen. Each session also keeps:
   - the previous close, the volatility and the volume usual at each minute, from the 20
     sessions before it, on its own basis, splits taken into account;
+  - the usual size of a move at each minute (`swing`) and its beta to QQQ, from the same 20
+    sessions;
+  - what it did apart from QQQ over the 30 minutes after each minute, in the 5 sessions before
+    (`habit`);
   - the headlines naming it, by the minute they were first published, and those since the
     previous close;
   - the VIX's last close.
@@ -35,12 +39,21 @@ uv run python research/kutbit/dataset.py
 year's `<year>.npz`.
 
 **What it holds** (`results_dataset.txt`):
-- About 16,500 sessions a year of 66 instruments; 12,819 in 2026, to 9 October. 776 MB in all.
+- About 16,500 sessions a year of 66 instruments; 12,819 in 2026, to 9 October. 1.3 GB in all.
 - About 99% of sessions are usable, but 91.7% in 2016, whose first weeks have no minutes before
   them.
 - 98.7-99.98% of minutes had a trade, year by year.
 - A 30-minute position moved 24.8 bps on average, up or down, and its worst moment along the way
   was 24.9 bps against it.
+- **A move is read against its own minute.** Against the day's volatility alone, a move of the
+  first five minutes was about four times a midday one. Against `swing` the two are alike: 0.77
+  and 0.76.
+- **The market's part.** A stock's beta to QQQ has a median of 0.69. On 2016-2021, taking
+  QQQ out at that beta removes 29% of the variance of a stock's 30-minute moves, and the mean
+  correlation between two stocks falls from 0.28 to 0.06.
+- **`habit` says little, but something.** On 2016-2021 its correlation across stocks with the
+  next 30 minutes' move apart from QQQ is +0.005 (t 2.9), the pattern of Heston, Korajczyk and
+  Sadka (2010). A trade needs far more than that; it is one input among the others.
 - **Splits.** Five sector ETFs split 2-for-1 on 5 December 2025: XLB, XLE, XLK, XLU and XLY.
   `dataset.py` found them from the overnight jump, and Alpaca's corporate actions list the same
   five on the same day.

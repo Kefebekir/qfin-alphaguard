@@ -86,9 +86,12 @@ def test_an_etf_split_is_found_from_a_clean_overnight_ratio():
     assert found == [(date(2024, 1, 3), 2)]
 
 
-def history(closes, volume=1000.0):
+def history(closes, volume=1000.0, minutes=FULL_SESSION):
+    """Sessions that end at the given closes, each minute 0.1% above or below its close."""
+    wobble = np.where(np.arange(minutes) % 2 == 0, 1.001, 1.0)
+    wobble[-1] = 1.0
     return [
-        {"close": np.array([c]), "volume": np.full(FULL_SESSION, volume)}
+        {"open": np.array([c]), "close": c * wobble, "volume": np.full(minutes, volume)}
         for c in closes
     ]
 
@@ -96,7 +99,12 @@ def history(closes, volume=1000.0):
 def test_what_was_known_before_a_session_is_put_on_its_basis():
     # 21 sessions before a 10-for-1 split: prices ten times higher, volumes ten times lower
     closes = [1000.0 * (1.01 if i % 2 else 1.0) for i in range(21)]
-    prev_close, vol, profile = kd.lookback(history(closes, 100.0), [10.0] * 21, 1.0)
+    before = history(closes, 100.0)
+    # the oldest of the 21 gives only the first return's start: its minutes are not read
+    before[0]["close"] = before[0]["close"] * np.linspace(3.0, 1.0, FULL_SESSION)
+    prev_close, vol, profile, swing = kd.lookback(before, [10.0] * 21, 1.0)
+    # a split changes no minute's return: every minute moved 0.1%, bar the first and the last
+    assert swing[100] == pytest.approx(math.log(1.001), rel=1e-6)
     assert prev_close == pytest.approx(closes[-1] / 10)
     returns = np.diff(np.log(np.array(closes) / 10))
     assert vol == pytest.approx(np.std(returns, ddof=1))
@@ -109,10 +117,108 @@ def test_what_was_known_before_a_session_is_put_on_its_basis():
 
 def test_a_half_day_before_counts_only_its_own_minutes_in_the_profile():
     sessions_ = history([100.0] * 21, 1000.0)
-    sessions_[-1] = {"close": np.array([100.0]), "volume": np.full(210, 4000.0)}
-    _, _, profile = kd.lookback(sessions_, [1.0] * 21, 1.0)
+    sessions_[-1] = history([100.0], 4000.0, minutes=210)[0]
+    _, _, profile, swing = kd.lookback(sessions_, [1.0] * 21, 1.0)
+    assert (
+        np.isfinite(swing).all() and (swing > 0).all()
+    )  # past 13:00 from the 19 alone
     # the median of 19 sessions at 1000 and one at 4000, then of 19 alone
     assert profile[:210].tolist() == [1000.0] * 210 and profile[300] == 1000.0
+
+
+def session(close, open_=None):
+    close = np.asarray(close, dtype=float)
+    return {"open": np.array([open_ or close[0]]), "close": close}
+
+
+def test_the_usual_move_at_a_minute_is_the_root_mean_square_over_the_sessions():
+    rng = np.random.default_rng(3)
+    paths = [100 * np.exp(np.cumsum(rng.normal(0, 0.001, 390))) for _ in range(20)]
+    grids = [session(p, 100.0) for p in paths]
+    moves = np.array([np.diff(np.log(np.concatenate([[100.0], p]))) for p in paths])
+    mean = (moves**2).mean(axis=0)
+    swing = kd.usual_moves(grids)
+    assert swing[100] == pytest.approx(math.sqrt(mean[93:108].mean()))
+    # at the open the window has nothing before it: the first minute counts for those too
+    assert swing[0] == pytest.approx(math.sqrt((8 * mean[0] + mean[1:8].sum()) / 15))
+    assert swing[389] == pytest.approx(
+        math.sqrt((8 * mean[389] + mean[382:389].sum()) / 15)
+    )
+
+
+def test_sessions_that_never_move_have_no_usual_move():
+    assert kd.usual_moves([session(np.full(390, 100.0))] * 20) is None
+
+
+def test_a_dead_minute_s_usual_move_is_a_quarter_of_the_median():
+    rng = np.random.default_rng(4)
+    paths = []
+    for _ in range(20):
+        steps = rng.normal(0, 0.001, 390)
+        steps[100:160] = 0.0  # an hour without a trade, every session
+        paths.append(100 * np.exp(np.cumsum(steps)))
+    swing = kd.usual_moves([session(p, 100.0) for p in paths])
+    assert swing[130] == pytest.approx(0.25 * np.median(swing))
+    assert swing[300] > 2 * swing[130]
+
+
+def test_half_hour_returns_start_at_the_open():
+    close = 100.0 + np.arange(390) * 0.01
+    returns = kd.half_hours(session(close, 99.0))
+    assert len(returns) == 13
+    assert returns[0] == pytest.approx(math.log(close[29] / 99.0))
+    assert returns[1] == pytest.approx(math.log(close[59] / close[29]))
+    assert len(kd.half_hours(session(close[:210]))) == 7  # a half day
+
+
+def test_the_beta_is_the_slope_of_half_hour_returns_on_the_market_s():
+    rng = np.random.default_rng(5)
+    market = [
+        session(400 * np.exp(np.cumsum(rng.normal(0, 0.001, 390))), 400.0)
+        for _ in range(20)
+    ]
+    twice = [session(100 * (m["close"] / 400) ** 2, 100.0) for m in market]
+    assert kd.beta_to(twice, market) == pytest.approx(2.0)
+    own = [
+        session(100 * np.exp(np.cumsum(rng.normal(0, 0.001, 390)))) for _ in range(20)
+    ]
+    x = np.concatenate([kd.half_hours(g) for g in own])
+    q = np.concatenate([kd.half_hours(g) for g in market])
+    assert kd.beta_to(own, market) == pytest.approx((x @ q) / (q @ q))
+    assert kd.beta_to(own, [None, *market[1:]]) is None
+    assert kd.beta_to(own, [session(np.full(390, 400.0))] * 20) is None
+    half = session(market[0]["close"][:210])
+    assert kd.beta_to(own, [half, *market[1:]]) is None  # not the same minutes
+
+
+def test_the_habit_is_the_mean_move_apart_from_the_market_over_the_next_half_hour():
+    rng = np.random.default_rng(6)
+    market = [
+        session(400 * np.exp(np.cumsum(rng.normal(0, 0.001, 390)))) for _ in range(5)
+    ]
+    own = [
+        session(100 * np.exp(np.cumsum(rng.normal(0, 0.001, 390)))) for _ in range(5)
+    ]
+    habit = kd.habit_of(own, market, 0.7)
+
+    def ahead(grids, start, end):
+        return np.array([math.log(g["close"][end] / g["close"][start]) for g in grids])
+
+    expected = ahead(own, 50, 80) - 0.7 * ahead(market, 50, 80)
+    assert habit[50] == pytest.approx(expected.mean())
+    # near the close, to the close
+    expected = ahead(own, 380, 389) - 0.7 * ahead(market, 380, 389)
+    assert habit[380] == pytest.approx(expected.mean())
+    assert habit[389] == 0.0
+    assert kd.habit_of(own, [None, *market[1:]], 0.7) is None
+    # a half day among them says nothing past 13:00; the others still do
+    own[0], market[0] = (
+        session(own[0]["close"][:210]),
+        session(market[0]["close"][:210]),
+    )
+    habit = kd.habit_of(own, market, 0.7)
+    expected = ahead(own[1:], 300, 330) - 0.7 * ahead(market[1:], 300, 330)
+    assert habit[300] == pytest.approx(expected.mean())
 
 
 def test_headlines_are_counted_by_the_minute_they_were_first_published():
@@ -169,15 +275,17 @@ def test_the_vix_known_at_a_session_is_the_close_of_the_day_before(tmp_path):
     assert kd.last_before(days, values, date(2024, 1, 31)) is None
 
 
-def write_minutes(raw, ticker, first, last, price, split_day=None):
+def write_minutes(
+    raw, ticker, first, last, price, split_day=None, sway=lambda day: 1.0
+):
     """Full sessions of bars from `first` to `last`; at `split_day` a 2-for-1 split halves the
-    prices as traded and doubles the volume."""
+    prices as traded and doubles the volume. `sway` is how far a day's minutes swing."""
     rows = []
     for s in sessions(first, last):
         ratio = 2.0 if split_day and s.day >= split_day else 1.0
         level = price * (1 + 0.002 * (s.day.toordinal() % 5)) / ratio
         for m in range(s.minutes):
-            p = level * (1 + 0.001 * math.sin(m / 7))
+            p = level * (1 + 0.001 * sway(s.day) * math.sin(m / 7))
             rows.append(
                 {
                     "start": s.open + timedelta(minutes=m),
@@ -200,14 +308,23 @@ def write_minutes(raw, ticker, first, last, price, split_day=None):
         part.write_parquet(folder / f"{year}.parquet")
 
 
+def sway(day):
+    """AAA follows QQQ's path within a session, further on some days than on others."""
+    return 1 + (day.toordinal() % 11) / 5
+
+
 @pytest.fixture
 def stored(tmp_path, monkeypatch):
+    return build(tmp_path, monkeypatch)
+
+
+def build(tmp_path, monkeypatch, market_from=date(2023, 11, 1)):
     """A data folder: AAA joins the universe in 2024 and splits 2-for-1 on 1 February; QQQ's
     minutes reach back to November 2023; BBB, also in the universe, has no minutes."""
     raw, news = tmp_path / "raw", tmp_path / "news"
     split = date(2024, 2, 1)
-    write_minutes(raw, "AAA", date(2024, 1, 2), date(2024, 2, 29), 200.0, split)
-    write_minutes(raw, "QQQ", date(2023, 11, 1), date(2024, 2, 29), 400.0)
+    write_minutes(raw, "AAA", date(2024, 1, 2), date(2024, 2, 29), 200.0, split, sway)
+    write_minutes(raw, "QQQ", market_from, date(2024, 2, 29), 400.0)
     days = [s.day for s in sessions(date(2023, 11, 1), date(2024, 2, 29))]
     pl.DataFrame(
         {
@@ -268,6 +385,55 @@ def test_a_split_neither_moves_the_previous_close_nor_the_volume_profile(stored)
     assert row["split"] == 1.0 and before["split"] == 2.0
     # 1000 shares a minute before the split are 2000 of today's
     assert (arrays[2024]["profile"][row["row"]] == 2000).all()
+
+
+def grid(days, arrays, ticker, day):
+    row = days.filter((pl.col("ticker") == ticker) & (pl.col("day") == day)).row(
+        0, named=True
+    )
+    a = arrays[row["year"]]
+    return {f: a[f][row["row"]].astype(float) for f in ("open", "close")}
+
+
+def test_the_beta_the_usual_move_and_the_habit_come_from_the_sessions_just_before(
+    stored,
+):
+    days, arrays, _ = stored
+    calendar = [s.day for s in sessions(date(2024, 1, 2), date(2024, 2, 29))]
+    for day in (date(2024, 2, 5), date(2024, 2, 20)):
+        i = calendar.index(day)
+        own = [grid(days, arrays, "AAA", d) for d in calendar[i - 20 : i]]
+        market = [grid(days, arrays, "QQQ", d) for d in calendar[i - 20 : i]]
+        row = days.filter((pl.col("ticker") == "AAA") & (pl.col("day") == day)).row(
+            0, named=True
+        )
+        beta = kd.beta_to(own, market)
+        assert row["beta"] == pytest.approx(beta, rel=1e-4)
+        # a window one session off would give another beta: the days sway differently
+        assert kd.beta_to(own[:-1], market[:-1]) != pytest.approx(beta, rel=1e-3)
+        np.testing.assert_allclose(
+            arrays[2024]["swing"][row["row"]], kd.usual_moves(own), rtol=1e-3
+        )
+        habit = kd.habit_of(own[-5:], market[-5:], beta)
+        np.testing.assert_allclose(arrays[2024]["habit"][row["row"]], habit, atol=1e-6)
+        assert np.abs(habit - kd.habit_of(own[:5], market[:5], beta)).max() > 1e-4
+        session = kd.day_of(days, arrays, "AAA", day)
+        np.testing.assert_array_equal(session.swing, arrays[2024]["swing"][row["row"]])
+        np.testing.assert_array_equal(session.habit, arrays[2024]["habit"][row["row"]])
+        assert session.beta == row["beta"]
+    assert arrays[2024]["swing"].dtype == arrays[2024]["habit"].dtype == np.float32
+    assert days.filter(~pl.col("usable"))["beta"].is_null().all()
+
+
+def test_a_session_is_not_usable_until_the_market_has_the_sessions_before_it(
+    tmp_path, monkeypatch
+):
+    start = date(2024, 1, 10)
+    days, _, _ = build(tmp_path, monkeypatch, market_from=start)
+    first = sessions(start, date(2024, 2, 29))[20].day  # 20 sessions of QQQ before it
+    usable = days.filter(pl.col("usable"))
+    assert usable.filter(pl.col("ticker") == "AAA")["day"].min() == first
+    assert usable["beta"].is_not_null().all()
 
 
 def test_headlines_and_the_vix_reach_the_session(stored):
