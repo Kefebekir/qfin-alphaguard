@@ -1,6 +1,6 @@
 # 0023: KUTBIT, Efe's own intraday model with leverage
 
-- **Status:** accepted
+- **Status:** accepted; its design, retraining schedule and margin line were changed by decision 0024
 - **Date:** 2026-11-15
 - **Builds on:** decisions 0014 and 0019 (Guard), 0020 (the shadow record) and 0021 (the
   live engine). It changes nothing in the QQQ rule.
