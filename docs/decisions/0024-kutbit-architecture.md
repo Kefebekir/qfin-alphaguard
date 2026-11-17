@@ -119,9 +119,15 @@ the next is built:
   - the same within each minute, across instruments, which takes out what is common to all;
   - the hedged return, in bps, of trading in the forecast's direction on its strongest 10% and
     1%, by thresholds set on 2019, against 2 bps a round trip.
-- **Placebos, which must show nothing (|t| < 3 at every horizon), or the harness is wrong:**
-  - random-walk prices with each minute's usual move, run through the same code;
-  - each `z` dealt to another day of the same instrument, at the same minute.
+- **The placebo, which must show nothing, or the harness is wrong:** every session's prices
+  replaced by a random walk with each minute's usual move, run through the same code. No
+  forecaster may reach |t| 3 at any horizon in any measure. It runs first; the real run waits
+  for it.
+- **No placebo of shuffled targets here.** A model fitted on real targets dealt to another day
+  or another instrument still carries what is real in them, such as each stock's pattern
+  through the day or one instrument leading another, so it need not show nothing even when
+  the harness is right; on planted data it did not. Only the random walk is empty by
+  construction. 0023's shuffled labels stay for the variants, as a bar to beat.
 - **What it decides.** It is a ruler, not a variant: it does not count among the ten, and it is
   never traded. Efe's network must beat its correlation on the same years. If the strongest 1%
   of its forecasts already pay the cost at some horizon, the inputs hold a tradable edge; if no
