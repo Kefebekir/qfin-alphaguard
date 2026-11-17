@@ -77,14 +77,15 @@ week alongside university.
     with QQQ's part taken out.
   - It forecasts each position's return over the next 1-60 minutes, hedged with QQQ, and its
     size; the shape of what may follow comes from real past moves.
-  - Every minute it computes, for new and open positions, which size adds most to the account's
-    expected growth after costs, and waits when none does.
-  - Its leverage is spread over several hedged positions: up to 4x on a second Alpaca paper
-    account, and 10x in a virtual account.
+  - Every minute it computes, for new and open positions, which size adds most to the account
+    at Efe's risk appetite after costs, and waits when none does.
+  - Its leverage is spread over several positions, long and short: up to 4x on a second Alpaca
+    paper account, and 10x in a virtual account. How much of the market part they leave is
+    hedged with QQQ is chosen with the sizes, every minute, within Efe's limit (decision 0025).
   - It learns each instrument every minute, every night and every month (decision 0024).
   - Done (`research/kutbit`): the data set of 2016-2026, inputs v2 and the target (#106-#108),
-    and the skill test, a linear model of the same inputs, whose rules are in decision 0024
-    (#110).
+    the skill test, a linear model of the same inputs, whose rules are in decision 0024
+    (#110), and the hedge study behind decision 0025.
   - The skill test's placebo failed its first run on 17 November, on a measure that made a
     random walk look like it reverses; the measure is fixed (decision 0024's amendment). Next:
     Efe runs the placebo again, then the real run.
