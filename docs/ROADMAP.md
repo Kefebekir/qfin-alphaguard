@@ -71,14 +71,20 @@ week alongside university.
   stopped before the open on 9, because IEX's minute bars from before the open reached the
   core. Nothing was held; only 20 and 26 October traded. The fix is `in_the_session` in
   `live/runner.py`.
-- **KUTBIT, Efe's own intraday model with leverage, is decided** (decision 0023, 15 November
-  2026). It is separate from the QQQ rule, which stays as it is.
-  - It reads each stock's and ETF's minute chart.
-  - It forecasts the distribution of the next 5-60 minutes, and the worst move on the way.
-  - It trades only when its account's expected growth after costs clears Efe's threshold.
-  - It runs at up to 4x on a second Alpaca paper account, and at 10x in a virtual account.
-  - Its data set is built (`research/kutbit`): every instrument's sessions of 2016-2026, minute
-    by minute, with its inputs and labels. Next: the simulator, whose broker rules Efe writes.
+- **KUTBIT, Efe's own intraday model with leverage, is decided** (decisions 0023 and 0024,
+  15-17 November 2026). It is separate from the QQQ rule, which stays as it is.
+  - It reads each stock's and ETF's minute chart, scaled by the usual move at each minute and
+    with QQQ's part taken out.
+  - It forecasts each position's return over the next 1-60 minutes, hedged with QQQ, and its
+    size; the shape of what may follow comes from real past moves.
+  - Every minute it computes, for new and open positions, which size adds most to the account's
+    expected growth after costs, and waits when none does.
+  - Its leverage is spread over several hedged positions: up to 4x on a second Alpaca paper
+    account, and 10x in a virtual account.
+  - It learns each instrument every minute, every night and every month (decision 0024).
+  - Done (`research/kutbit`): the data set of 2016-2026, inputs v2 and the target (#106-#108).
+    Next: the skill test, a linear model of the same inputs, which Efe runs; its rules are in
+    decision 0024.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
