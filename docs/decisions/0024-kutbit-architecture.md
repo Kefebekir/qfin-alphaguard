@@ -1,6 +1,7 @@
 # 0024: KUTBIT's architecture, after a review on the data
 
-- **Status:** accepted
+- **Status:** accepted; the skill test's daily correlation amended on 17 November 2026, after
+  its placebo's first run and before any real run (see the amendment at the end)
 - **Date:** 2026-11-17 (agreed with Efe on 16 November)
 - **Builds on:** decision 0023, which it changes where this record says so. Everything else in
   0023 stands: KUTBIT is separate from the QQQ rule, has its own Guard file and accounts, trades
@@ -115,7 +116,8 @@ the next is built:
 - **Rows:** every minute of every usable session but its last. Inputs and `z` are clipped at
   ±10 and ±5 for the fit.
 - **Measures, on 2020-2021, for each horizon:**
-  - the correlation of forecast and `z`, each day's, averaged over the days, with its t;
+  - the correlation of forecast and `z`, each day's, averaged over the days, with its t (taken
+    about the means of all the rows, not each day's own, since the amendment below);
   - the same within each minute, across instruments, which takes out what is common to all;
   - the hedged return, in bps, of trading in the forecast's direction on its strongest 10% and
     1%, by thresholds set on 2019, against 2 bps a round trip.
@@ -147,3 +149,29 @@ month). Nothing is bought before then; at that point the price and Efe's balance
 - Still to check: each instrument's cost, and the paper account's margin once Efe opens the
   second one.
 - Real money stays outside this decision, as in 0023.
+
+## Amendment of 17 November 2026: the daily correlation
+
+- **What happened.** The skill test's placebo ran first, as section 9 requires. It failed on
+  one measure only: the last 30 minutes reversed, in each day's correlation, at t +5.8, +5.8,
+  +6.6, +7.8 and +8.7 for 1, 5, 15, 30 and 60 minutes. The ridge and `habit` passed every
+  measure, and the reversal every other one. The real run did not start; no real price of
+  2020-2021 was read.
+- **Why.** The measure took each day's correlation about that day's own means. Every
+  instrument of a day shares QQQ's path. Over a day a path's ups and downs add up to the day's
+  move, so once the day's mean is taken out, a rise above the mean before a minute leaves less
+  than the mean after it: the past and the future move against each other, even in a random
+  walk. An instrument's own path averages out over the day's instruments; the shared one
+  does not.
+- **The check, on random walks of 2017-2019** (2020-2021 not read): the old measure gave the
+  reversal t +5.6 to +10.0; with QQQ held flat, so that no path was shared, t +1.5 to +2.2.
+  About the means of all the rows the same correlation gave |t| at most 1.0 in both cases,
+  and the correlation across instruments at most 0.8.
+- **The change.** Each day's correlation is taken about the means of all the measured rows;
+  it is still averaged over the days, with its t. The correlation across instruments, the
+  strongest forecasts' returns and the placebo rule are unchanged. A test plants a path shared
+  by a day's instruments and checks that the measure shows nothing where the old one did.
+- **Why it is fair.** The change was decided on random walks alone, before the real run, so
+  it cannot have been chosen to suit a result. On the real prices the old measure would have
+  tilted every forecast built on the same day's past: toward a reversal, against momentum.
+  Efe runs the placebo again; the real run still waits for it.
