@@ -11,11 +11,19 @@ A short position's return is -ret, its worst moment is `best` and its best is `w
 the worst moment along the way, not the exit, is what closes an account.
 
 The session's last bar has no labels, since nothing can be filled after it.
+
+`targets` adds what the forecaster learns from them:
+- `apart`: the return with the market's part taken out, ret - beta * QQQ's ret over the same
+  bars: a long position hedged with QQQ at the beta known before the open;
+- `scale`: the usual size of a move over the bars held, from the instrument's usual move at
+  each of those minutes (features.Day.swing), also known before the open;
+- `z`: apart over scale. The open and midday, a quiet stock and a jumpy one, are then in the
+  same units, so the forecaster's work is the direction and what today adds to the usual.
 """
 
 import numpy as np
 
-HORIZONS = (5, 15, 30, 60)  # minutes
+HORIZONS = (1, 5, 15, 30, 60)  # minutes
 
 
 def labels(
@@ -46,3 +54,22 @@ def labels(
             cut[:-1] = t + h > n - 1
         out[h] = {"ret": ret, "worst": worst, "best": best, "cut": cut}
     return out
+
+
+def targets(day, market, horizons: tuple[int, ...] = HORIZONS):
+    """For each horizon, the labels of `day` (a features.Day) with apart, scale and z added;
+    `market` is QQQ's Day of the same session."""
+    if len(market.open) != len(day.open):
+        raise ValueError("the market's day must cover the same minutes")
+    own = labels(day.open, day.high, day.low, day.close, horizons)
+    of_market = labels(market.open, market.high, market.low, market.close, horizons)
+    n = len(day.open)
+    t = np.arange(n - 1)
+    squares = np.concatenate([[0.0], np.cumsum(np.asarray(day.swing) ** 2)])
+    for h in horizons:
+        stop = np.minimum(t + h, n - 1)
+        scale = np.full(n, np.nan)
+        scale[:-1] = np.sqrt(squares[stop + 1] - squares[t + 1])  # bars t + 1 .. stop
+        apart = own[h]["ret"] - day.beta * of_market[h]["ret"]
+        own[h].update(apart=apart, scale=scale, z=apart / scale)
+    return own

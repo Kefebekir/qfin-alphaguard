@@ -6,7 +6,8 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | Part | Where | State |
 |---|---|---|
 | What it sees at each minute: 120 minutes of chart and a few numbers, the same in training and live | `src/qfin_alphaguard/kutbit/features.py` | done |
-| What happened after each minute: the return 5, 15, 30 and 60 minutes on, and the best and worst moments along the way | `labels.py` | done |
+| What happened after each minute: the return 1, 5, 15, 30 and 60 minutes on, and the best and worst moments along the way | `labels.py` | done |
+| What the forecaster learns: that return with QQQ's part taken out, in the usual moves of the minutes held | `labels.py` (`targets`), `target_report.py`, `results_target.txt` | done |
 | The data set: every instrument's sessions of 2016-2026, minute by minute, with what was known before each | `dataset.py` → `data/kutbit/`, `results_dataset.txt` | done |
 | The simulator: fills, costs, margin and stops | | next; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -58,3 +59,27 @@ year's `<year>.npz`.
   `dataset.py` found them from the overnight jump, and Alpaca's corporate actions list the same
   five on the same day.
 - **A gap.** AVGO was in 2017's universe, but the minute store has nothing of it before 2018.
+
+## The target
+
+`targets` turns the labels into what the forecaster learns: the return of a long position hedged
+with QQQ at the beta known before the open (`apart`), over the usual size of a move in the minutes
+held (`scale`), which is `z`.
+
+On 3,000 sessions of stocks from 2016-2021 (`results_target.txt`):
+
+| Held | Hedged move | Share of it a forecast must capture to pay 2 bps |
+|---|---|---|
+| 1 minute | 7.3 bps | 27% |
+| 5 minutes | 15.3 bps | 13% |
+| 15 minutes | 24.6 bps | 8% |
+| 30 minutes | 32.9 bps | 6% |
+| 60 minutes | 43.5 bps | 5% |
+
+- **The cost is the same however long a position is held, and the move grows.** A one-minute
+  trade has to be right about a quarter of the move to pay for itself; an hour's, a twentieth.
+  The hedge's own cost is not in the 2 bps.
+- **`z` is in nearly the same units through the day:** 0.90 in the first half hour, 0.83 at
+  midday and 0.76 after 15:00 at 30 minutes, where the raw moves differed about fourfold.
+- **Its tails are fat:** a kurtosis of 7 at 30 minutes and 20 at one minute, against 3 for a
+  normal distribution. The shape of what follows has to come from real past moves.

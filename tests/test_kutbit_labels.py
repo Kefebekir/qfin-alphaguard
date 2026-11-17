@@ -2,6 +2,7 @@
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -49,7 +50,7 @@ def test_every_minute_and_horizon_as_by_hand():
     high = np.maximum(open_, close) * (1 + rng.uniform(0, 1e-3, n))
     low = np.minimum(open_, close) * (1 - rng.uniform(0, 1e-3, n))
     found = kl.labels(open_, high, low, close)
-    assert set(found) == set(kl.HORIZONS) == {5, 15, 30, 60}
+    assert set(found) == set(kl.HORIZONS) == {1, 5, 15, 30, 60}
     for h in kl.HORIZONS:
         ret, worst, best, cut = by_hand(open_, high, low, close, h)
         np.testing.assert_allclose(found[h]["ret"][:-1], ret)
@@ -62,3 +63,52 @@ def test_a_one_minute_session_has_nothing_to_learn():
     one = np.array([100.0])
     found = kl.labels(one, one, one, one)
     assert all(np.isnan(found[h]["ret"]).all() and found[h]["cut"].all() for h in found)
+
+
+def session(rng, n, start=100.0, **given):
+    close = start * np.exp(np.cumsum(rng.normal(0, 0.001, n)))
+    open_ = close * np.exp(rng.normal(0, 3e-4, n))
+    return SimpleNamespace(
+        open=open_,
+        high=np.maximum(open_, close) * (1 + rng.uniform(0, 1e-3, n)),
+        low=np.minimum(open_, close) * (1 - rng.uniform(0, 1e-3, n)),
+        close=close,
+        **given,
+    )
+
+
+def test_the_target_is_the_hedged_return_in_the_usual_moves_of_the_bars_held():
+    rng = np.random.default_rng(8)
+    n = 100
+    swing = rng.uniform(5e-4, 3e-3, n)
+    day, market = session(rng, n, swing=swing, beta=0.6), session(rng, n, 400.0)
+    found = kl.targets(day, market)
+    own = kl.labels(day.open, day.high, day.low, day.close)
+    of_market = kl.labels(market.open, market.high, market.low, market.close)
+    for h in kl.HORIZONS:
+        for name in ("ret", "worst", "best", "cut"):  # the instrument's own, untouched
+            np.testing.assert_array_equal(found[h][name], own[h][name])
+        np.testing.assert_allclose(
+            found[h]["apart"], own[h]["ret"] - 0.6 * of_market[h]["ret"]
+        )
+        for t in (0, 40, n - 3, n - 2):
+            held = swing[t + 1 : min(t + h, n - 1) + 1]  # the bars from entry to exit
+            assert found[h]["scale"][t] == pytest.approx(np.sqrt((held**2).sum()))
+            assert found[h]["z"][t] == pytest.approx(
+                found[h]["apart"][t] / found[h]["scale"][t]
+            )
+        assert np.isnan(found[h]["z"][-1]) and np.isnan(found[h]["scale"][-1])
+
+
+def test_the_market_itself_has_nothing_apart_from_the_market():
+    rng = np.random.default_rng(9)
+    market = session(rng, 50, 400.0, swing=np.full(50, 0.001), beta=1.0)
+    found = kl.targets(market, market, horizons=(5,))[5]
+    np.testing.assert_allclose(found["apart"][:-1], 0.0, atol=1e-15)
+
+
+def test_the_target_needs_the_market_s_same_minutes():
+    rng = np.random.default_rng(10)
+    day = session(rng, 50, swing=np.full(50, 0.001), beta=1.0)
+    with pytest.raises(ValueError, match="same minutes"):
+        kl.targets(day, session(rng, 49, 400.0))
