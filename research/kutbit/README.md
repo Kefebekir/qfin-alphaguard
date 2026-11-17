@@ -1,6 +1,7 @@
 # KUTBIT
 
-Efe's own intraday model with leverage ([decision 0023](../../docs/decisions/0023-kutbit.md)).
+Efe's own intraday model with leverage (decisions [0023](../../docs/decisions/0023-kutbit.md) and
+[0024](../../docs/decisions/0024-kutbit-architecture.md)).
 It is separate from the QQQ rule: its own code, its own Guard file and its own accounts.
 
 | Part | Where | State |
@@ -9,7 +10,9 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | What happened after each minute: the return 1, 5, 15, 30 and 60 minutes on, and the best and worst moments along the way | `labels.py` | done |
 | What the forecaster learns: that return with QQQ's part taken out, in the usual moves of the minutes held | `labels.py` (`targets`), `target_report.py`, `results_target.txt` | done |
 | The data set: every instrument's sessions of 2016-2026, minute by minute, with what was known before each | `dataset.py` → `data/kutbit/`, `results_dataset.txt` | done |
-| The simulator: fills, costs, margin and stops | | next; its broker rules are Efe's |
+| The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | ready; Efe runs it |
+| The bank of real paths: the shapes of what may follow, in the target's units | | next |
+| The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
 | The training harness and its placebos | | to come; Efe designs and trains the networks |
 
@@ -83,3 +86,21 @@ On 3,000 sessions of stocks from 2016-2021 (`results_target.txt`):
   midday and 0.76 after 15:00 at 30 minutes, where the raw moves differed about fourfold.
 - **Its tails are fat:** a kurtosis of 7 at 30 minutes and 20 at one minute, against 3 for a
   normal distribution. The shape of what follows has to come from real past moves.
+
+## The skill test
+
+The first rung of decision 0024's ladder, with its rules written there before it runs. A ridge
+regression of each horizon's `z` on the 971 inputs the network will see, fitted on 2016-2019 and
+measured once on 2020-2021, beside two known patterns. It is a ruler, not a variant.
+
+Efe runs it, in this order: a check of speed that shows no score (about 12 seconds), the
+random-walk placebo, then the real run, which waits until the placebo passes. Each full run
+takes about 20 minutes, by the speed check's estimate.
+
+```bash
+OMP_NUM_THREADS=8 uv run python research/kutbit/skill.py smoke
+OMP_NUM_THREADS=8 uv run python research/kutbit/skill.py random
+OMP_NUM_THREADS=8 uv run python research/kutbit/skill.py real
+```
+
+The page is `data/kutbit/skill/skill.html`.

@@ -458,6 +458,11 @@ def day_of(days: pl.DataFrame, arrays: dict, ticker: str, day: date) -> Day:
     row = days.filter((pl.col("ticker") == ticker) & (pl.col("day") == day)).row(
         0, named=True
     )
+    return day_from(row, arrays)
+
+
+def day_from(row: dict, arrays: dict) -> Day:
+    """The session of a row of days.parquet, as features.Day."""
     a, n = arrays[row["year"]], row["minutes"]
     i = row["row"]
     return Day(
