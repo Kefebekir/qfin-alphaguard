@@ -13,6 +13,8 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The data set: every instrument's sessions of 2016-2026, minute by minute, with what was known before each | `dataset.py` → `data/kutbit/`, `results_dataset.txt` | done |
 | The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | ready; Efe runs it |
 | The hedge study: how much of a book's market part to hedge with QQQ, under a gross cap | `hedge_study.py`, `results_hedge.txt` | done |
+| What follows an extreme minute, on 2016-2018: the ground for Efe's first agent | `events.py`, `results_events.txt` | done |
+| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | | its rules first (decision 0026); Efe writes and trains it |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -126,3 +128,25 @@ It takes about a minute and writes `results_hedge.txt`. In short:
 - careful appetites (γ 4, 8) and jumpy markets hedge more;
 - the price of leaving ten long unhedged at 10x is in the bad days: 15% of days below −5%,
   against 2% hedged in full, with an edge of 0.1 in every window.
+
+## Extreme minutes
+
+Efe's idea for the first agent: when a stock makes an extreme move in one minute, follow it,
+bet against it or let it be, and choose how much to hedge. `events.py` measures what followed
+such minutes on 2016-2018, the years an agent learns on; 2019 and later are not read.
+
+```bash
+PYTHONPATH=src uv run python research/kutbit/events.py
+```
+
+It takes about 15 seconds and writes `results_events.txt`. On 16,343 fresh extreme minutes, at
+least 4 usual moves apart from QQQ with none in the 30 minutes before:
+
+- they reverse a little: −2.4 bps apart from QQQ over 15 minutes (t −5.8), and 55% reverse;
+- more at the open (−7.9 bps) and when QQQ moved too (−5.1 bps over 30 minutes); with a
+  headline, no clear reversal;
+- the bounce to the next open, −1.0 bps, cannot be caught;
+- betting against all of them earns about a round trip of 2 bps and no more; at the open and
+  without a headline, +7.6 bps before costs;
+- the hedge takes out 15% of the variance in general, but 42% when QQQ moved too: that is
+  where it belongs.
