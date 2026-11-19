@@ -44,10 +44,11 @@ one, so "the same way as the move" is always positive.
 
 All 971 inputs of 0024 are a later variant.
 
-**3. What it chooses: 37 actions.**
+**3. What it chooses: up to 91 actions.**
 - Either it lets the move be, or it chooses, all together:
   - a side: with the move, or against it;
-  - a size: half or all of the position cap;
+  - a size: a quarter, a half, one, two or four times the account's equity, as far as the
+    position cap allows, so that a thin edge can be taken small and a strong one large;
   - a hold: 5, 15 or 30 minutes;
   - a hedge: none, half or all of the position's market part (0025).
 - It never bets on QQQ. The hedge stays between none and all.
@@ -61,12 +62,13 @@ All 971 inputs of 0024 are a later variant.
   doubled, is reported beside it, as 0023 requires; so is 2 bps.
 - QQQ's round trip costs 0.5 bps.
 - The reward is the account's utility at Efe's risk appetite γ = 4 (0025).
-- The position cap is 2x of equity, so half is 1x. M is 2x.
+- The position cap is 4x of equity, Efe's wish. M is 2x, so a position above 2x is at
+  least partly hedged.
 - Efe may change γ, the cap and M before any training, never after.
 
 **5. Learning, with every action's outcome known.** At an event, the outcome of every action
-is in the stored minutes, so the agent learns from all 37 at once. This stage is a contextual
-bandit. Learning to manage an open position minute by minute is the second stage, and real
+is in the stored minutes, so the agent learns from all of them at once. This stage is a
+contextual bandit. Learning to manage an open position minute by minute is the second stage, and real
 reinforcement learning. It is built only if this stage passes.
 
 **6. Years and schedule.**
