@@ -10,6 +10,8 @@ the stored minutes, so the gym gives them all at once:
   direction;
 - `returns`: the account's return for every action, after a stock's round trip of COST and
   QQQ's of COST_QQQ, the hedge leg included;
+- `known`: the minute at whose close all of an event's outcomes are known, the longest
+  hold's last bar or the session's, and so the first minute it may be learned from;
 - `allowed`: the actions within the position cap and Efe's limit M on the market part left
   unhedged;
 - `utility`: the account's utility at Efe's risk appetite GAMMA, -inf where the account would
@@ -86,7 +88,18 @@ KINDS = tuple(
     for q in (0, 1)
     for h in (0, 1)
 )
-FIELDS = ("state", "own", "qqq", "beta", "kind", "day", "minute", "ticker", "chart")
+FIELDS = (
+    "state",
+    "own",
+    "qqq",
+    "beta",
+    "kind",
+    "day",
+    "minute",
+    "known",
+    "ticker",
+    "chart",
+)
 
 
 # --- the actions ------------------------------------------------------------------------
@@ -211,6 +224,7 @@ def session(day: Day, market: Day) -> dict[str, np.ndarray]:
         "beta": np.full(n, day.beta),
         "kind": kind_of(at, channel("market"), headlines),
         "minute": at.astype(np.int16),
+        "known": np.minimum(at + max(HOLDS), len(day.open) - 1).astype(np.int16),
         "chart": chart.astype(np.float32),
     }
 
@@ -224,6 +238,7 @@ def empty() -> dict[str, np.ndarray]:
         "beta": np.zeros(0),
         "kind": np.zeros(0, np.uint8),
         "minute": np.zeros(0, np.int16),
+        "known": np.zeros(0, np.int16),
         "chart": np.zeros((0, 2 * CHART + 1), np.float32),
     }
 

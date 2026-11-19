@@ -146,6 +146,15 @@ def test_every_hold_s_outcome_is_signed_by_the_move():
     assert found["qqq"][0, 0] < 0  # QQQ rose, against a fall's direction
 
 
+def test_an_outcome_is_known_once_the_longest_hold_or_the_session_has_ended():
+    day, market = an_event(1.0)
+    assert list(gym.session(day, market)["known"]) == [40 + max(gym.HOLDS)]
+    steps = np.zeros(50)
+    steps[40] = 0.006
+    late = gym.session(a_day(steps), a_day(np.zeros(50), etf=True))
+    assert list(late["known"]) == [49]  # the session's last bar
+
+
 def test_a_hold_past_the_close_ends_at_the_last_bar():
     steps = np.zeros(50)
     steps[40] = 0.006
