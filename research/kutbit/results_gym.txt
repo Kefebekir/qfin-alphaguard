@@ -1,0 +1,52 @@
+KUTBIT's event gym (decision 0026), on the years an agent learns on
+Stored minutes of 2016-2018; 2019-2026 not read. Run 2026-11-19 17:12 UTC in 19 s.
+16,343 events: 2016 3,876, 2017 6,881, 2018 5,586. 91 actions; position cap 4x, M 2x, gamma 2.
+Events by kind: later, QQQ quiet, no headline 11,805; later, QQQ quiet, a headline 531; later, QQQ moved, no headline 2,186; later, QQQ moved, a headline 58; at the open, QQQ quiet, no headline 1,586; at the open, QQQ quiet, a headline 50; at the open, QQQ moved, no headline 125; at the open, QQQ moved, a headline 2
+
+At 2 bps a round trip: certainty equivalent in bps an event (trades)
+  nothing                                +0.00  (0)
+  against every event                    -0.13  (16,343)
+  against, no headline                   -0.11  (15,702)
+  against, no headline, at the open      +0.45  (1,711)
+  best simple policy, in sample          +2.12  (3,413)
+  the best simple policy's action by kind, chosen on these events:
+    later, QQQ quiet, no headline            11,805  let it be
+    later, QQQ quiet, a headline                531  against, 4x, 15 min, hedge 0
+    later, QQQ moved, no headline             2,186  against, 4x, 30 min, hedge 0.5
+    later, QQQ moved, a headline                 58  let it be
+    at the open, QQQ quiet, no headline       1,586  against, 4x, 5 min, hedge 0.5
+    at the open, QQQ quiet, a headline           50  let it be
+    at the open, QQQ moved, no headline         125  against, 4x, 30 min, hedge 1
+    at the open, QQQ moved, a headline            2  let it be
+
+At 5 bps a round trip: certainty equivalent in bps an event (trades)
+  nothing                                +0.00  (0)
+  against every event                    -3.13  (16,343)
+  against, no headline                   -2.99  (15,702)
+  against, no headline, at the open      +0.13  (1,711)
+  best simple policy, in sample          +0.77  (1,459)
+  the best simple policy's action by kind, chosen on these events:
+    later, QQQ quiet, no headline            11,805  let it be
+    later, QQQ quiet, a headline                531  let it be
+    later, QQQ moved, no headline             2,186  let it be
+    later, QQQ moved, a headline                 58  let it be
+    at the open, QQQ quiet, no headline       1,586  against, 2x, 5 min, hedge 0
+    at the open, QQQ quiet, a headline           50  let it be
+    at the open, QQQ moved, no headline         125  against, 4x, 30 min, hedge 1
+    at the open, QQQ moved, a headline            2  let it be
+
+At 10 bps a round trip: certainty equivalent in bps an event (trades)
+  nothing                                +0.00  (0)
+  against every event                    -8.13  (16,343)
+  against, no headline                   -7.79  (15,702)
+  against, no headline, at the open      -0.39  (1,711)
+  best simple policy, in sample          +0.41  (125)
+  the best simple policy's action by kind, chosen on these events:
+    later, QQQ quiet, no headline            11,805  let it be
+    later, QQQ quiet, a headline                531  let it be
+    later, QQQ moved, no headline             2,186  let it be
+    later, QQQ moved, a headline                 58  let it be
+    at the open, QQQ quiet, no headline       1,586  let it be
+    at the open, QQQ quiet, a headline           50  let it be
+    at the open, QQQ moved, no headline         125  against, 4x, 30 min, hedge 1
+    at the open, QQQ moved, a headline            2  let it be

@@ -15,7 +15,8 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | ready; Efe runs it |
 | The hedge study: how much of a book's market part to hedge with QQQ, under a gross cap | `hedge_study.py`, `results_hedge.txt` | done |
 | What follows an extreme minute, on 2016-2018: the ground for Efe's first agent | `events.py`, `results_events.txt` | done |
-| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026 | the event gym next; then Efe writes and trains it |
+| The event gym: every extreme minute's 16 numbers, the outcome of all 91 actions, the bars, the placebo's random walks and the shuffled outcomes | `gym.py`, `results_gym.txt` | done |
+| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026 | next the harness that trains and measures it month by month, and its page; then Efe writes and trains it |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -151,3 +152,23 @@ least 4 usual moves apart from QQQ with none in the 30 minutes before:
   without a headline, +7.6 bps before costs;
 - the hedge takes out 15% of the variance in general, but 42% when QQQ moved too: that is
   where it belongs.
+
+## The event gym
+
+Decision 0026's ground for Efe's first agent. At each fresh extreme minute it gives the 16
+numbers the agent sees, the outcome of all 91 actions (a side, a size from a quarter to four
+times equity, a hold of 5, 15 or 30 minutes, a hedge of none, half or all), which actions Efe's
+limits allow, the account's utility at γ 2, and the bars: doing nothing, betting against every
+event, against those without a headline, against those at the open, and the best simple
+policy of each kind of event. It builds the same events on the skill test's random walks, for
+the placebo, and deals outcomes between stocks, for the shuffled bar.
+
+```bash
+PYTHONPATH=src uv run python research/kutbit/gym.py learning   # 2016-2018 in memory, ~20 s
+PYTHONPATH=src uv run python research/kutbit/gym.py build      # Efe: 2016-2021, both sources
+```
+
+`learning` writes `results_gym.txt`. On 2016-2018, after 5 bps a round trip, betting against
+every event loses 3.1 bps an event; only the open pays, and the best simple policy, chosen on
+the same years, earns 0.8 bps an event. Kinds with fewer than 100 events are let be, since the
+best of 91 actions on a few events is chance.
