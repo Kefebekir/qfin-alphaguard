@@ -87,7 +87,9 @@ reinforcement learning. It is built only if this stage passes.
 - Betting against events without a headline at the open, the same way.
 - The best simple policy: for each kind of event (at the open or not, QQQ moved or not, a
   headline or not), the action with the highest utility on every event before the month,
-  chosen afresh each month as the agent learns afresh.
+  chosen afresh each month as the agent learns afresh. A kind with fewer than 100 events
+  before the month lets the move be: on 2016-2018 one kind had 2 events, and the best of 91
+  actions on a few events is chance, not a rule.
 - The same agent trained on shuffled outcomes. Each event's outcomes are dealt to another
   stock's event in the same part of the day. That agent learns only what is common to all
   events.
