@@ -73,11 +73,22 @@ is in the stored minutes, so the agent learns from all of them at once. This sta
 contextual bandit. Learning to manage an open position minute by minute is the second stage, and real
 reinforcement learning. It is built only if this stage passes.
 
-**6. Years and schedule.**
-- Settings are chosen on 2019: the network's size, its learning rate, how long it learns.
-  For each month of 2019 it learns on every event before that month, from 2016 on.
-- It is measured once on 2020-2021, the same way: each month by an agent that learned on
-  every event before it, as live (0024).
+**6. It learns as it goes, at two speeds, as 0024 asks.**
+- **Every minute.** At each minute's close, every event whose outcome has just become known
+  is given to the agent with the outcome of all its actions. An outcome is known once the
+  longest hold, 30 minutes, has ended, or the session has. The agent may update itself
+  before its next decision.
+- **Each stock has a part of its own,** pulled toward what the agent learned from all
+  stocks. On 2016-2018 a stock had about 10 events a month, too few to learn from alone; the
+  more events a stock has had, the more its own part may say. This is where the agent learns
+  each stock's character and takes its own initiative.
+- **Every month,** the part shared by all stocks learns afresh on every event before the
+  month, so the latest few events cannot overwrite what thousands taught it.
+- The agent never sees an outcome before it is known.
+- **Settings are chosen on 2019:** the network's size, its learning rates, and how strongly a
+  stock's own part is pulled toward the shared one. Every month of 2019 runs as above, from
+  every event since 2016.
+- **It is measured once on 2020-2021,** the same way, as live.
 - 2022-2026 are not read.
 
 **7. The bars it must beat, under the same fills, costs and γ.**
@@ -114,14 +125,18 @@ reinforcement learning. It is built only if this stage passes.
 
 **11. Who writes what.**
 - Claude: the event gym (states, actions, every action's outcome, masks, bars, shuffled and
-  random-walk data), the measurement, the page, the tests and a guide, step by step.
-- Efe: the agent itself (its network, its loss and its learning loop, with PyTorch only as a
-  tool), and every run of it.
+  random-walk data); the harness that gives the agent each minute's events and, once known,
+  their outcomes, in time order; the measurement, the page, the tests and a guide, step by
+  step.
+- Efe: the agent itself, with PyTorch only as a tool:
+  - its network, its loss and its learning loop;
+  - how it updates itself each minute, and each stock's own part;
+  - every run of it.
 
 ## Consequences
 
-- Next: the event gym and the page; then the guide; then Efe's agent, the placebo, the choice
-  on 2019 and the measurement.
+- Next: the event gym; the harness and the page; then the guide; then Efe's agent, the
+  placebo, the choice on 2019 and the measurement.
 - The skill test and the forecaster of 0024 go on as before. This agent is a separate variant
   on the same data.
 - If it passes, the second stage manages the open position minute by minute.
