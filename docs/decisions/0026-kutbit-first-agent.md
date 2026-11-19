@@ -61,7 +61,9 @@ All 971 inputs of 0024 are a later variant.
 - A stock's round trip costs 5 bps, since spreads widen at extreme minutes. 10 bps, costs
   doubled, is reported beside it, as 0023 requires; so is 2 bps.
 - QQQ's round trip costs 0.5 bps.
-- The reward is the account's utility at Efe's risk appetite γ = 4 (0025).
+- The reward is the account's utility at Efe's risk appetite γ = 2, about half Kelly (0025),
+  chosen by Efe on 19 November: the agent goes large when it sees a strong edge, and an
+  agent twice too sure of its edge still bets no more than Kelly.
 - The position cap is 4x of equity, Efe's wish. M is 2x, so a position above 2x is at
   least partly hedged.
 - Efe may change γ, the cap and M before any training, never after.
@@ -80,7 +82,7 @@ reinforcement learning. It is built only if this stage passes.
 
 **7. The bars it must beat, under the same fills, costs and γ.**
 - Doing nothing.
-- Betting against every event: 15 minutes, all of the cap, hedged in full.
+- Betting against every event: 15 minutes, 1x of equity, hedged in full.
 - Betting against events without a headline, the same way.
 - Betting against events without a headline at the open, the same way.
 - The best simple policy: for each kind of event (at the open or not, QQQ moved or not, a
