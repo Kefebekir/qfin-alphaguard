@@ -90,8 +90,9 @@ week alongside university.
   - The skill test's placebo failed its first run on 17 November, on a measure that made a
     random walk look like it reverses; the measure is fixed (decision 0024's amendment). Next:
     Efe runs the placebo again, then the real run.
-  - Efe's first agent: at an extreme minute, follow it, bet against it or let it be, and how
-    much to hedge. Its rules come first (decision 0026); then Efe writes and trains it.
+  - Efe's first agent (decision 0026, variant 1 of 10): at an extreme minute of a stock,
+    follow it, bet against it or let it be, how large, how long and how much to hedge;
+    never a bet on QQQ. Next: the event gym and its page; then Efe writes and trains it.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on

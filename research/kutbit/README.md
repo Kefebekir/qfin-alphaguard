@@ -1,8 +1,9 @@
 # KUTBIT
 
 Efe's own intraday model with leverage (decisions [0023](../../docs/decisions/0023-kutbit.md),
-[0024](../../docs/decisions/0024-kutbit-architecture.md) and
-[0025](../../docs/decisions/0025-kutbit-hedge.md)).
+[0024](../../docs/decisions/0024-kutbit-architecture.md),
+[0025](../../docs/decisions/0025-kutbit-hedge.md) and
+[0026](../../docs/decisions/0026-kutbit-first-agent.md)).
 It is separate from the QQQ rule: its own code, its own Guard file and its own accounts.
 
 | Part | Where | State |
@@ -14,7 +15,7 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | ready; Efe runs it |
 | The hedge study: how much of a book's market part to hedge with QQQ, under a gross cap | `hedge_study.py`, `results_hedge.txt` | done |
 | What follows an extreme minute, on 2016-2018: the ground for Efe's first agent | `events.py`, `results_events.txt` | done |
-| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | | its rules first (decision 0026); Efe writes and trains it |
+| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026 | the event gym next; then Efe writes and trains it |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
