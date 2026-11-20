@@ -17,7 +17,7 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | What follows an extreme minute, on 2016-2018: the ground for Efe's first agent | `events.py`, `results_events.txt` | done |
 | The event gym: every extreme minute's 16 numbers, the outcome of all 91 actions, the bars, the placebo's random walks and the shuffled outcomes | `gym.py`, `results_gym.txt` | done |
 | The harness: feeds the agent minute by minute in time order, never an outcome before it is known; chooses its setting on 2019; runs the placebo; measures it once on 2020-2021 against the bars; writes the page of what it did | `harness.py` | done |
-| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026; `agent.py`, Efe's | next the guide; then Efe writes and trains it |
+| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026; design A in `AGENT_GUIDE.md`; `agent.py`, Efe's, checked by `tests/test_kutbit_agent.py` | the guide is written; Efe writes the agent, then runs the placebo, the choice and the measurement |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
