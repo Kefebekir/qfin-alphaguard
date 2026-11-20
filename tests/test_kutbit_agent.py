@@ -91,9 +91,7 @@ def test_step1_the_settings_and_make():
     for setting in agent.SETTINGS:
         assert set(setting) == {"hidden", "pull", "epochs", "rate", "seed"}
     a = agent.make(agent.SETTINGS[0])
-    for method in ("fit", "update", "forecast", "act"):
-        assert callable(getattr(a, method))
-    assert a.weights is None and a.counts.sum() == 0
+    assert a.weights is None and a.counts.sum() == 0 and (a.trust == 0).all()
     assert (
         agent.SIZE.shape == agent.SIDE.shape == agent.HOLD.shape == (len(gym.ACTIONS),)
     )
@@ -129,7 +127,7 @@ def test_step2_the_inputs_are_in_units_of_their_spread():
     assert x[1].max().item() == 5 and x[2].min().item() == -5
 
 
-# --- step 3: the loss ----------------------------------------------------------------------
+# --- step 3: the loss, and what it is taken on -------------------------------------------
 
 
 def test_step3_the_loss_is_the_student_t_less_its_constant():
@@ -155,10 +153,7 @@ def test_step3_the_loss_is_least_at_the_true_mean_and_scale():
         assert at(x, torch.tensor(mean), torch.tensor(math.log(scale))) > best
 
 
-# --- step 4: learning ----------------------------------------------------------------------
-
-
-def test_step4_the_targets_are_the_move_apart_from_qqq_and_qqq_s_in_percent():
+def test_step3_the_targets_are_the_move_apart_from_qqq_and_qqq_s_in_percent():
     a = agent.make(agent.SETTINGS[0])
     known = {
         "own": np.array([[0.01, 0.02, 0.03]]),
@@ -170,14 +165,64 @@ def test_step4_the_targets_are_the_move_apart_from_qqq_and_qqq_s_in_percent():
     np.testing.assert_allclose(qqq.numpy(), [[0.4, -0.2, 0.0]], rtol=1e-5)
 
 
-def test_step4_it_trusts_an_edge_that_came_true_and_not_noise():
+# --- step 4: every minute ----------------------------------------------------------------
+
+
+def by_hand(data):
+    """An agent whose network and trust are set by hand, as step 5's learning would set them."""
+    a = agent.make(agent.SETTINGS[0])
+    generator = torch.Generator().manual_seed(3)
+    state = torch.as_tensor(data["state"], dtype=torch.float32)
+    a.mean, a.spread = state.mean(0), state.std(0)
+    a.weights = [
+        *a.layer(16, 8, generator),
+        *a.layer(8, 8, generator),
+        *a.layer(8, 3 * len(gym.HOLDS), generator),
+    ]
+    a.trust = torch.tensor([0.5, 0.25, 1.0])
+    return a
+
+
+def test_step4_each_outcome_adds_its_miss_to_its_stock():
+    data = synthetic()
+    a = by_hand(data)
+    picked = np.flatnonzero(data["ticker"] == 3)[:7]
+    known = hs.view(data, picked, gym.allowed(data), gym.utility(gym.returns(data)))
+    a.update(known)
+    assert a.counts[3] == 7 and a.counts.sum() == 7
+    with torch.no_grad():
+        edge = a.trust * a.network(a.inputs(known["state"]))[..., 0]
+    apart = (known["own"] - known["beta"][:, None] * known["qqq"]) * 100
+    np.testing.assert_allclose(
+        a.sums[3], (apart - edge.numpy()).sum(0), rtol=1e-4, atol=1e-6
+    )
+    expected = a.sums[3] / (7 + a.pull)
+    np.testing.assert_allclose(
+        a.correction(np.array([3]))[0].numpy(), expected, rtol=1e-5
+    )
+    assert (a.correction(np.array([5])) == 0).all()  # a stock without events: nothing
+
+
+def test_step4_nothing_is_counted_before_the_network_has_learned():
+    data = synthetic()
+    a = agent.make(agent.SETTINGS[0])
+    a.update(
+        hs.view(data, np.arange(9), gym.allowed(data), gym.utility(gym.returns(data)))
+    )
+    assert a.counts.sum() == 0
+
+
+# --- step 5: learning ----------------------------------------------------------------------
+
+
+def test_step5_it_trusts_an_edge_that_came_true_and_not_noise():
     loud = fitted(synthetic())
     assert (loud.trust > 0.5).all()
     quiet = fitted(synthetic(seed=2, edge=0.0, odd=False))
     assert (quiet.trust < 0.5).all() and quiet.trust.mean() < 0.3
 
 
-def test_step4_the_trust_is_the_slope_kept_between_none_and_all():
+def test_step5_the_trust_is_the_slope_kept_between_none_and_all():
     data = synthetic()
     a = fitted(data, epochs=5)
     with torch.no_grad():
@@ -193,7 +238,7 @@ def test_step4_the_trust_is_the_slope_kept_between_none_and_all():
         np.testing.assert_allclose(found, trust, atol=1e-4)
 
 
-def test_step4_it_tells_a_jumpy_qqq_from_a_calm_one():
+def test_step5_it_tells_a_jumpy_qqq_from_a_calm_one():
     data = synthetic()
     a = fitted(data)
     with torch.no_grad():
@@ -202,44 +247,18 @@ def test_step4_it_tells_a_jumpy_qqq_from_a_calm_one():
     assert scale[jumpy].mean() > 2 * scale[~jumpy].mean()
 
 
-def test_step4_too_few_events_teach_nothing():
+def test_step5_too_few_events_teach_nothing():
     data = synthetic()
     a = agent.make(agent.SETTINGS[0])
     a.fit(history(data, until=100))
     assert a.weights is None
-    events = hs.view(data, np.arange(5), gym.allowed(data))
-    assert list(a.act(events)) == [0] * 5
 
 
-def test_step4_the_same_seed_learns_the_same():
+def test_step5_the_same_seed_learns_the_same():
     data = synthetic()
     one, two = fitted(data, epochs=5), fitted(data, epochs=5)
     for w1, w2 in zip(one.weights, two.weights, strict=True):
         assert torch.equal(w1, w2)
-
-
-# --- step 5: every minute ------------------------------------------------------------------
-
-
-def test_step5_each_outcome_adds_to_its_stock_s_count():
-    data = synthetic()
-    a = fitted(data, epochs=5)
-    before_sums, before_counts = a.sums.copy(), a.counts.copy()
-    picked = np.flatnonzero(data["ticker"] == 3)[:7]
-    known = hs.view(data, picked, gym.allowed(data), gym.utility(gym.returns(data)))
-    a.update(known)
-    assert a.counts[3] == before_counts[3] + 7
-    assert (np.delete(a.counts, 3) == np.delete(before_counts, 3)).all()
-    with torch.no_grad():
-        edge = a.trust * a.network(a.inputs(known["state"]))[..., 0]
-    apart, _ = a.targets(known)
-    np.testing.assert_allclose(
-        a.sums[3] - before_sums[3], (apart - edge).sum(0).numpy(), rtol=1e-4, atol=1e-6
-    )
-    expected = a.sums[3] / (a.counts[3] + a.pull)
-    np.testing.assert_allclose(
-        a.correction(np.array([3]))[0].numpy(), expected, rtol=1e-5
-    )
 
 
 def test_step5_fit_counts_every_stock_again_from_its_events():
@@ -278,6 +297,14 @@ def test_step6_every_action_s_worth_by_hand():
             assert worth[i, j] == pytest.approx(hand, rel=1e-4, abs=1e-9)
     assert (worth[:, 0] == 0).all()
     assert np.isneginf(worth[~permitted[idx]]).all()
+
+
+def test_step6_an_agent_that_learned_nothing_lets_every_move_be():
+    data = synthetic()
+    a = agent.make(agent.SETTINGS[0])
+    a.fit(history(data, until=100))
+    events = hs.view(data, np.arange(5), gym.allowed(data))
+    assert list(a.act(events)) == [0] * 5
 
 
 def test_step6_it_takes_the_best_action_or_lets_the_move_be():
@@ -319,6 +346,12 @@ def test_the_agent_hedges_where_qqq_swings_and_learns_each_stock():
     mine = big & traded & late & (data["ticker"][idx] == 0)
     others = big & traded & late & (data["ticker"][idx] != 0)
     assert np.mean(side[mine] > 0) > 0.5 > np.mean(side[others] > 0)
+
+
+def test_the_agent_has_every_method_the_harness_calls():
+    a = agent.make(agent.SETTINGS[0])
+    for method in ("fit", "update", "forecast", "act"):
+        assert callable(getattr(a, method))
 
 
 def test_it_is_written_from_scratch():

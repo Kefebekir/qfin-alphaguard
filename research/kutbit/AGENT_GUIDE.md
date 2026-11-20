@@ -4,7 +4,7 @@ This is design A of decision 0026's agent, which Efe chose on 20 November 2026. 
 around it is built and tested: the event gym (`gym.py`), the harness that feeds the agent
 minute by minute and measures it (`harness.py`), the bars and the placebo. What you write is
 one file, `research/kutbit/agent.py`, in six steps. Each step has its tests, and a step is
-done when they pass.
+done when they pass with only the steps so far typed.
 
 ## The idea in four lines
 
@@ -102,8 +102,8 @@ class Agent:
         self.counts = np.zeros(STOCKS)
 ```
 
-The methods of the next steps go inside `class Agent`, indented as shown. Check:
-`-k step1`.
+The methods of the next steps go inside `class Agent`, indented as shown, each step below
+the one before. Check: `-k step1`.
 
 ## Step 2: the network
 
@@ -115,7 +115,7 @@ clamped at ±5 so a freak value cannot throw the network.
 
 <!-- fmt: off -->
 ```python
-    # --- step 2: the network -------------------------------------------------------------
+    # --- step 2: the network ----------------------------------------------------------
 
     def layer(self, n_in: int, n_out: int, generator) -> list:
         """A layer's weights, drawn so that a signal neither fades nor grows through it, and
@@ -139,17 +139,18 @@ clamped at ±5 so a freak value cannot throw the network.
 
 Check: `-k step2`.
 
-## Step 3: the loss
+## Step 3: the loss, and what it is taken on
 
 The network learns by making what followed as likely as it can under its forecast. Minute
 moves have fat tails (0024 measured a kurtosis of 7 to 20), so the forecast is a Student t
 with 4 degrees of freedom, not a normal: one crash minute does not tear the forecast apart.
 The loss is the t's negative log density, less the parts that do not depend on the mean or
-the scale.
+the scale. What it is taken on: the stock's move apart from QQQ, its own move less β times
+QQQ's, and QQQ's move, both in percent.
 
 <!-- fmt: off -->
 ```python
-    # --- step 3: the loss ----------------------------------------------------------------
+    # --- step 3: the loss and what it is taken on -------------------------------------
 
     @staticmethod
     def loss(x: torch.Tensor, mean, log_scale: torch.Tensor) -> torch.Tensor:
@@ -157,15 +158,56 @@ the scale.
         negative log density, less the parts that do not depend on them."""
         z = (x - mean) / log_scale.exp()
         return (log_scale + (NU + 1) / 2 * torch.log1p(z * z / NU)).mean()
+
+    def targets(self, known: dict) -> tuple[torch.Tensor, torch.Tensor]:
+        """The stock's move apart from QQQ and QQQ's move, over each hold, in percent."""
+        own = torch.as_tensor(known["own"], dtype=torch.float32) * PERCENT
+        qqq = torch.as_tensor(known["qqq"], dtype=torch.float32) * PERCENT
+        beta = torch.as_tensor(known["beta"], dtype=torch.float32)[:, None]
+        return own - beta * qqq, qqq
 ```
 <!-- fmt: on -->
 
-Check: `-k step3`. One test compares it with PyTorch's own Student t, used only there.
+Check: `-k step3`. One test compares the loss with PyTorch's own Student t, used only there.
 
-## Step 4: learning
+## Step 4: every minute
 
-What the network learns from: the stock's move apart from QQQ (own less β times QQQ's) and
-QQQ's move, in percent. At each month's start, `fit`:
+Each outcome, as soon as it is known, tells the agent how far that stock's move apart from
+QQQ was from the shared edge it would have acted on: the network's edge times its trust. That
+miss is added to the stock's sum, and the stock's correction is its sum over its count plus
+`pull`: with few events it is nearly nothing, with many it is the stock's own mean miss. The
+network and the trust come from the learning of step 5; this step's tests set them by hand.
+
+<!-- fmt: off -->
+```python
+    # --- step 4: every minute ---------------------------------------------------------
+
+    def update(self, known: dict) -> None:
+        """Each outcome as soon as it is known: how far the stock's move apart from QQQ was
+        from the shared network's edge, added to that stock's count."""
+        if self.weights is None or not len(known["state"]):
+            return
+        with torch.no_grad():
+            edge = self.trust * self.network(self.inputs(known["state"]))[..., 0]
+        apart, _ = self.targets(known)
+        miss = (apart - edge).numpy()
+        np.add.at(self.sums, known["ticker"].astype(int), miss)
+        np.add.at(self.counts, known["ticker"].astype(int), 1)
+
+    def correction(self, tickers: np.ndarray) -> torch.Tensor:
+        """Each stock's own edge beside the shared one: its mean miss, pulled toward nothing
+        by `pull` events' worth of weight."""
+        t = tickers.astype(int)
+        found = self.sums[t] / (self.counts[t] + self.pull)[:, None]
+        return torch.as_tensor(found, dtype=torch.float32)
+```
+<!-- fmt: on -->
+
+Check: `-k step4`.
+
+## Step 5: learning
+
+At each month's start, `fit`:
 
 1. keeps the latest fifth of the events before the month aside;
 2. draws the network afresh from the seed, and starts its spreads at the moves' usual size;
@@ -174,20 +216,15 @@ QQQ's move, in percent. At each month's start, `fit`:
    running square, both corrected for starting at zero;
 4. measures its trust on the fifth it kept aside: the slope of what followed on what it
    forecast, kept between none and all;
-5. counts every stock's correction again from all the events before the month.
+5. counts every stock's correction again from all the events before the month, with step 4's
+   `update`.
 
 QQQ's loss has a mean of zero: the network learns how much QQQ swings, never where it goes.
+The events come in time order, so the fifth kept aside is the latest.
 
 <!-- fmt: off -->
 ```python
-    # --- step 4: learning ----------------------------------------------------------------
-
-    def targets(self, known: dict) -> tuple[torch.Tensor, torch.Tensor]:
-        """The stock's move apart from QQQ and QQQ's move, over each hold, in percent."""
-        own = torch.as_tensor(known["own"], dtype=torch.float32) * PERCENT
-        qqq = torch.as_tensor(known["qqq"], dtype=torch.float32) * PERCENT
-        beta = torch.as_tensor(known["beta"], dtype=torch.float32)[:, None]
-        return own - beta * qqq, qqq
+    # --- step 5: learning -------------------------------------------------------------
 
     def fit(self, history: dict) -> None:
         """At the month's start: the shared network learns afresh on the earlier events before
@@ -248,42 +285,7 @@ QQQ's loss has a mean of zero: the network learns how much QQQ swings, never whe
 ```
 <!-- fmt: on -->
 
-The events come in time order, so the fifth kept aside is the latest. Check: `-k step4`. Its
-tests learn for real on small made-up events and take about a minute.
-
-## Step 5: every minute
-
-Each outcome, as soon as it is known, tells the agent how far that stock's move apart from
-QQQ was from the shared edge it would have acted on. That miss is added to the stock's sum,
-and the stock's correction is its sum over its count plus `pull`: with few events it is
-nearly nothing, with many it is the stock's own mean miss.
-
-<!-- fmt: off -->
-```python
-    # --- step 5: every minute ------------------------------------------------------------
-
-    def update(self, known: dict) -> None:
-        """Each outcome as soon as it is known: how far the stock's move apart from QQQ was
-        from the shared network's edge, added to that stock's count."""
-        if self.weights is None or not len(known["state"]):
-            return
-        with torch.no_grad():
-            edge = self.trust * self.network(self.inputs(known["state"]))[..., 0]
-        apart, _ = self.targets(known)
-        miss = (apart - edge).numpy()
-        np.add.at(self.sums, known["ticker"].astype(int), miss)
-        np.add.at(self.counts, known["ticker"].astype(int), 1)
-
-    def correction(self, tickers: np.ndarray) -> torch.Tensor:
-        """Each stock's own edge beside the shared one: its mean miss, pulled toward nothing
-        by `pull` events' worth of weight."""
-        t = tickers.astype(int)
-        found = self.sums[t] / (self.counts[t] + self.pull)[:, None]
-        return torch.as_tensor(found, dtype=torch.float32)
-```
-<!-- fmt: on -->
-
-Check: `-k step5`.
+Check: `-k step5`. Its tests learn for real on small made-up events and take about a minute.
 
 ## Step 6: deciding
 
@@ -302,7 +304,7 @@ more than nothing.
 
 <!-- fmt: off -->
 ```python
-    # --- step 6: deciding ------------------------------------------------------------------
+    # --- step 6: deciding -------------------------------------------------------------
 
     def forecast(self, events: dict) -> np.ndarray:
         """Every action's worth at each event: the expected return less gamma/2 times its
