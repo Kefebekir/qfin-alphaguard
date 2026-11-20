@@ -95,7 +95,10 @@ week alongside university.
     never a bet on QQQ. It learns every minute, each stock a part of its own, and its
     shared part each month. The event gym and the harness that feeds it minute by minute,
     chooses, runs the placebo and measures it are built (`research/kutbit/gym.py`,
-    `harness.py`). Next: the guide; then Efe writes and trains the agent.
+    `harness.py`). Efe chose design A on 20 November: the network forecasts the edge and
+    the spreads, every action is valued as Kelly would, and the agent trusts its edge only
+    as far as it came true. Next: Efe writes it from `research/kutbit/AGENT_GUIDE.md`,
+    then runs the placebo, the choice on 2019 and the measurement.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on

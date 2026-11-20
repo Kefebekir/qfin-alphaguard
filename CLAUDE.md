@@ -93,7 +93,8 @@ Both ruff commands must pass before a commit.
   sees at each minute, shared by training and live; `skill.py`, the linear ruler its network
   must beat; `hedge_study.py`, how much of the market part to hedge with QQQ; `events.py`,
   what follows an extreme minute; `gym.py`, the event gym of the first agent (decision 0026);
-  `harness.py`, which feeds, chooses, runs the placebo for and measures Efe's agent
+  `harness.py`, which feeds, chooses, runs the placebo for and measures Efe's agent;
+  `AGENT_GUIDE.md`, the steps of Efe's `agent.py`, run in `data/llmenv` with PyTorch
 - `guard.yaml`, `guard_qqq.yaml`, `src/qfin_alphaguard/guard/`: the risk limits
   of the nightly plan's and the QQQ strategy's accounts, and the code that
   loads and checks them
