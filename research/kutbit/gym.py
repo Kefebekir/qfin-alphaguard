@@ -431,7 +431,29 @@ def follow(policy: np.ndarray, kind: np.ndarray, permitted: np.ndarray) -> np.nd
 # --- the shuffled bar -----------------------------------------------------------------------
 
 
-def shuffled(data: dict, rng: np.random.Generator, tries: int = 100) -> dict:
+def deal(group: np.ndarray, ticker: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """For each event of `group`, the event whose outcome it takes: always another stock's.
+    The events are lined up by stock, in a random order within each, and each takes the
+    outcome of the event a random step ahead, a step at least as long as the largest
+    stock's run and no longer than the rest, so it always lands on another stock. That is
+    possible whenever no stock has more than half the events."""
+    n = len(group)
+    if n < 2:
+        return group.copy()
+    order = rng.permutation(group)
+    order = order[np.argsort(ticker[order], kind="stable")]
+    largest = int(np.unique(ticker[order], return_counts=True)[1].max())
+    if largest > n - largest:
+        raise ValueError("cannot deal outcomes away from their own stock")
+    step = int(rng.integers(largest, n - largest + 1))
+    source = np.empty(n, dtype=group.dtype)
+    position = {int(e): i for i, e in enumerate(order)}
+    for i, event in enumerate(group):
+        source[i] = order[(position[int(event)] + step) % n]
+    return source
+
+
+def shuffled(data: dict, rng: np.random.Generator) -> dict:
     """The events with their outcomes dealt to another stock's event in the same part of
     the day; everything the agent sees stays. An agent trained on it learns only what is
     common to all events."""
@@ -440,19 +462,7 @@ def shuffled(data: dict, rng: np.random.Generator, tries: int = 100) -> dict:
     minute = data["minute"].astype(int)
     for first, last in PARTS.values():
         mine = np.flatnonzero((minute >= first) & (minute <= last))
-        if len(mine) < 2:
-            continue
-        order = rng.permutation(mine)
-        for _ in range(tries):
-            same = data["ticker"][mine] == data["ticker"][order]
-            if not same.any():
-                break
-            for i in np.flatnonzero(same):
-                j = rng.integers(len(mine))
-                order[i], order[j] = order[j], order[i]
-        if (data["ticker"][mine] == data["ticker"][order]).any():
-            raise ValueError("cannot deal outcomes away from their own stock")
-        source[mine] = order
+        source[mine] = deal(mine, data["ticker"], rng)
     for k in ("own", "qqq"):
         out[k] = data[k][source]
     return out
