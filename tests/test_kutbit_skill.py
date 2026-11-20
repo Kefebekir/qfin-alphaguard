@@ -86,9 +86,17 @@ def test_correlations_by_day_and_across_instruments_by_hand():
     rng = np.random.default_rng(5)
     day = np.repeat([10, 11, 12], 40)
     minute = np.tile(np.repeat([0, 1], 20), 3)
-    p, z = rng.normal(0, 1, 120), rng.normal(0, 1, 120)
+    p, z = rng.normal(0.3, 1, 120), rng.normal(-0.2, 1, 120)
     found = ks.daily_correlation(p, z, day)
-    per_day = [np.corrcoef(p[day == d], z[day == d])[0, 1] for d in (10, 11, 12)]
+    dp, dz = (
+        p - p.mean(),
+        z - z.mean(),
+    )  # about the means of all the rows, not each day's
+    per_day = [
+        (dp[day == d] @ dz[day == d])
+        / math.sqrt((dp[day == d] @ dp[day == d]) * (dz[day == d] @ dz[day == d]))
+        for d in (10, 11, 12)
+    ]
     assert found["mean"] == pytest.approx(np.mean(per_day))
     assert found["t"] == pytest.approx(
         np.mean(per_day) / np.std(per_day, ddof=1) * math.sqrt(3)
@@ -106,6 +114,28 @@ def test_correlations_by_day_and_across_instruments_by_hand():
         for d in (10, 11, 12)
     ]
     assert across["mean"] == pytest.approx(np.mean(each)) and across["n"] == 3
+
+
+def test_a_path_every_instrument_of_a_day_shares_does_not_look_like_a_reversal():
+    # Each day, ten instruments: a path they all share, as QQQ's part, and one of their own.
+    # The forecast is the last 30 minutes reversed; the target, the next 30 minutes. Nothing
+    # can be forecast, but about each day's own means the past and the future of the shared
+    # path move against each other, as in the placebo's first run on 17 November 2026.
+    rng = np.random.default_rng(17)
+    days, instruments, minutes, back, ahead = 300, 10, 390, 30, 30
+    shared = np.cumsum(rng.normal(0, 1, (days, 1, minutes + 1)), axis=2)
+    paths = shared + np.cumsum(
+        rng.normal(0, 1, (days, instruments, minutes + 1)), axis=2
+    )
+    t = np.arange(back, minutes + 1 - ahead)
+    p = -(paths[:, :, t] - paths[:, :, t - back]).ravel()
+    z = ((paths[:, :, t + ahead] - paths[:, :, t]) / math.sqrt(ahead)).ravel()
+    day = np.repeat(np.arange(days), instruments * len(t))
+    minute = np.tile(t, days * instruments)
+    _, about_each_day = ks.grouped_correlations(p, z, day)
+    assert ks.mean_and_t(about_each_day)["t"] > 4  # the bias the measure must not have
+    assert abs(ks.daily_correlation(p, z, day)["t"]) < ks.PLACEBO_T
+    assert abs(ks.across_correlation(p, z, day, minute)["t"]) < ks.PLACEBO_T
 
 
 def test_a_minute_with_too_few_instruments_is_left_out():

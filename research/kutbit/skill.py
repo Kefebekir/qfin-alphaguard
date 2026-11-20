@@ -15,7 +15,9 @@ network has to beat it on the same years. Its rules were written in decision 002
   read.
 - **Measures on MEASURE_YEARS,** for each horizon, beside the two known patterns (`habit`, and
   the last 30 minutes apart from the market, reversed):
-  - each day's correlation of forecast and clipped `z`, averaged over the days, and its t;
+  - each day's correlation of forecast and clipped `z`, about the means of all the measured
+    rows, averaged over the days, and its t; not about each day's own means, which made a
+    random walk look like it reverses (decision 0024, amendment of 17 November 2026);
   - the same within each minute across instruments (at least MIN_ACROSS), which takes out what
     is common to them all, averaged over each day's minutes and then over the days;
   - the hedged return of trading in the forecast's direction on its STRONGEST forecasts, by
@@ -284,14 +286,19 @@ def mean_and_t(values: np.ndarray) -> dict:
     return {"mean": float(values.mean()), "t": float(t), "n": n}
 
 
-def grouped_correlations(p, z, groups, least: int = 2) -> tuple[np.ndarray, np.ndarray]:
+def grouped_correlations(
+    p, z, groups, least: int = 2, about_all: bool = False
+) -> tuple[np.ndarray, np.ndarray]:
     """Each group's correlation of p and z, for groups of at least `least` rows: (the groups'
-    keys, their correlations)."""
+    keys, their correlations). About each group's own means, or with `about_all` about the
+    means of all the rows."""
     keys, index, counts = np.unique(groups, return_inverse=True, return_counts=True)
-    size = counts.astype(float)
-    mp = np.bincount(index, p) / size
-    mz = np.bincount(index, z) / size
-    dp, dz = p - mp[index], z - mz[index]
+    if about_all:
+        dp, dz = p - p.mean(), z - z.mean()
+    else:
+        size = counts.astype(float)
+        dp = p - (np.bincount(index, p) / size)[index]
+        dz = z - (np.bincount(index, z) / size)[index]
     spz = np.bincount(index, dp * dz)
     spp = np.bincount(index, dp * dp)
     szz = np.bincount(index, dz * dz)
@@ -302,8 +309,16 @@ def grouped_correlations(p, z, groups, least: int = 2) -> tuple[np.ndarray, np.n
 
 
 def daily_correlation(p, z, day) -> dict:
-    """Each day's correlation of forecast and target, then their mean over the days and t."""
-    _, corr = grouped_correlations(p, z, day)
+    """Each day's correlation of forecast and target about the means of all the rows, then
+    their mean over the days and t.
+
+    Not about each day's own means: every instrument of a day shares QQQ's path, and once a
+    day's mean is taken out, what went before a minute and what followed it move against each
+    other, even in a random walk. Over a day the path's ups and downs add up to the day's
+    move, so a rise above the day's mean before a minute leaves less than the mean after it.
+    The last 30 minutes reversed then 'forecast' a random walk at t +5.8 to +8.7 (decision
+    0024, amendment of 17 November 2026)."""
+    _, corr = grouped_correlations(p, z, day, about_all=True)
     return mean_and_t(corr)
 
 
@@ -559,7 +574,9 @@ def section(result: dict) -> str:
         )
 
     out += table(
-        result, f"Each day's correlation with z, {years}", lambda g: corr(g["daily"])
+        result,
+        f"Each day's correlation with z, about all rows' means, {years}",
+        lambda g: corr(g["daily"]),
     )
     out += table(
         result,

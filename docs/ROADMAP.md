@@ -82,9 +82,12 @@ week alongside university.
   - Its leverage is spread over several hedged positions: up to 4x on a second Alpaca paper
     account, and 10x in a virtual account.
   - It learns each instrument every minute, every night and every month (decision 0024).
-  - Done (`research/kutbit`): the data set of 2016-2026, inputs v2 and the target (#106-#108).
-    Next: the skill test, a linear model of the same inputs, which Efe runs; its rules are in
-    decision 0024.
+  - Done (`research/kutbit`): the data set of 2016-2026, inputs v2 and the target (#106-#108),
+    and the skill test, a linear model of the same inputs, whose rules are in decision 0024
+    (#110).
+  - The skill test's placebo failed its first run on 17 November, on a measure that made a
+    random walk look like it reverses; the measure is fixed (decision 0024's amendment). Next:
+    Efe runs the placebo again, then the real run.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on

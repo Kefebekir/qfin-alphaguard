@@ -94,8 +94,8 @@ regression of each horizon's `z` on the 971 inputs the network will see, fitted 
 measured once on 2020-2021, beside two known patterns. It is a ruler, not a variant.
 
 Efe runs it, in this order: a check of speed that shows no score (about 12 seconds), the
-random-walk placebo, then the real run, which waits until the placebo passes. Each full run
-takes about 20 minutes, by the speed check's estimate.
+random-walk placebo, then the real run, which waits until the placebo passes. The placebo's
+full run took about 7 minutes on 17 November.
 
 ```bash
 OMP_NUM_THREADS=8 uv run python research/kutbit/skill.py smoke
