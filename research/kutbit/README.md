@@ -16,7 +16,8 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The hedge study: how much of a book's market part to hedge with QQQ, under a gross cap | `hedge_study.py`, `results_hedge.txt` | done |
 | What follows an extreme minute, on 2016-2018: the ground for Efe's first agent | `events.py`, `results_events.txt` | done |
 | The event gym: every extreme minute's 16 numbers, the outcome of all 91 actions, the bars, the placebo's random walks and the shuffled outcomes | `gym.py`, `results_gym.txt` | done |
-| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026 | next the harness that feeds it minute by minute, retrains its shared part month by month and measures it, and its page; then Efe writes and trains it |
+| The harness: feeds the agent minute by minute in time order, never an outcome before it is known; chooses its setting on 2019; runs the placebo; measures it once on 2020-2021 against the bars; writes the page of what it did | `harness.py` | done |
+| Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026; `agent.py`, Efe's | next the guide; then Efe writes and trains it |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -172,3 +173,23 @@ PYTHONPATH=src uv run python research/kutbit/gym.py build      # Efe: 2016-2021,
 every event loses 3.1 bps an event; only the open pays, and the best simple policy, chosen on
 the same years, earns 0.8 bps an event. Kinds with fewer than 100 events are let be, since the
 best of 91 actions on a few events is chance.
+
+## The harness
+
+It runs Efe's agent, from `agent.py` (`make(settings)` and `SETTINGS`), over the event gym as
+live. At each month's start the agent learns afresh on every event before the month; at each
+minute's close it is given the events whose outcomes have just become known, then asked for its
+action at that minute's extreme minutes. It is never given an outcome before it is known, and
+an action Efe's limits forbid is refused.
+
+```bash
+PYTHONPATH=src uv run python research/kutbit/gym.py build        # once
+PYTHONPATH=src uv run python research/kutbit/harness.py placebo   # random walks first
+PYTHONPATH=src uv run python research/kutbit/harness.py choose    # the setting, on 2019
+PYTHONPATH=src uv run python research/kutbit/harness.py measure   # once, on 2020-2021
+```
+
+`measure` refuses until the placebo has passed and a setting has been chosen. The pages are
+`data/kutbit/agent/choice.html` (2019) and `data/kutbit/agent/agent.html` (2020-2021). The
+agent on dealt outcomes learns from outcomes dealt within each month, so it never learns from
+beyond the month it trades in.
