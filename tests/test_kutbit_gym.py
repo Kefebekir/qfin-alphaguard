@@ -300,6 +300,26 @@ def test_the_best_simple_policy_takes_the_best_action_of_each_kind():
 # --- the shuffled bar -----------------------------------------------------------------------
 
 
+def test_an_outcome_is_always_dealt_from_another_stock_when_that_is_possible():
+    rng = np.random.default_rng(9)
+    for n, stocks in ((10, 2), (11, 3), (40, 5), (7, 7)):
+        ticker = np.sort(rng.integers(0, stocks, n)).astype(np.int16)
+        while np.bincount(ticker).max() > n / 2:
+            ticker = np.sort(rng.integers(0, stocks, n)).astype(np.int16)
+        group = np.arange(100, 100 + n)
+        full = np.zeros(200, np.int16)
+        full[group] = ticker
+        for _ in range(20):
+            source = gym.deal(group, full, rng)
+            assert sorted(source) == list(group)
+            assert (full[source] != full[group]).all()
+    full = np.zeros(10, np.int16)
+    full[[0, 1, 2]] = [1, 1, 2]
+    with pytest.raises(ValueError, match="own stock"):
+        gym.deal(np.array([0, 1, 2]), full, rng)  # one stock has two of three
+    assert list(gym.deal(np.array([4]), full, rng)) == [4]
+
+
 def test_shuffled_outcomes_stay_in_their_part_of_the_day_and_leave_their_stock():
     n = 40
     minute = np.where(np.arange(n) < 20, 10, 200).astype(np.int16)
