@@ -1,7 +1,8 @@
 # KUTBIT
 
-Efe's own intraday model with leverage (decisions [0023](../../docs/decisions/0023-kutbit.md) and
-[0024](../../docs/decisions/0024-kutbit-architecture.md)).
+Efe's own intraday model with leverage (decisions [0023](../../docs/decisions/0023-kutbit.md),
+[0024](../../docs/decisions/0024-kutbit-architecture.md) and
+[0025](../../docs/decisions/0025-kutbit-hedge.md)).
 It is separate from the QQQ rule: its own code, its own Guard file and its own accounts.
 
 | Part | Where | State |
@@ -11,7 +12,8 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | What the forecaster learns: that return with QQQ's part taken out, in the usual moves of the minutes held | `labels.py` (`targets`), `target_report.py`, `results_target.txt` | done |
 | The data set: every instrument's sessions of 2016-2026, minute by minute, with what was known before each | `dataset.py` → `data/kutbit/`, `results_dataset.txt` | done |
 | The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | ready; Efe runs it |
-| The bank of real paths: the shapes of what may follow, in the target's units | | next |
+| The hedge study: how much of a book's market part to hedge with QQQ, under a gross cap | `hedge_study.py`, `results_hedge.txt` | done |
+| The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
 | The training harness and its placebos | | to come; Efe designs and trains the networks |
@@ -104,3 +106,23 @@ OMP_NUM_THREADS=8 uv run python research/kutbit/skill.py real
 ```
 
 The page is `data/kutbit/skill/skill.html`.
+
+## The hedge study
+
+Decision 0025's evidence. On 876,570 stock windows of 30 minutes in 2016-2021, an edge is
+planted in the move apart from QQQ, and QQQ is given none. For three books (one stock, ten long,
+five long and five short), each gross cap and each risk appetite γ, it finds the share of the
+cap and the share of the market part hedged that the account would value most, after costs.
+
+```bash
+PYTHONPATH=src uv run python research/kutbit/hedge_study.py
+```
+
+It takes about a minute and writes `results_hedge.txt`. In short:
+
+- once an edge pays its cost, the cap fills, and at γ 1 or 2 the hedge's room under the cap is
+  worth more than the risk it takes out;
+- the book's own shorts are the best hedge: five long and five short leave a beta of 0.10;
+- careful appetites (γ 4, 8) and jumpy markets hedge more;
+- the price of leaving ten long unhedged at 10x is in the bad days: 15% of days below −5%,
+  against 2% hedged in full, with an edge of 0.1 in every window.

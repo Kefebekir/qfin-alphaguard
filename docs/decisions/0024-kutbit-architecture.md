@@ -1,7 +1,8 @@
 # 0024: KUTBIT's architecture, after a review on the data
 
 - **Status:** accepted; the skill test's daily correlation amended on 17 November 2026, after
-  its placebo's first run and before any real run (see the amendment at the end)
+  its placebo's first run and before any real run (see the amendment at the end); sections 1
+  and 5 changed by decision 0025, which makes the hedge a decision
 - **Date:** 2026-11-17 (agreed with Efe on 16 November)
 - **Builds on:** decision 0023, which it changes where this record says so. Everything else in
   0023 stands: KUTBIT is separate from the QQQ rule, has its own Guard file and accounts, trades
@@ -49,7 +50,7 @@ Before any model was trained, decision 0023's design was checked against the sto
 
 ## Decision
 
-**1. The leverage is spread, not stacked.**
+**1. The leverage is spread, not stacked.** (How much is hedged is changed by decision 0025.)
 - The account's gross leverage is Efe's cap: 4x on paper, 10x in the virtual account.
 - It is shared among several positions at once, each with a cap of its own, and each position's
   market part is hedged with QQQ. Longs and shorts offset part of the hedge.
@@ -75,7 +76,8 @@ repository has each stock's sector.
   paths in the same units, shifted and stretched by the forecast. `z`'s kurtosis is 7 at 30
   minutes and 20 at one minute, so no formula's shape will do.
 
-**5. The decision is computed, every minute, open positions included.**
+**5. The decision is computed, every minute, open positions included.** (Its measure is
+changed by decision 0025: the certainty equivalent at Efe's risk appetite.)
 - For each candidate size of each position, including keeping, cutting or closing one already
   held, the account's expected log growth after costs is computed over those paths, under Efe's
   stop, caps and costs. The best is taken; if none adds growth, KUTBIT waits.
