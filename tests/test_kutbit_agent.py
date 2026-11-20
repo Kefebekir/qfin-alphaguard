@@ -173,7 +173,7 @@ def by_hand(data):
     a = agent.make(agent.SETTINGS[0])
     generator = torch.Generator().manual_seed(3)
     state = torch.as_tensor(data["state"], dtype=torch.float32)
-    a.mean, a.spread = state.mean(0), state.std(0)
+    a.mean, a.spread = state.mean(0), state.std(0).clamp_min(1e-6)  # beta never varies
     a.weights = [
         *a.layer(16, 8, generator),
         *a.layer(8, 8, generator),
@@ -190,6 +190,7 @@ def test_step4_each_outcome_adds_its_miss_to_its_stock():
     known = hs.view(data, picked, gym.allowed(data), gym.utility(gym.returns(data)))
     a.update(known)
     assert a.counts[3] == 7 and a.counts.sum() == 7
+    assert np.isfinite(a.sums[3]).all() and (a.sums[3] != 0).all()
     with torch.no_grad():
         edge = a.trust * a.network(a.inputs(known["state"]))[..., 0]
     apart = (known["own"] - known["beta"][:, None] * known["qqq"]) * 100
