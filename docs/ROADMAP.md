@@ -85,10 +85,13 @@ week alongside university.
   - It learns each instrument every minute, every night and every month (decision 0024).
   - Done (`research/kutbit`): the data set of 2016-2026, inputs v2 and the target (#106-#108),
     the skill test, a linear model of the same inputs, whose rules are in decision 0024
-    (#110), and the hedge study behind decision 0025.
+    (#110), the hedge study behind decision 0025, and the study of extreme minutes on
+    2016-2018 that Efe's first agent starts from.
   - The skill test's placebo failed its first run on 17 November, on a measure that made a
     random walk look like it reverses; the measure is fixed (decision 0024's amendment). Next:
     Efe runs the placebo again, then the real run.
+  - Efe's first agent: at an extreme minute, follow it, bet against it or let it be, and how
+    much to hedge. Its rules come first (decision 0026); then Efe writes and trains it.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
