@@ -203,6 +203,39 @@ def test_an_outcome_known_at_a_minute_s_close_comes_before_that_minute_s_decisio
     assert 40 in clock.at[40]  # but it is at the close of 40, before that decision
 
 
+class Recorder(Nothing):
+    """Keeps every outcome it learns from."""
+
+    def __init__(self):
+        self.own, self.qqq, self.utility = [], [], []
+
+    def update(self, known):
+        self.own.append(known["own"])
+        self.qqq.append(known["qqq"])
+        self.utility.append(known["utility"])
+
+
+def test_what_followed_is_given_to_learn_from_and_the_dealt_bar_learns_the_dealt():
+    data = synthetic(days_a_month=6, events_a_day=8)
+    values, permitted = ready(data)
+    months = hs.months_of([2019])
+    inside = np.flatnonzero(np.isin(hs.month_key(data["day"]), months))
+    order = inside[
+        np.lexsort((data["ticker"][inside], data["known"][inside], data["day"][inside]))
+    ]
+    mine = Recorder()
+    hs.run(mine, data, values, permitted, months)
+    np.testing.assert_array_equal(np.concatenate(mine.own), data["own"][order])
+    np.testing.assert_array_equal(np.concatenate(mine.qqq), data["qqq"][order])
+    dealt = hs.within_months(data, np.random.default_rng(4))
+    teach = gym.utility(gym.returns(dealt))
+    theirs = Recorder()
+    hs.run(theirs, data, teach, permitted, months, outcomes=dealt)
+    np.testing.assert_array_equal(np.concatenate(theirs.own), dealt["own"][order])
+    np.testing.assert_array_equal(np.concatenate(theirs.utility), teach[order])
+    assert not np.array_equal(np.concatenate(theirs.own), data["own"][order])
+
+
 def test_an_action_the_limits_forbid_or_that_does_not_exist_is_refused():
     data = synthetic()
     values, permitted = ready(data)
@@ -332,6 +365,27 @@ def test_the_measurement_runs_the_agent_beside_every_bar():
     ).mean() > 0.2  # it cannot read the size
     flat = hs.measure(TableAgent, {"use_size": True}, synthetic(), log=lambda s: None)
     assert not flat["gate"]["passed"]
+
+
+def test_the_bar_on_dealt_outcomes_learns_from_the_dealt_moves():
+    data = synthetic(edge=0.01)
+    made = []
+
+    def make(setting):
+        made.append(Recorder())
+        return made[-1]
+
+    hs.measure(make, {}, data, log=lambda s: None)
+    inside = np.flatnonzero(
+        np.isin(hs.month_key(data["day"]), hs.months_of(hs.MEASURE_YEARS))
+    )
+    order = inside[
+        np.lexsort((data["ticker"][inside], data["known"][inside], data["day"][inside]))
+    ]
+    dealt = hs.within_months(data, np.random.default_rng(hs.SEED))
+    np.testing.assert_array_equal(np.concatenate(made[0].own), data["own"][order])
+    np.testing.assert_array_equal(np.concatenate(made[1].own), dealt["own"][order])
+    np.testing.assert_array_equal(np.concatenate(made[1].qqq), dealt["qqq"][order])
 
 
 def test_the_page_shows_what_the_agent_did():

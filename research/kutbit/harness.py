@@ -51,7 +51,8 @@ PASS_T = 2.0  # the margin over the best bar must reach this t
 PLACEBO_T = 2.0  # on random walks the agent may not beat doing nothing at this t
 SEED = 26
 SAMPLES = 4  # sample events of each sort on the page: the best, the worst, at random
-VIEW = ("state", "ticker", "kind", "day", "minute")
+VIEW = ("state", "ticker", "kind", "day", "minute", "beta")  # all known at the decision
+OUTCOMES = ("own", "qqq")  # given only once known
 
 
 # --- the run --------------------------------------------------------------------------------
@@ -67,14 +68,21 @@ def months_of(years) -> list[int]:
     return [year * 12 + m for year in years for m in range(12)]
 
 
-def view(data: dict, idx: np.ndarray, permitted: np.ndarray, values=None) -> dict:
+def view(
+    data: dict, idx: np.ndarray, permitted: np.ndarray, values=None, outcomes=None
+) -> dict:
     """What the agent is given about the events `idx`: what it sees and what it may do, and,
-    when `values` are given, every action's utility and when it became known."""
+    when `values` are given, what followed: every action's utility, the stock's and QQQ's
+    moves over each hold (`own` and `qqq`, signed by the move's direction, taken from
+    `outcomes` when given) and when they became known."""
     out = {k: data[k][idx] for k in VIEW}
     out["allowed"] = permitted[idx]
     if values is not None:
+        source = data if outcomes is None else outcomes
         out["known"] = data["known"][idx]
         out["utility"] = values[idx]
+        for k in OUTCOMES:
+            out[k] = source[k][idx]
     return out
 
 
@@ -85,10 +93,12 @@ def run(
     permitted: np.ndarray,
     months: list[int],
     forecasts: bool = False,
+    outcomes: dict | None = None,
 ) -> dict:
     """`agent` over the events of `months`, in time order: at each month's start, fit on
     every event before it; at each minute's close, update with the outcomes known by then,
-    then act on that minute's events. Returns each event's action (-1 outside the months)
+    then act on that minute's events. `values` and `outcomes` are what it learns from, the
+    events' own unless given. Returns each event's action (-1 outside the months)
     and, if asked and the agent can, its forecast utility of the action it took."""
     n = len(data["day"])
     key = month_key(data["day"])
@@ -98,7 +108,8 @@ def run(
     known_at = data["day"].astype(np.int64) * 1000 + data["known"]
     forecast = getattr(agent, "forecast", None) if forecasts else None
     for month in months:
-        agent.fit(view(data, np.flatnonzero(key < month), permitted, values))
+        before = np.flatnonzero(key < month)
+        agent.fit(view(data, before, permitted, values, outcomes))
         mine = np.flatnonzero(key == month)
         to_decide = mine[np.lexsort((data["ticker"][mine], decide_at[mine]))]
         to_learn = mine[np.lexsort((data["ticker"][mine], known_at[mine]))]
@@ -110,7 +121,8 @@ def run(
             while ready < len(to_learn) and known_at[to_learn[ready]] <= when:
                 ready += 1
             if ready > learned:
-                agent.update(view(data, to_learn[learned:ready], permitted, values))
+                batch = to_learn[learned:ready]
+                agent.update(view(data, batch, permitted, values, outcomes))
                 learned = ready
             group = to_decide[first:last]
             events = view(data, group, permitted)
@@ -126,7 +138,7 @@ def run(
                 found = np.asarray(forecast(events))
                 expected[group] = found[np.arange(len(group)), actions]
         if learned < len(to_learn):
-            agent.update(view(data, to_learn[learned:], permitted, values))
+            agent.update(view(data, to_learn[learned:], permitted, values, outcomes))
     return {"choice": choice, "expected": expected}
 
 
@@ -261,7 +273,7 @@ def measure(make, setting, data: dict, log=print) -> dict:
     log("the agent: done")
     dealt = within_months(data, np.random.default_rng(SEED))
     teach = gym.utility(gym.returns(dealt))
-    shuffled_run = run(make(setting), data, teach, permitted, months)
+    shuffled_run = run(make(setting), data, teach, permitted, months, outcomes=dealt)
     log("the agent on dealt outcomes: done")
     others = bars(data, main, permitted, months)
     others["itself on dealt outcomes"] = shuffled_run["choice"]
