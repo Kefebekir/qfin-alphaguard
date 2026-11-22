@@ -1,6 +1,8 @@
 # 0026: KUTBIT's first agent: extreme minutes, on the stock's side
 
-- **Status:** accepted
+- **Status:** accepted; the agent's trust and each stock's correction amended on 22 November
+  2026, after the placebo's first run and before the choice and the measurement (see the
+  amendment at the end)
 - **Date:** 2026-11-19 (agreed with Efe on 18 and 19 November)
 - **Builds on:** decision 0023 (variants, placebos, the card), 0024 (the ladder; development
   retrained monthly) and 0025 (the hedge is a decision; KUTBIT never bets on the market).
@@ -142,3 +144,58 @@ reinforcement learning. It is built only if this stage passes.
 - If it passes, the second stage manages the open position minute by minute.
 - If it fails, that is written down as it is, and the next variant starts from what its page
   showed.
+
+## Amendment of 22 November 2026: the agent acts only on what it has proved
+
+- **What happened.** Efe ran the placebo on 20 November, on the random walks of 2016-2021
+  (150,517 events). It passed: on the 52,247 events of 2020-2021 the agent did not beat doing
+  nothing (−0.25 bps of utility an event, t −2.45). But where nothing can be foreseen it should
+  not have traded at all, and it made 658 trades, which lost about 20 bps of utility each. The
+  choice on 2019 and the measurement had not run.
+- **Why: two numbers it acted on were never asked for proof.**
+  - Its trust, the slope of what followed on what it forecast over the latest fifth, is itself
+    measured with noise, and keeping it between none and all cut off its negative draws but
+    kept its positive ones. On the random walks it came out at 0.21, 0.14 and 0.21 for the
+    three holds at the start of 2020, where it should have been nothing. The network's edges
+    on noise, about 35-50 bps on the trades it made, came through at a fifth of their size and
+    cleared the costs.
+  - Each stock's correction, its mean miss pulled toward nothing by `pull` events, was not
+    asked for proof either. The random walks take each minute's usual move from the real
+    prices, so spring 2020's swung widely, and after them some stocks' corrections reached
+    7.6 bps, above the 5 bps a round trip costs.
+- **The check, on the random walks only.** Efe fitted the agent at six month starts, four
+  months apart, and counted the trades of the four months after each:
+
+  | Start | t of the slope (5, 15, 30 min) | Trust as it was | Trust cut | Trades as it was / trust cut |
+  | --- | --- | --- | --- | --- |
+  | Jan 2020 | +1.5, +1.2, +2.1 | 0.21, 0.14, 0.21 | 0, 0, 0.01 | 47 / 0 |
+  | May 2020 | +0.7, +1.6, +1.4 | 0.11, 0.25, 0.28 | 0, 0, 0 | 551 / 418 |
+  | Sep 2020 | −0.6, +1.2, +0.4 | 0, 0.14, 0.08 | 0, 0, 0 | 33 / 0 |
+  | Jan 2021 | −0.2, +0.2, −0.3 | 0, 0.02, 0 | 0, 0, 0 | 0 / 0 |
+  | May 2021 | −0.7, −1.8, −2.9 | 0, 0, 0 | 0, 0, 0 | 170 / 170 |
+  | Sep 2021 | −1.4, −2.3, −1.2 | 0, 0, 0 | 0, 0, 0 | 0 / 0 |
+
+  The slopes' t lay between −2.9 and +2.1, as noise does. The trades left once the trust was
+  cut came from the stocks' corrections alone: counted with no network, the corrections open
+  0, 434, 0, 0, 170 and 0 trades in the same months, and none once each is cut by two of its
+  errors. With a pull of 20 they open 1,273, and none once cut.
+- **The change: every number the agent acts on must clear two of its standard errors, the t
+  the gate asks of the agent itself** (`PROOF = 2`).
+  - The trust is the slope less two of its standard errors, kept between none and all. The
+    error counts a day's events together, as the gate does.
+  - A stock's correction is its pulled mean miss cut toward nothing by two of its errors: the
+    root of its squared misses over its count plus `pull`. The agent keeps each stock's sum of
+    squared misses beside its sum of misses.
+  - Nothing else changes: the network and its learning, the settings to choose among (a hidden
+    layer of 32 or 64, a pull of 20 or 100), the actions, γ, the costs, the bars and the gate.
+- **Why it is fair.** The change was decided on random walks alone, before the choice on 2019
+  and the measurement, so it cannot have been chosen to suit a result on real prices. Efe
+  agreed to cut the trust on 21 November; the corrections follow the same rule, found in his
+  check on 22 November. What it costs: a proven edge is acted on at less than its measured
+  size until it has more proof. At a t of 5 the trust is 60% of the slope, at 10 it is 80%.
+- **Checked on made-up events** (`tests/test_kutbit_agent.py`, 23 tests). With a planted edge
+  the agent still passes the gate, at a t of 22.1 over the best bar (22.8 before). On made-up
+  noise its trust is nothing (the slope alone gave 0.10-0.17) and it makes no trade (9
+  before). All 10 bugs planted in the two cuts were caught.
+- **Next.** Efe types the change into `agent.py` from the guide's steps 1, 4 and 5, then runs
+  the placebo again, the choice on 2019 and the measurement.
