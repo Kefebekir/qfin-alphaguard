@@ -87,9 +87,13 @@ week alongside university.
     the skill test, a linear model of the same inputs, whose rules are in decision 0024
     (#110), the hedge study behind decision 0025, and the study of extreme minutes on
     2016-2018 that Efe's first agent starts from.
-  - The skill test's placebo failed its first run on 17 November, on a measure that made a
-    random walk look like it reverses; the measure is fixed (decision 0024's amendment). Next:
-    Efe runs the placebo again, then the real run.
+  - The skill test ran on 22 November. Its placebo passed once the measure that made a random
+    walk look like it reverses was fixed (decision 0024's amendment). On 2020-2021 the ridge
+    forecasts at every horizon, above both known patterns: each day's correlation is +0.006
+    to +0.016 at a t of 3.6 to 7.7, and across instruments its t reaches 17.1. Its strongest
+    1% earn 1.89 bps a signal at 15-60 minutes, 0.11 bps short of 2 bps a round trip (0024's
+    result). Each instrument's real cost decides whether a forecast this size can pay; Efe
+    decides whether the network is worth building.
   - Efe's first agent (decision 0026, variant 1 of 10): at an extreme minute of a stock,
     follow it, bet against it or let it be, how large, how long and how much to hedge;
     never a bet on QQQ. It learns every minute, each stock a part of its own, and its
