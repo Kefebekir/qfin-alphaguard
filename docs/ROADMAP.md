@@ -102,8 +102,8 @@ week alongside university.
     placebo passed, since the agent did not beat doing nothing on random walks, but it
     traded on noise, 658 times. Decision 0026's amendment of 22 November makes its trust and
     each stock's correction count only beyond two standard errors; on the random walks they
-    are then nothing. Next: Efe types the change, runs the placebo again, then the choice on
-    2019 and the measurement on 2020-2021.
+    are then nothing. The change is in `agent.py`. Next: Efe runs the placebo again, then the
+    choice on 2019 and the measurement on 2020-2021.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
