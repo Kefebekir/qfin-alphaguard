@@ -197,5 +197,5 @@ reinforcement learning. It is built only if this stage passes.
   the agent still passes the gate, at a t of 22.1 over the best bar (22.8 before). On made-up
   noise its trust is nothing (the slope alone gave 0.10-0.17) and it makes no trade (9
   before). All 10 bugs planted in the two cuts were caught.
-- **Next.** Efe types the change into `agent.py` from the guide's steps 1, 4 and 5, then runs
-  the placebo again, the choice on 2019 and the measurement.
+- **Next.** The change goes into `agent.py` as the guide's steps 1, 4 and 5 show; then Efe
+  runs the placebo again, the choice on 2019 and the measurement.
