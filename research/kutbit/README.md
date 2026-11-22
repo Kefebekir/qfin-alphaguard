@@ -189,7 +189,9 @@ PYTHONPATH=src uv run python research/kutbit/harness.py choose    # the setting,
 PYTHONPATH=src uv run python research/kutbit/harness.py measure   # once, on 2020-2021
 ```
 
-`measure` refuses until the placebo has passed and a setting has been chosen. The pages are
+Each run's record keeps the SHA-256 of `agent.py`, `gym.py`, `harness.py` and `skill.py`:
+`choose` waits for a placebo that passed on today's code, `measure` for that placebo and a choice
+made on today's code, and `measure` runs only once. The pages are
 `data/kutbit/agent/choice.html` (2019) and `data/kutbit/agent/agent.html` (2020-2021). The
 agent on dealt outcomes learns from outcomes dealt within each month, so it never learns from
 beyond the month it trades in.

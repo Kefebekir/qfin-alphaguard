@@ -385,8 +385,11 @@ The gym's build is done once; after the amendment, the placebo runs again. It to
 minutes on Efe's laptop: its random walks have 150,517 events, nearly five times the real
 31,586, and a month's learning on them takes 20 to 35 seconds. The choice and the measurement
 run on the real events, so their months learn faster; the measurement also trains the agent
-on dealt outcomes. `measure` refuses until the placebo has passed and the setting is chosen.
-Read `data/kutbit/agent/choice.html` before the measurement, and `agent.html` after it.
+on dealt outcomes. Each run's record keeps the SHA-256 of `agent.py`, `gym.py`, `harness.py`
+and `skill.py`. `choose` waits for a placebo that passed on today's code, and `measure` for that
+placebo and a choice made on today's code, and it runs only once. So a change to any of the
+four files after the placebo means running the placebo, then the choice, again. Read
+`data/kutbit/agent/choice.html` before the measurement, and `agent.html` after it.
 
 ## What to look at on the pages
 
