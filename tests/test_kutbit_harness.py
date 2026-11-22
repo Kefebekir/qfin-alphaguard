@@ -1,5 +1,6 @@
 """The harness of KUTBIT's first agent (research/kutbit/harness.py)."""
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -424,22 +425,73 @@ def test_the_commands_run_in_order_and_measure_waits(tmp_path, monkeypatch):
     monkeypatch.setattr(
         hs, "efe_agent", lambda: SimpleNamespace(make=TableAgent, SETTINGS=SETTINGS)
     )
-    with pytest.raises(SystemExit, match="placebo first"):
-        hs.main(["measure", str(tmp_path)])
+    code = {name: f"{name} as it is" for name in hs.CODE}
+    monkeypatch.setattr(hs, "fingerprint", lambda: dict(code))
+    for command in ("choose", "measure"):
+        with pytest.raises(SystemExit, match="placebo first"):
+            hs.main([command, str(tmp_path)])
     hs.main(["placebo", str(tmp_path)])
-    assert json.loads((folder / "placebo.json").read_text())["passed"]
+    placebo = json.loads((folder / "placebo.json").read_text())
+    assert placebo["passed"] and placebo["code"] == code
     with pytest.raises(SystemExit, match="choose"):
         hs.main(["measure", str(tmp_path)])
+    code["agent.py"] = "agent.py changed"  # the agent changed after its placebo
+    with pytest.raises(SystemExit, match="agent.py changed since"):
+        hs.main(["choose", str(tmp_path)])
+    code["agent.py"] = "agent.py as it is"
     hs.main(["choose", str(tmp_path)])
     chosen = json.loads((folder / "choice.json").read_text())
-    assert (
-        chosen["settings"] == {"use_size": True} and (folder / "choice.html").exists()
-    )
+    assert chosen["settings"] == {"use_size": True} and chosen["code"] == code
+    assert (folder / "choice.html").exists()
     hs.main(["measure", str(tmp_path)])
     measured = json.loads((folder / "measure.json").read_text())
-    assert measured["gate"]["passed"] and (folder / "agent.html").exists()
+    assert measured["gate"]["passed"] and measured["code"] == code
+    assert (folder / "agent.html").exists()
+    with pytest.raises(SystemExit, match="only once"):
+        hs.main(["measure", str(tmp_path)])
     with pytest.raises(SystemExit, match="usage"):
         hs.main(["train", str(tmp_path)])
+
+
+def test_each_command_waits_for_the_one_before_on_the_same_code(tmp_path):
+    code = {name: f"{name} as it is" for name in hs.CODE}
+
+    def write(name, record):
+        (tmp_path / name).write_text(json.dumps(record))
+
+    assert "placebo first" in hs.refusal(tmp_path, "choose", code)
+    write("placebo.json", {"passed": False, "code": code})
+    assert "placebo failed" in hs.refusal(tmp_path, "choose", code)
+    write("placebo.json", {"passed": True})  # from before the harness kept the code's
+    assert "which code" in hs.refusal(tmp_path, "choose", code)
+    write("placebo.json", {"passed": True, "code": code | {"gym.py": "older"}})
+    assert "(gym.py changed since); run the placebo again" in hs.refusal(
+        tmp_path, "choose", code
+    )
+    write("placebo.json", {"passed": True, "code": code})
+    assert hs.refusal(tmp_path, "choose", code) is None
+    assert "choose the setting" in hs.refusal(tmp_path, "measure", code)
+    write("choice.json", {"settings": {}, "code": code | {"harness.py": "older"}})
+    assert "(harness.py changed since); choose again" in hs.refusal(
+        tmp_path, "measure", code
+    )
+    write("choice.json", {"settings": {}, "code": code})
+    assert hs.refusal(tmp_path, "measure", code) is None
+    write("measure.json", {})
+    assert "only once" in hs.refusal(tmp_path, "measure", code)
+
+
+def test_the_fingerprint_tells_which_file_changed(tmp_path):
+    for name in hs.CODE:
+        (tmp_path / name).write_text(f"# {name}\n")
+    before = hs.fingerprint(tmp_path)
+    (tmp_path / "skill.py").write_text("# skill.py, one line changed\n")
+    after = hs.fingerprint(tmp_path)
+    assert [name for name in hs.CODE if before[name] != after[name]] == ["skill.py"]
+    real = hs.fingerprint()  # by default, the files beside the harness
+    assert set(real) == {"agent.py", "gym.py", "harness.py", "skill.py"}
+    for name in hs.CODE:
+        assert real[name] == hashlib.sha256((HERE / name).read_bytes()).hexdigest()
 
 
 def test_the_harness_never_reads_past_2021(tmp_path):

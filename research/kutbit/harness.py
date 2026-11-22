@@ -16,6 +16,11 @@ Efe's limits forbid. Then, as decision 0026 orders:
   The agent passes if it beats every bar, its margin over the best one has a t of PASS_T
   clustered by day, and its certainty equivalent after 5 bps is above zero.
 
+Each command's record keeps the fingerprint of the code it ran on: the SHA-256 of agent.py,
+gym.py, harness.py and skill.py. `choose` runs only after a placebo that passed on today's
+code; `measure` runs only after that placebo and a choice made on today's code, and only once.
+A placebo or a choice made on other code proves nothing about this code.
+
 Efe's agent lives in agent.py: `make(settings)` returns an agent and SETTINGS lists the
 settings chosen among. An agent has
 - fit(history): every event before the month, with every action's utility;
@@ -32,6 +37,7 @@ Output in DATA/kutbit/agent/: placebo.json, choice.json and measure.json, and th
 choice.html (2019) and agent.html (2020-2021).
 """
 
+import hashlib
 import html
 import importlib
 import json
@@ -45,6 +51,10 @@ import numpy as np
 from skill import clustered_mean
 
 DATA = Path("data")
+SOURCE = Path(__file__).resolve().parent  # the agent's and the harness's code
+# the agent's code, and the code that feeds, runs and judges it
+CODE = ("agent.py", "gym.py", "harness.py", "skill.py")
+AGAIN = {"placebo": "run the placebo again", "choice": "choose again on 2019"}
 CHOOSE_YEAR = 2019
 MEASURE_YEARS = (2020, 2021)
 PASS_T = 2.0  # the margin over the best bar must reach this t
@@ -569,24 +579,72 @@ def efe_agent():
         ) from missing
 
 
+# --- the order of the commands -------------------------------------------------------------
+
+
+def fingerprint(source: Path = SOURCE) -> dict:
+    """Each file's SHA-256: the agent's code and the code that feeds, runs and judges it."""
+    return {
+        name: hashlib.sha256((source / name).read_bytes()).hexdigest() for name in CODE
+    }
+
+
+def stale(step: str, record: dict, code: dict) -> str | None:
+    """Why a step's record does not hold for today's code, or None."""
+    if "code" not in record:
+        return f"the {step} does not say which code it ran on; {AGAIN[step]}"
+    changed = [name for name in code if record["code"].get(name) != code[name]]
+    if changed:
+        names = ", ".join(changed)
+        return f"the {step} ran on other code ({names} changed since); {AGAIN[step]}"
+    return None
+
+
+def refusal(folder: Path, command: str, code: dict) -> str | None:
+    """Why `command` may not run yet, or None. The choice waits for a placebo that passed on
+    today's code; the measurement waits for that placebo and a choice made on today's code,
+    and runs only once."""
+    placebo_file, choice_file = folder / "placebo.json", folder / "choice.json"
+    if not placebo_file.exists():
+        return "run the placebo first"
+    placebo_record = json.loads(placebo_file.read_text())
+    if not placebo_record["passed"]:
+        return "the placebo failed; nothing runs on real prices until it passes"
+    why = stale("placebo", placebo_record, code)
+    if why or command == "choose":
+        return why
+    if not choice_file.exists():
+        return "choose the setting on 2019 first"
+    why = stale("choice", json.loads(choice_file.read_text()), code)
+    if why:
+        return why
+    if (folder / "measure.json").exists():
+        return "the measurement has run; it runs only once"
+    return None
+
+
 def main(argv: list[str]) -> None:
     if not argv or argv[0] not in ("placebo", "choose", "measure"):
         raise SystemExit("usage: harness.py placebo|choose|measure [DATA]")
     data_dir = Path(argv[1]) if len(argv) > 1 else DATA
     folder = data_dir / "kutbit" / "agent"
     agent = efe_agent()
+    code = fingerprint()  # of the code just loaded
     started = time.time()
     stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
     if argv[0] == "placebo":
         data = gym.load_events(folder / "random", gym.YEARS)
         found = placebo(agent.make, agent.SETTINGS, data)
-        found["run_utc"] = stamp
+        found["run_utc"], found["code"] = stamp, code
         (folder / "placebo.json").write_text(json.dumps(plain(found), indent=1))
         verdict = "passes" if found["passed"] else "FAILS"
         print(
             f"placebo: {verdict}, t {found['agent']['t']:+.2f} ({time.time() - started:.0f} s)"
         )
         return
+    why = refusal(folder, argv[0], code)
+    if why:
+        raise SystemExit(why)
     tickers = json.loads((folder / "real" / "tickers.json").read_text())
     if argv[0] == "choose":
         years = (*gym.LEARN, CHOOSE_YEAR)
@@ -608,16 +666,12 @@ def main(argv: list[str]) -> None:
             bars(data, values, permitted, months),
         )
         (folder / "choice.html").write_text(text)
-        record = {k: v for k, v in found.items() if k != "run"} | {"run_utc": stamp}
+        record = {k: v for k, v in found.items() if k != "run"}
+        record |= {"run_utc": stamp, "code": code}
         (folder / "choice.json").write_text(json.dumps(plain(record), indent=1))
         print(f"choose: setting {found['index'] + 1} kept; {folder / 'choice.html'}")
         return
-    placebo_file, choice_file = folder / "placebo.json", folder / "choice.json"
-    if not placebo_file.exists() or not json.loads(placebo_file.read_text())["passed"]:
-        raise SystemExit("run the placebo first; measure runs only once it passes")
-    if not choice_file.exists():
-        raise SystemExit("choose the setting on 2019 first")
-    setting = json.loads(choice_file.read_text())["settings"]
+    setting = json.loads((folder / "choice.json").read_text())["settings"]
     data = gym.load_events(folder / "real", gym.YEARS)
     found = measure(agent.make, setting, data)
     text = page(
@@ -632,7 +686,8 @@ def main(argv: list[str]) -> None:
         found["gate"],
     )
     (folder / "agent.html").write_text(text)
-    record = {k: found[k] for k in ("settings", "gate", "table")} | {"run_utc": stamp}
+    record = {k: found[k] for k in ("settings", "gate", "table")}
+    record |= {"run_utc": stamp, "code": code}
     (folder / "measure.json").write_text(json.dumps(plain(record), indent=1))
     verdict = "passed" if found["gate"]["passed"] else "failed"
     print(f"measure: the agent {verdict}; {folder / 'agent.html'}")
