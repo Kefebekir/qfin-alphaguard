@@ -6,7 +6,11 @@ minute by minute and measures it (`harness.py`), the bars and the placebo. What 
 one file, `research/kutbit/agent.py`, in six steps. Each step has its tests, and a step is
 done when they pass with only the steps so far typed.
 
-## The idea in four lines
+**Amended on 22 November 2026**, after the first placebo (decision 0026's amendment): the
+trust and each stock's correction count only beyond two of their standard errors. Steps 1, 4
+and 5 carry the change.
+
+## The idea in five lines
 
 1. At an extreme minute the network forecasts, for each hold of 5, 15 and 30 minutes, the
    stock's move apart from QQQ (its mean, the edge, and its spread) and how much QQQ itself
@@ -17,9 +21,14 @@ done when they pass with only the steps so far typed.
    hedge from a QQQ that is expected to swing.
 3. It trusts its own edge only as far as it came true. Each month it learns on the earlier
    four fifths of the events before the month, and on the latest fifth it measures how much
-   of its forecast edge came true: none to all. It acts on its forecast times that trust.
+   of its forecast edge came true, less two standard errors of that measure: none to all. It
+   acts on its forecast times that trust.
 4. Each stock has its own correction of the edge, learned from every outcome as soon as it
-   is known, and pulled toward the shared view until the stock has had enough events.
+   is known, pulled toward the shared view until the stock has had enough events, and cut
+   toward nothing by two of its standard errors.
+5. Neither number counts before it is proved: each must clear two standard errors, the t the
+   gate asks of the agent itself (`PROOF`). On random walks both are nothing, so there the
+   agent lets every move be.
 
 PyTorch is a tool for tensors and derivatives only (decision 0024, section 7). The layers,
 the loss and the learning loop, Adam included, are written here; no `torch.nn`, no
@@ -41,7 +50,9 @@ there.
 
 The settings chosen among on 2019, the constants, every action's columns, and the agent's
 memory. `SETTINGS` are the four candidates: a hidden layer of 32 or 64, and a stock's own
-correction pulled toward the shared view by 20 or 100 events' worth of weight.
+correction pulled toward the shared view by 20 or 100 events' worth of weight. `PROOF` is how
+many standard errors a number must clear before the agent acts on it. The memory keeps, for
+each stock, its count of events, the sum of its misses and the sum of their squares.
 
 ```python
 """Efe's agent for KUTBIT's first variant (decision 0026), design A.
@@ -55,10 +66,12 @@ be.
 - A shared network learns afresh at each month's start, on every event before the month.
 - It trusts its own edge only as far as it proved right: each month it learns on the earlier
   four fifths of the events before the month, and on the latest fifth, which it has not
-  learned from, it measures how far the edge it forecast came true. That share, from none to
-  all, is its trust, and the edge it acts on is the forecast times its trust.
+  learned from, it measures how far the edge it forecast came true, less two of that
+  measure's standard errors. That share, from none to all, is its trust, and the edge it acts
+  on is the forecast times its trust.
 - Each stock has its own correction of the edge, learned from every outcome as soon as it is
-  known and pulled toward the shared network's view by `pull` events' worth of weight.
+  known, pulled toward the shared network's view by `pull` events' worth of weight and cut
+  toward nothing by two of its standard errors.
 
 PyTorch is a tool for tensors and derivatives only: the layers, the loss and the learning loop
 are written here.
@@ -80,6 +93,7 @@ PERCENT = 100.0  # moves are learned in percent, so the numbers stay near one
 BATCH = 256  # events in each step of learning
 CHECK = 0.2  # the latest share of the events before the month, kept for the trust
 STOCKS = 1000  # room for every stock's correction
+PROOF = 2.0  # standard errors a number must clear before it is acted on: the gate's t
 
 # every action's side, size, hedge and hold, as columns the decision can use at once
 SIDE = torch.tensor([a.side for a in gym.ACTIONS])
@@ -99,6 +113,7 @@ class Agent:
         self.weights = None
         self.trust = torch.zeros(len(gym.HOLDS))
         self.sums = np.zeros((STOCKS, len(gym.HOLDS)))
+        self.squares = np.zeros((STOCKS, len(gym.HOLDS)))
         self.counts = np.zeros(STOCKS)
 ```
 
@@ -174,9 +189,13 @@ Check: `-k step3`. One test compares the loss with PyTorch's own Student t, used
 
 Each outcome, as soon as it is known, tells the agent how far that stock's move apart from
 QQQ was from the shared edge it would have acted on: the network's edge times its trust. That
-miss is added to the stock's sum, and the stock's correction is its sum over its count plus
-`pull`: with few events it is nearly nothing, with many it is the stock's own mean miss. The
-network and the trust come from the learning of step 5; this step's tests set them by hand.
+miss is added to the stock's sum, and its square to the stock's sum of squares. The stock's
+correction is its sum over its count plus `pull`: with few events it is nearly nothing, with
+many it is the stock's own mean miss. Then it is cut toward nothing by `PROOF` of its
+standard errors, the root of its sum of squares over the same count plus `pull`, so that a
+stock's luck is not taken for its nature: a correction of 0.25% with an error of 0.05% acts
+as 0.15%, and one of 0.08% with the same error as nothing. The network and the trust come
+from the learning of step 5; this step's tests set them by hand.
 
 <!-- fmt: off -->
 ```python
@@ -184,7 +203,7 @@ network and the trust come from the learning of step 5; this step's tests set th
 
     def update(self, known: dict) -> None:
         """Each outcome as soon as it is known: how far the stock's move apart from QQQ was
-        from the shared network's edge, added to that stock's count."""
+        from the shared network's edge, added to that stock's count, with its square."""
         if self.weights is None or not len(known["state"]):
             return
         with torch.no_grad():
@@ -192,14 +211,19 @@ network and the trust come from the learning of step 5; this step's tests set th
         apart, _ = self.targets(known)
         miss = (apart - edge).numpy()
         np.add.at(self.sums, known["ticker"].astype(int), miss)
+        np.add.at(self.squares, known["ticker"].astype(int), miss * miss)
         np.add.at(self.counts, known["ticker"].astype(int), 1)
 
     def correction(self, tickers: np.ndarray) -> torch.Tensor:
         """Each stock's own edge beside the shared one: its mean miss, pulled toward nothing
-        by `pull` events' worth of weight."""
+        by `pull` events' worth of weight and cut toward nothing by PROOF of its standard
+        errors, so that a stock's luck is not taken for its nature."""
         t = tickers.astype(int)
-        found = self.sums[t] / (self.counts[t] + self.pull)[:, None]
-        return torch.as_tensor(found, dtype=torch.float32)
+        weight = (self.counts[t] + self.pull)[:, None]
+        found = self.sums[t] / weight
+        error = np.sqrt(self.squares[t]) / weight
+        cut = np.sign(found) * np.maximum(np.abs(found) - PROOF * error, 0.0)
+        return torch.as_tensor(cut, dtype=torch.float32)
 ```
 <!-- fmt: on -->
 
@@ -215,7 +239,9 @@ At each month's start, `fit`:
    Adam written out: each weight moves by its gradient's running mean over the root of its
    running square, both corrected for starting at zero;
 4. measures its trust on the fifth it kept aside: the slope of what followed on what it
-   forecast, kept between none and all;
+   forecast, less `PROOF` of its standard errors, kept between none and all. The error counts
+   a day's events together, as the gate does: on one day many stocks move with the same
+   market and the same news, so they are not as many separate proofs;
 5. counts every stock's correction again from all the events before the month, with step 4's
    `update`.
 
@@ -230,7 +256,7 @@ The events come in time order, so the fifth kept aside is the latest.
         """At the month's start: the shared network learns afresh on the earlier events before
         the month, its trust is measured on the latest ones, and every stock's correction is
         counted again from its events."""
-        self.sums[:], self.counts[:] = 0, 0
+        self.sums[:], self.squares[:], self.counts[:] = 0, 0, 0
         n = len(history["state"])
         split = int(n * (1 - CHECK))
         if split < BATCH or n - split < BATCH:
@@ -276,12 +302,18 @@ The events come in time order, so the fifth kept aside is the latest.
 
     def measure_trust(self, later: dict) -> torch.Tensor:
         """For each hold, how far the forecast edge came true on events not learned from:
-        the slope of what followed on what was forecast, from none to all."""
+        the slope of what followed on what was forecast, less PROOF of its standard errors,
+        from none to all. A day's events count together in the error, as in the gate."""
         with torch.no_grad():
             edge = self.network(self.inputs(later["state"]))[..., 0]
         apart, _ = self.targets(later)
-        slope = (edge * apart).sum(0) / (edge * edge).sum(0).clamp_min(1e-12)
-        return slope.clamp(0.0, 1.0)
+        squared = (edge * edge).sum(0).clamp_min(1e-12)
+        slope = (edge * apart).sum(0) / squared
+        _, day = np.unique(later["day"], return_inverse=True)
+        each = torch.zeros(day.max() + 1, len(gym.HOLDS))
+        each.index_add_(0, torch.as_tensor(day), edge * (apart - slope * edge))
+        error = (each * each).sum(0).sqrt() / squared
+        return (slope - PROOF * error).clamp(0.0, 1.0)
 ```
 <!-- fmt: on -->
 
@@ -349,10 +381,12 @@ PYTHONPATH=src OMP_NUM_THREADS=8 data/llmenv/bin/python research/kutbit/harness.
 PYTHONPATH=src OMP_NUM_THREADS=8 data/llmenv/bin/python research/kutbit/harness.py measure
 ```
 
-A month's learning takes 4 to 10 seconds, so the placebo and the choice take about 5 to 10
-minutes each, and the measurement, which also trains the agent on dealt outcomes, about as
-long. `measure` refuses until the placebo has passed and the setting is chosen. Read
-`data/kutbit/agent/choice.html` before the measurement, and `agent.html` after it.
+The gym's build is done once; after the amendment, the placebo runs again. It took about 30
+minutes on Efe's laptop: its random walks have 150,517 events, nearly five times the real
+31,586, and a month's learning on them takes 20 to 35 seconds. The choice and the measurement
+run on the real events, so their months learn faster; the measurement also trains the agent
+on dealt outcomes. `measure` refuses until the placebo has passed and the setting is chosen.
+Read `data/kutbit/agent/choice.html` before the measurement, and `agent.html` after it.
 
 ## What to look at on the pages
 

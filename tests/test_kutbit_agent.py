@@ -92,6 +92,8 @@ def test_step1_the_settings_and_make():
         assert set(setting) == {"hidden", "pull", "epochs", "rate", "seed"}
     a = agent.make(agent.SETTINGS[0])
     assert a.weights is None and a.counts.sum() == 0 and (a.trust == 0).all()
+    assert a.squares.shape == a.sums.shape and a.squares.sum() == 0
+    assert agent.PROOF == hs.PASS_T  # it asks of its numbers the t the gate asks of it
     assert (
         agent.SIZE.shape == agent.SIDE.shape == agent.HOLD.shape == (len(gym.ACTIONS),)
     )
@@ -194,14 +196,27 @@ def test_step4_each_outcome_adds_its_miss_to_its_stock():
     with torch.no_grad():
         edge = a.trust * a.network(a.inputs(known["state"]))[..., 0]
     apart = (known["own"] - known["beta"][:, None] * known["qqq"]) * 100
+    miss = apart - edge.numpy()
+    np.testing.assert_allclose(a.sums[3], miss.sum(0), rtol=1e-4, atol=1e-6)
+    np.testing.assert_allclose(a.squares[3], (miss * miss).sum(0), rtol=1e-4, atol=1e-6)
+    found = a.sums[3] / (7 + a.pull)
+    error = np.sqrt(a.squares[3]) / (7 + a.pull)
+    expected = np.sign(found) * np.maximum(np.abs(found) - 2 * error, 0.0)
     np.testing.assert_allclose(
-        a.sums[3], (apart - edge.numpy()).sum(0), rtol=1e-4, atol=1e-6
-    )
-    expected = a.sums[3] / (7 + a.pull)
-    np.testing.assert_allclose(
-        a.correction(np.array([3]))[0].numpy(), expected, rtol=1e-5
+        a.correction(np.array([3]))[0].numpy(), expected, rtol=1e-5, atol=1e-7
     )
     assert (a.correction(np.array([5])) == 0).all()  # a stock without events: nothing
+
+
+def test_step4_a_stock_s_correction_counts_only_beyond_two_of_its_errors():
+    a = agent.make({**agent.SETTINGS[0], "pull": 100})
+    a.counts[2] = 100
+    a.sums[2] = [50.0, -50.0, 1.0]
+    a.squares[2] = [100.0, 100.0, 100.0]
+    # pulled means of 0.25, -0.25 and 0.005, each with an error of sqrt(100) / 200 = 0.05
+    found = a.correction(np.array([2, 4])).numpy()
+    np.testing.assert_allclose(found[0], [0.15, -0.15, 0.0], atol=1e-6)
+    assert (found[1] == 0).all()  # a stock without events: nothing
 
 
 def test_step4_nothing_is_counted_before_the_network_has_learned():
@@ -220,7 +235,7 @@ def test_step5_it_trusts_an_edge_that_came_true_and_not_noise():
     loud = fitted(synthetic())
     assert (loud.trust > 0.5).all()
     quiet = fitted(synthetic(seed=2, edge=0.0, odd=False))
-    assert (quiet.trust < 0.5).all() and quiet.trust.mean() < 0.3
+    assert (quiet.trust == 0).all()  # the slope alone gave it 0.10 to 0.17 here
 
 
 def test_step5_the_trust_is_the_slope_kept_between_none_and_all():
@@ -234,9 +249,37 @@ def test_step5_the_trust_is_the_slope_kept_between_none_and_all():
             "own": (slope * edge / 100).double().numpy(),
             "qqq": np.zeros_like(data["qqq"]),
             "beta": data["beta"],
-        }
+            "day": data["day"],
+        }  # what followed is the forecast to the letter: no luck, so no error to cut
         found = a.measure_trust(later).numpy()
         np.testing.assert_allclose(found, trust, atol=1e-4)
+
+
+def test_step5_the_trust_is_cut_by_two_errors_with_a_day_s_events_counted_together():
+    data = synthetic()
+    a = fitted(data, epochs=5)
+    with torch.no_grad():
+        edge = a.network(a.inputs(data["state"]))[..., 0].double()
+    _, day = np.unique(data["day"], return_inverse=True)
+    rng = np.random.default_rng(4)
+    luck = torch.as_tensor(rng.normal(0, 1, (day.max() + 1, 3)))[day]  # one draw a day
+    apart = 0.8 * edge + 2 * luck * edge.abs().mean(0) * torch.sign(edge)
+    later = {
+        "state": data["state"],
+        "own": (apart / 100).numpy(),
+        "qqq": np.zeros_like(data["qqq"]),
+        "beta": data["beta"],
+        "day": data["day"],
+    }
+    found = a.measure_trust(later).numpy()
+    squared = (edge * edge).sum(0)
+    slope = (edge * apart).sum(0) / squared
+    each = np.zeros((day.max() + 1, 3))
+    np.add.at(each, day, (edge * (apart - slope * edge)).numpy())
+    error = np.sqrt((each**2).sum(0)) / squared.numpy()
+    np.testing.assert_allclose(found, slope.numpy() - 2 * error, atol=1e-4)
+    # counted event by event, the error would be under half as large
+    assert (found > 0).all() and (found < slope.numpy() - 0.1).all()
 
 
 def test_step5_it_tells_a_jumpy_qqq_from_a_calm_one():
@@ -265,9 +308,11 @@ def test_step5_the_same_seed_learns_the_same():
 def test_step5_fit_counts_every_stock_again_from_its_events():
     data = synthetic()
     a = fitted(data, epochs=5)
+    squares = a.squares.copy()
     a.fit(history(data))  # a second month's fit counts afresh, not on top
     assert a.counts[:10].sum() == len(data["day"])
     assert (a.counts[:10] == np.bincount(data["ticker"], minlength=10)).all()
+    np.testing.assert_allclose(a.squares, squares)  # the same seed's misses, once
 
 
 # --- step 6: deciding ----------------------------------------------------------------------
@@ -329,7 +374,7 @@ def test_the_agent_finds_a_planted_edge_and_waits_on_noise():
     assert found["gate"]["passed"]
     noise = synthetic(seed=2, edge=0.0, odd=False)
     quiet = hs.placebo(agent.make, agent.SETTINGS[:2], noise, log=lambda s: None)
-    assert quiet["passed"] and quiet["trades"] < 50
+    assert quiet["passed"] and quiet["trades"] == 0  # the slope alone made 9 here
 
 
 def test_the_agent_hedges_where_qqq_swings_and_learns_each_stock():

@@ -98,8 +98,12 @@ week alongside university.
     `harness.py`). Efe chose design A on 20 November: the network forecasts the edge and
     the spreads, every action is valued as Kelly would, and the agent trusts its edge only
     as far as it came true. Efe wrote it from `research/kutbit/AGENT_GUIDE.md` on 20
-    November (`research/kutbit/agent.py`). Next, his runs: the gym's build, the placebo,
-    the choice on 2019 and the measurement on 2020-2021.
+    November (`research/kutbit/agent.py`) and ran the gym's build and the placebo. The
+    placebo passed, since the agent did not beat doing nothing on random walks, but it
+    traded on noise, 658 times. Decision 0026's amendment of 22 November makes its trust and
+    each stock's correction count only beyond two standard errors; on the random walks they
+    are then nothing. Next: Efe types the change, runs the placebo again, then the choice on
+    2019 and the measurement on 2020-2021.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
