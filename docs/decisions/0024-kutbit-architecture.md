@@ -149,8 +149,9 @@ month). Nothing is bought before then; at that point the price and Efe's balance
 - Done: the inputs, the labels and the data set (#106), inputs v2 (#107), the target (#108).
 - Next, in order: the skill test; the bank of real paths; the simulator, whose broker, margin
   and stop rules Efe writes; the decision rule, Efe's; Efe's network.
-- Still to check: each instrument's cost, and the paper account's margin once Efe opens the
-  second one.
+- Still to check: each instrument's cost, measured from the consolidated tape's quotes by
+  `research/kutbit/costs.py`, whose rules its docstring gives; and the paper account's margin
+  once Efe opens the second one.
 - Real money stays outside this decision, as in 0023.
 
 ## Amendment of 17 November 2026: the daily correlation
