@@ -12,7 +12,7 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | What happened after each minute: the return 1, 5, 15, 30 and 60 minutes on, and the best and worst moments along the way | `labels.py` | done |
 | What the forecaster learns: that return with QQQ's part taken out, in the usual moves of the minutes held | `labels.py` (`targets`), `target_report.py`, `results_target.txt` | done |
 | The data set: every instrument's sessions of 2016-2026, minute by minute, with what was known before each | `dataset.py` → `data/kutbit/`, `results_dataset.txt` | done |
-| The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | ready; Efe runs it |
+| The skill test: how much of the target a linear model of the same inputs forecasts; the ruler Efe's network must beat | `skill.py` → `data/kutbit/skill/skill.html` | run on 22 November: the placebo passed; on 2020-2021 a small real forecast at every horizon, above both known patterns; its strongest 1% are 0.11 bps short of 2 bps a round trip (0024's result) |
 | The hedge study: how much of a book's market part to hedge with QQQ, under a gross cap | `hedge_study.py`, `results_hedge.txt` | done |
 | What follows an extreme minute, on 2016-2018: the ground for Efe's first agent | `events.py`, `results_events.txt` | done |
 | The event gym: every extreme minute's 16 numbers, the outcome of all 91 actions, the bars, the placebo's random walks and the shuffled outcomes | `gym.py`, `results_gym.txt` | done |

@@ -2,7 +2,8 @@
 
 - **Status:** accepted; the skill test's daily correlation amended on 17 November 2026, after
   its placebo's first run and before any real run (see the amendment at the end); sections 1
-  and 5 changed by decision 0025, which makes the hedge a decision
+  and 5 changed by decision 0025, which makes the hedge a decision; the skill test run on 22
+  November 2026 (see its result at the end)
 - **Date:** 2026-11-17 (agreed with Efe on 16 November)
 - **Builds on:** decision 0023, which it changes where this record says so. Everything else in
   0023 stands: KUTBIT is separate from the QQQ rule, has its own Guard file and accounts, trades
@@ -177,3 +178,43 @@ month). Nothing is bought before then; at that point the price and Efe's balance
   it cannot have been chosen to suit a result. On the real prices the old measure would have
   tilted every forecast built on the same day's past: toward a reversal, against momentum.
   Efe runs the placebo again; the real run still waits for it.
+
+## Result of 22 November 2026: a real forecast, too small to pay 2 bps on all instruments
+
+Efe ran both on 22 November.
+
+- **The placebo passed** on its second run. None of its 180 t values reached 3; the largest
+  was +2.59 (`habit`, 1 minute, ETFs, each day's correlation). The reversal's daily t, +5.8 to
+  +8.7 before the amendment, was +0.9 to +2.2.
+- **The real run** took 7 minutes. It fitted on 24,458,227 rows of 2016-2019 and was measured
+  once on 12,627,628 rows of 2020-2021. The penalty kept was 0.1 at every horizon but 30
+  minutes, where it was 0.01. On all instruments:
+
+  | | 1 min | 5 min | 15 min | 30 min | 60 min |
+  | --- | --- | --- | --- | --- | --- |
+  | Ridge, each day's correlation (t) | +0.006 (7.7) | +0.009 (6.6) | +0.012 (5.5) | +0.014 (4.7) | +0.016 (3.6) |
+  | Ridge, within each minute across instruments (t) | +0.010 (17.1) | +0.013 (13.1) | +0.013 (9.0) | +0.013 (6.6) | +0.012 (4.3) |
+  | `habit`, each day's correlation (t) | +0.002 (2.7) | +0.003 (2.1) | +0.004 (1.9) | +0.005 (1.6) | +0.001 (0.3) |
+  | The last 30 minutes reversed, each day's correlation (t) | +0.003 (3.9) | +0.007 (4.0) | +0.009 (3.2) | +0.008 (2.3) | +0.008 (2.2) |
+  | Ridge's strongest 1%, bps a signal before costs (t) | +0.34 (5.4) | +1.21 (3.8) | +1.89 (2.4) | +1.89 (1.5) | +1.89 (1.1) |
+  | The same after 2 bps | −1.66 | −0.79 | −0.11 | −0.11 | −0.11 |
+
+- **What it shows.**
+  - The inputs hold a forecast. The ridge's correlation is above zero at every horizon, at a
+    t of 3.6 to 17.1, and above both known patterns at every horizon in both correlations:
+    the ladder's second rung beats its first.
+  - The forecast is small, a correlation of about 0.01, and out of sample it was about twice
+    too large: the slope of `z` on it was 0.36 to 0.55.
+  - The strongest 1% of its forecasts, about 360 signals a day, earn 1.89 bps a signal before
+    costs at 15, 30 and 60 minutes, 0.11 bps short of 2 bps a round trip. They pay it only in
+    parts: the stocks at 15 minutes (+0.02 after costs, on 285 signals a day), and the ETFs at
+    30 and 60 minutes (+0.14 and +1.28, on about 70 signals a day, at a t of only 1.6 and 1.7
+    before costs). The strongest 10% fall 1.5-1.9 bps short at every horizon.
+  - A signal is one minute's forecast, and one trade may span several. The 2 bps leave out the
+    hedge's own cost. At the 5 bps that the first agent's gym charges at an extreme minute,
+    none of these pays.
+- **What it decides** (section 9). On all instruments the strongest 1% come near the cost
+  without paying it; they pay it only in the parts above. Whether a forecast this size can pay
+  depends on each instrument's real cost, which is still to check. Efe decides whether the
+  network is worth building. If it is built, it must beat the ridge's correlation on the same
+  years.
