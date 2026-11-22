@@ -2,7 +2,8 @@
 
 - **Status:** accepted; the agent's trust and each stock's correction amended on 22 November
   2026, after the placebo's first run and before the choice and the measurement (see the
-  amendment at the end)
+  amendment at the end); measured once on 22 November 2026 and failed (see the result at the
+  end)
 - **Date:** 2026-11-19 (agreed with Efe on 18 and 19 November)
 - **Builds on:** decision 0023 (variants, placebos, the card), 0024 (the ladder; development
   retrained monthly) and 0025 (the hedge is a decision; KUTBIT never bets on the market).
@@ -199,3 +200,53 @@ reinforcement learning. It is built only if this stage passes.
   before). All 10 bugs planted in the two cuts were caught.
 - **Next.** The change goes into `agent.py` as the guide's steps 1, 4 and 5 show; then Efe
   runs the placebo again, the choice on 2019 and the measurement.
+
+## Result of 22 November 2026: failed
+
+Efe ran all three on 22 November, on the amended agent; each record keeps the same code's
+fingerprint. Certainty equivalents are in bps of the account an event, at γ 2; an event the
+agent lets be counts as zero.
+
+- **The placebo passed with no trade.** On the 52,247 random-walk events of 2020-2021 the
+  agent made no trade, so its mean utility is nothing and its t is undefined, since every
+  event's utility is zero. The first run made 658 trades there.
+- **On 2019 the setting kept made no trade.** The four settings' mean utility an event was
+  −0.037, −0.007, −0.007 and 0 bps; the fourth, a hidden layer of 64 and a pull of 100, is
+  kept. No bar made money after 5 bps on 2019's 4,127 events: betting against every event
+  −4.27, against events without a headline −4.06, against those at the open −0.07 (+0.23
+  after 2 bps), the best simple policy −0.39.
+- **Measured once on 2020-2021, it failed.** On 11,116 events:
+
+  | | After 2 bps | After 5 bps | After 10 bps | Trades |
+  | --- | --- | --- | --- | --- |
+  | The agent | +0.58 | +0.14 | −0.60 | 665 |
+  | Doing nothing | 0 | 0 | 0 | 0 |
+  | Against every event | −0.68 | −3.68 | −8.68 | 11,116 |
+  | Against, no headline | −0.61 | −3.42 | −8.11 | 10,422 |
+  | Against, no headline, at the open | +0.74 | +0.46 | −0.02 | 1,063 |
+  | The best simple policy | +0.77 | +0.20 | −0.77 | 1,022 |
+  | Itself on dealt outcomes | +0.10 | +0.09 | +0.07 | 63 |
+
+  It beat doing nothing, betting against every event or every event without a headline, and
+  itself on dealt outcomes, and its certainty equivalent after 5 bps is above zero. It did
+  not beat betting against events without a headline at the open, nor the best simple
+  policy: its margin over the open bar is −0.32 bps an event, with a t of −0.40 where 2 was
+  asked. As section 8 says, it is written down as failed and not used.
+- **What its page showed, for the next variant to start from.**
+  - It bet against the move in 85-100% of its trades in every kind of event, held almost
+    always for 30 minutes, and hedged none, half or all of the market part in about 40%, 20%
+    and 40% of its trades, about the same whether QQQ had moved or not.
+  - It bet least where the edge was. Of the 1,063 events at the open without a headline,
+    where the best bar made its gain at 1x, it traded about 90, at a mean size of 1.05x and
+    1.52x in the two kinds. About 85% of its trades came later in the day, at a mean size of
+    2.6-3.3x, where betting against every event lost.
+  - Its forecast did not sort its trades. The tenth it rated highest (+25.8 bps of utility a
+    trade) lost 9.8; the sixth to ninth earned more than it forecast. A tenth is about 66
+    trades, and one of its largest trades moves a tenth's mean by more than 20 bps.
+  - A few trades swung the two years. Its four best and four worst were all in March 2020, at
+    2-4x for 30 minutes, between +17.0% and −16.2% of the account each. The gym charges 5 bps
+    in those weeks as in any other; what a trade really cost then is not measured.
+  - Where it chose otherwise than the best simple policy, on 1,615 events, it did neither
+    better nor worse: −0.40 bps an event, t −0.05.
+- **Next.** The next variant starts from this page; decision 0023 allows nine more. The skill
+  test of decision 0024 has yet to run: its placebo again, after its fix, then the real run.
