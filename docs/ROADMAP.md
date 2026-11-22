@@ -102,8 +102,13 @@ week alongside university.
     placebo passed, since the agent did not beat doing nothing on random walks, but it
     traded on noise, 658 times. Decision 0026's amendment of 22 November makes its trust and
     each stock's correction count only beyond two standard errors; on the random walks they
-    are then nothing. The change is in `agent.py`. Next: Efe runs the placebo again, then the
-    choice on 2019 and the measurement on 2020-2021.
+    are then nothing. The change is in `agent.py`. On it the placebo passed with no trade,
+    and on 2019 the setting kept made no trade, a year when no bar made money after 5 bps.
+    Measured once on 2020-2021, on 22 November, it failed: 665 trades and a certainty
+    equivalent of +0.14 bps an event after 5 bps, above doing nothing but below betting
+    against events without a headline at the open (+0.46), with a t of −0.40 over it. It
+    bet least where that edge was and most later in the day; its best and worst trades, at
+    up to 4x, were all in March 2020 (0026's result). The next variant starts from its page.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
