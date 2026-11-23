@@ -4,7 +4,7 @@
   its placebo's first run and before any real run (see the amendment at the end); sections 1
   and 5 changed by decision 0025, which makes the hedge a decision; the skill test run on 22
   November 2026 and each instrument's cost measured on 23 November (see their results at the
-  end)
+  end); the order of its next steps changed by decision 0027, which puts Efe's network first
 - **Date:** 2026-11-17 (agreed with Efe on 16 November)
 - **Builds on:** decision 0023, which it changes where this record says so. Everything else in
   0023 stands: KUTBIT is separate from the QQQ rule, has its own Guard file and accounts, trades
@@ -149,7 +149,9 @@ month). Nothing is bought before then; at that point the price and Efe's balance
 
 - Done: the inputs, the labels and the data set (#106), inputs v2 (#107), the target (#108).
 - Next, in order: the skill test; the bank of real paths; the simulator, whose broker, margin
-  and stop rules Efe writes; the decision rule, Efe's; Efe's network.
+  and stop rules Efe writes; the decision rule, Efe's; Efe's network. Changed by decision
+  0027: Efe's network comes first, and the bank, the simulator and the decision rule only
+  once a forecast of it pays its own costs.
 - Measured: each instrument's cost, from the consolidated tape's quotes by
   `research/kutbit/costs.py`, whose rules its docstring gives (see the result at the end).
 - Still to check: the paper account's margin once Efe opens the second one.
