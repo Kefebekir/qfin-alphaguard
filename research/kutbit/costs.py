@@ -16,8 +16,10 @@ the NBBO of Alpaca's SIP feed, which is free back to 2016. Only 2016-2021 are re
   kind, drawn with SEED. For each, the spread where it enters, at the next minute's open, and
   where a HOLD-minute hold leaves, or a minute before the close if that comes first.
 - `page`: the costs by instrument, by part of the day and by year; at the extreme minutes,
-  against the gym's 5 bps; and how often an order of each size in ORDERS fits within the size
-  shown at the best price, on both sides.
+  each kind weighed by its number of events in the gym, against the gym's 5 bps, and when only
+  those whose spread at entry is at most each of NARROW are kept; and how often an order of
+  each size in ORDERS fits within the size shown at the best price, on both sides, by part of
+  the day and at the extreme minutes' entries.
 - `trial`: the first month's sessions and TRIAL_EVENTS events, to see the speed and the page.
 
 A quote counts when its bid is above zero and below its ask. Locked and crossed quotes are
@@ -82,6 +84,10 @@ PARTS = (
     ("the last 30 minutes", 360, 390),
 )
 GYM_BPS = round(gym.COST * 1e4, 6)  # the first agent's gym: a stock's round trip
+OPEN_KINDS = frozenset(
+    k for k, name in enumerate(gym.KINDS) if name.startswith("at the open")
+)
+NARROW = (2, 3, 5, 10)  # bps: the widest spread at entry an order would go out at
 # the skill test's strongest 1% at 15-60 minutes, before costs (0024's result)
 EDGE_BPS = 1.89
 URL = "https://data.alpaca.markets/v2/stocks/quotes"
@@ -339,6 +345,13 @@ def drawn_events(
     )
 
 
+def kinds_in_gym(data: Path) -> dict[int, int]:
+    """How many of the first agent's extreme minutes of each kind the gym holds over YEARS.
+    At most PER_KIND of a kind are measured, so the kinds are weighed by these."""
+    kinds = gym.load_events(data / "kutbit" / "agent" / "real", YEARS)["kind"]
+    return {int(k): int(n) for k, n in zip(*np.unique(kinds, return_counts=True))}
+
+
 def entry_and_exit(session: Session, minute: int) -> tuple[datetime, datetime]:
     """Where the first agent enters at an extreme minute, at the next minute's open, and where
     a HOLD-minute hold leaves: at its last minute's close, or a minute before the session's
@@ -479,9 +492,45 @@ def valid_moments(moments: pl.DataFrame, etfs: set[str]) -> pl.DataFrame:
     )
 
 
-def summary(moments: pl.DataFrame, events: pl.DataFrame, etfs: set[str]) -> dict:
-    """The costs by instrument, by part of the day, by year and at the extreme minutes; the
-    orders that fit; and the checks."""
+def weighted_mean(frame: pl.DataFrame, column: str) -> float | None:
+    """The mean of `column`, each row weighing its `weight`, nulls left out."""
+    kept = frame.filter(pl.col(column).is_not_null())
+    total = kept["weight"].sum()
+    return float((kept[column] * kept["weight"]).sum() / total) if total else None
+
+
+def weighted_median(frame: pl.DataFrame, column: str) -> float | None:
+    """The smallest value of `column` with at least half the weight at or below it."""
+    kept = frame.filter(pl.col(column).is_not_null()).sort(column)
+    if kept.is_empty():
+        return None
+    reached = kept["weight"].cum_sum() >= kept["weight"].sum() / 2
+    return float(kept[column].filter(reached)[0])
+
+
+def weighed(trips: pl.DataFrame) -> dict:
+    """The round trips of `trips`, each event weighing its kind's events in the gym over the
+    events of that kind measured."""
+    above = trips.with_columns(
+        (pl.col("trip") > GYM_BPS).cast(pl.Float64).alias("above")
+    )
+    return {
+        "events": trips.height,
+        "in the gym": float(trips["weight"].sum()),
+        "enter": weighted_mean(trips, "enter_spread"),
+        "leave": weighted_mean(trips, "leave_spread"),
+        "mean": weighted_mean(trips, "trip"),
+        "median": weighted_median(trips, "trip"),
+        "above": weighted_mean(above, "above"),
+        "usual": weighted_mean(trips, "usual"),
+    }
+
+
+def summary(
+    moments: pl.DataFrame, events: pl.DataFrame, etfs: set[str], in_gym: dict[int, int]
+) -> dict:
+    """The costs by instrument, by part of the day, by year and at the extreme minutes, whose
+    kinds weigh as many as `in_gym` holds of each; the orders that fit; and the checks."""
     rows = valid_moments(moments, etfs)
     by_instrument = (
         rows.group_by("ticker")
@@ -519,27 +568,70 @@ def summary(moments: pl.DataFrame, events: pl.DataFrame, etfs: set[str]) -> dict
         )
         .sort("etf", "year")
     )
-    fits = rows.group_by("etf").agg(
-        *[(pl.col("shown") >= order).mean().alias(f"fits {order}") for order in ORDERS]
-    )
+    fit = [(pl.col("shown") >= order).mean().alias(f"fits {order}") for order in ORDERS]
+    fits = rows.group_by("etf").agg(*fit)
+    fits_by_part = rows.group_by("etf", "part").agg(*fit)
     trips = events.filter(
         pl.col("enter_spread").is_not_null() & pl.col("leave_spread").is_not_null()
     ).with_columns(
-        ((pl.col("enter_spread") + pl.col("leave_spread")) / 2).alias("trip")
+        ((pl.col("enter_spread") + pl.col("leave_spread")) / 2).alias("trip"),
+        pl.min_horizontal(
+            pl.col("enter_bid_size") * LOT * pl.col("enter_bid"),
+            pl.col("enter_ask_size") * LOT * pl.col("enter_ask"),
+        ).alias("shown"),
     )
     usual = by_instrument.select("ticker", pl.col("mean").alias("usual"))
     trips = trips.join(usual, on="ticker", how="left")
+    measured = dict(trips.group_by("kind").len().iter_rows())
+    if missing := sorted(set(measured) - set(in_gym)):
+        raise ValueError(f"the gym holds no events of kinds {missing}")
+    trips = trips.with_columns(
+        pl.col("kind")
+        .replace_strict(
+            {k: in_gym[k] / n for k, n in measured.items()}, return_dtype=pl.Float64
+        )
+        .alias("weight")
+    )
     by_kind = (
         trips.group_by("kind")
         .agg(
             pl.len().alias("events"),
+            pl.col("enter_spread").mean().alias("enter"),
+            pl.col("leave_spread").mean().alias("leave"),
             pl.col("trip").mean().alias("mean"),
             pl.col("trip").median().alias("median"),
             (pl.col("trip") > GYM_BPS).mean().alias("above"),
             pl.col("usual").mean().alias("usual"),
         )
+        .with_columns(
+            pl.col("kind")
+            .replace_strict(in_gym, return_dtype=pl.Int64)
+            .alias("in the gym")
+        )
         .sort("kind")
     )
+    at_open = pl.col("kind").is_in(
+        pl.Series(sorted(OPEN_KINDS), dtype=pl.Int64).implode()
+    )
+    by_time = {
+        "at the open": weighed(trips.filter(at_open)),
+        "later in the day": weighed(trips.filter(~at_open)),
+        "every kind": weighed(trips),
+    }
+    narrow = []
+    for most in NARROW if trips.height else ():
+        kept = trips.filter(pl.col("enter_spread") <= most)
+        share_kept = kept["weight"].sum() / trips["weight"].sum()
+        narrow.append({"at most": most, "kept": share_kept} | weighed(kept))
+    fits_at_entry = {
+        order: weighted_mean(
+            trips.with_columns(
+                (pl.col("shown") >= order).cast(pl.Float64).alias("fits")
+            ),
+            "fits",
+        )
+        for order in ORDERS
+    }
     priced = rows.filter(pl.col("mid") >= 1)
     sizes = pl.concat([rows["bid_size"], rows["ask_size"]])
     return {
@@ -549,8 +641,12 @@ def summary(moments: pl.DataFrame, events: pl.DataFrame, etfs: set[str]) -> dict
         "by_part": by_part,
         "by_year": by_year,
         "fits": fits,
+        "fits_by_part": fits_by_part,
+        "fits_at_entry": fits_at_entry,
         "events": trips,
         "by_kind": by_kind,
+        "by_time": by_time,
+        "narrow": narrow,
         "checks": {
             "with a valid quote": rows.height / max(moments.height, 1),
             "found only in the wider window": float(
@@ -636,6 +732,15 @@ def page(found: dict, title: str) -> str:
             f"{EDGE_BPS:g} bps, {under[SKILL_BPS]} less than {SKILL_BPS:g} bps and "
             f"{under[GYM_BPS]} less than {GYM_BPS:g} bps.</p>"
         )
+    if found["events"].height:
+        times = found["by_time"]
+        sections.append(
+            "<p class=verdict>At the first agent's extreme minutes, each kind weighed by its "
+            f"events in the gym, a round trip costs {bps(times['every kind']['mean'])} bps "
+            f"on average: {bps(times['at the open']['mean'])} at the open and "
+            f"{bps(times['later in the day']['mean'])} later in the day, against the "
+            f"gym's {GYM_BPS:g} bps.</p>"
+        )
     head = ["instrument", "price", "mean", "median", *(name for name, _, _ in PARTS)]
     head += [*(f"{order:,} USD fits" for order in ORDERS), "moments"]
     rows = [
@@ -678,39 +783,74 @@ def page(found: dict, title: str) -> str:
         for r in found["by_year"].iter_rows(named=True)
     ]
     sections += ["<h2>By year</h2>", table_html(["", "mean", "median"], rows)]
+
+    def trip_row(name: str, r: dict) -> list[str]:
+        return [name, f"{round(r['in the gym']):,}", f"{r['events']:,}", bps(r["enter"]),
+                bps(r["leave"]), bps(r["mean"]), bps(r["median"]), share(r["above"]),
+                bps(r["usual"])]  # fmt: skip
+
     rows = [
-        [gym.KINDS[r["kind"]], f"{r['events']:,}", bps(r["mean"]), bps(r["median"]),
-         share(r["above"]), bps(r["usual"])]
+        trip_row(gym.KINDS[r["kind"]], r)
         for r in found["by_kind"].iter_rows(named=True)
-    ]  # fmt: skip
+    ]
     if rows:
-        trips = found["events"]
-        rows.append(
-            [
-                "every kind",
-                f"{trips.height:,}",
-                bps(trips["trip"].mean()),
-                bps(trips["trip"].median()),
-                share((trips["trip"] > GYM_BPS).mean()),
-                bps(trips["usual"].mean()),
-            ]
-        )
-    head = ["kind of event", "events", "mean", "median", f"above {GYM_BPS:g} bps",
+        rows += [trip_row(f"{name}, at the gym's mix", r) for name, r in
+                 found["by_time"].items()]  # fmt: skip
+    head = ["kind of event", "in the gym", "measured", "the spread at entry", "at exit",
+            "a round trip", "its median", f"above {GYM_BPS:g} bps",
             "the same instruments at ordinary moments"]  # fmt: skip
     sections += [
         (
             "<h2>At the first agent's extreme minutes: half the spread in, half out, "
             f"{HOLD} minutes later</h2>"
         ),
+        (
+            f"<p class=note>At most {PER_KIND} events of a kind are measured. A row of "
+            "several kinds weighs each kind by its events in the gym, "
+            f"{YEARS[0]}-{YEARS[-1]}.</p>"
+        ),
         table_html(head, rows),
     ]
     rows = [
-        [
-            "ETFs" if r["etf"] else "stocks",
-            *(share(r[f"fits {order}"]) for order in ORDERS),
-        ]
-        for r in found["fits"].sort("etf").iter_rows(named=True)
+        [f"at most {r['at most']:g} bps", share(r["kept"]), bps(r["mean"]),
+         bps(r["leave"])]
+        for r in found["narrow"]
+    ]  # fmt: skip
+    sections += [
+        "<h2>If an order goes out only while the spread at entry is narrow</h2>",
+        (
+            "<p class=note>The extreme minutes whose spread at entry is at most each "
+            "width, at the gym's mix. An order sees that spread as it goes out, but for the "
+            f"{WINDOW} seconds it is weighed over; what the events left out would have "
+            "earned is not measured here.</p>"
+        ),
+        table_html(
+            [
+                "the spread at entry",
+                "events kept",
+                "a round trip",
+                "the spread at exit",
+            ],
+            rows,
+        ),
     ]
+    by_part = {
+        (r["etf"], r["part"]): r for r in found["fits_by_part"].iter_rows(named=True)
+    }
+    rows = []
+    for r in found["fits"].sort("etf").iter_rows(named=True):
+        kind = "ETFs" if r["etf"] else "stocks"
+        rows.append([kind, *(share(r[f"fits {order}"]) for order in ORDERS)])
+        rows += [
+            [f"{kind}, {name}", *(share(part[f"fits {order}"]) for order in ORDERS)]
+            for name, _, _ in PARTS
+            if (part := by_part.get((r["etf"], name)))
+        ]
+    if found["events"].height:
+        rows.append(
+            ["the first agent's extreme minutes, at entry",
+             *(share(found["fits_at_entry"][order]) for order in ORDERS)]
+        )  # fmt: skip
     sections += [
         "<h2>How often an order fits within the size shown at the best price</h2>",
         table_html(["on both sides", *(f"{order:,} USD" for order in ORDERS)], rows),
@@ -739,9 +879,9 @@ def write_page(
         .filter("etf")["ticker"]
         .unique()
     )
-    found = summary(
-        load(base / "moments", MOMENT_SCHEMA), load(base / "events", EVENT_SCHEMA), etfs
-    )
+    events = load(base / "events", EVENT_SCHEMA)
+    in_gym = kinds_in_gym(data) if events.height else {}
+    found = summary(load(base / "moments", MOMENT_SCHEMA), events, etfs, in_gym)
     path = base / "costs.html"
     path.write_text(page(found, title))
     return path

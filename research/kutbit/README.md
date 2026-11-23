@@ -124,17 +124,20 @@ only:
 - up to 400 of the first agent's extreme minutes of each kind, where it would enter and where a
   30-minute hold would leave.
 
-The page also shows how often an order of 30,000 or 120,000 USD fits within the size shown at the
-best price. A trial of January 2016's two sessions took about a minute. The whole download takes
-about an hour and a half. Since the live engine shares Alpaca's limit, the download does not
-start, and stops, from 45 minutes before a session's open to 45 minutes after its close; run
-again, it goes on where it stopped.
+The page weighs each kind of extreme minute by its events in the gym, and shows what they cost
+when only those with a narrow spread at entry are kept. It also shows how often an order of
+30,000 or 120,000 USD fits within the size shown at the best price, by part of the day and at
+the extreme minutes' entries. A trial of January 2016's two sessions took about a minute; the
+whole download takes about an hour and a half. Since the live engine shares Alpaca's
+limit, the download does not start, and stops, from 45 minutes before a session's open to 45
+minutes after its close; run again, it goes on where it stopped.
 
 ```bash
 uv run --env-file .env python research/kutbit/costs.py moments && uv run --env-file .env python research/kutbit/costs.py events && uv run python research/kutbit/costs.py page
 ```
 
-The page is `data/kutbit/costs/costs.html`.
+The page is `data/kutbit/costs/costs.html`. Once downloaded, it is drawn again in seconds, with
+no request, by `uv run python research/kutbit/costs.py page`.
 
 ## The hedge study
 

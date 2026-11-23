@@ -508,21 +508,28 @@ def made_up_moments() -> pl.DataFrame:
 
 
 def made_up_trips() -> pl.DataFrame:
+    """Extreme minutes of AAPL: two of kind 0, the dearer first, one at the open, and one
+    without an entry. At entry, 30,000 USD fits all but the one at the open, and 120,000 USD
+    the first; at exit, 30,000 USD fits all."""
     rows = []
-    for kind, enter, leave in (
-        (0, 4.0, 2.0),
-        (0, 8.0, 6.0),
-        (4, 9.0, 5.0),
-        (1, None, 3.0),
+    for kind, enter, leave, sizes in (
+        (0, 8.0, 6.0, (20, 13)),
+        (0, 4.0, 2.0, (13, 3)),  # 120,000 USD on the bid, not on the ask
+        (4, 9.0, 5.0, (1, 1)),
+        (1, None, 3.0, (5, 3)),
     ):
         row = {"day": date(2016, 3, 15), "minute": 50, "ticker": "AAPL", "kind": kind}
-        for side, spread in (("enter", enter), ("leave", leave)):
+        for side, spread, shown in (("enter", enter, sizes), ("leave", leave, (5, 3))):
             measured = moment_row(
-                "AAPL", 51, None if spread is None else around(spread)
+                "AAPL", 51, None if spread is None else around(spread), shown
             )
             row |= {f"{side}_{k}": measured[k] for k in costs.COLUMNS}
         rows.append(row)
     return pl.DataFrame(rows, schema=costs.EVENT_SCHEMA)
+
+
+# the gym's events of each kind: kind 0 weighs 30 / 2 measured, kind 4 10 / 1
+IN_GYM = {0: 30, 1: 5, 4: 10}
 
 
 AAPL_MEAN = (3.0 + 1.0 + 2.5) / 3
@@ -531,7 +538,7 @@ MSFT_SPREAD = 0.005 / 300.0025 * 1e4
 
 
 def test_the_costs_are_summed_up_by_instrument_part_of_day_year_and_event():
-    found = costs.summary(made_up_moments(), made_up_trips(), {"XLF"})
+    found = costs.summary(made_up_moments(), made_up_trips(), {"XLF"}, IN_GYM)
     aapl = found["by_instrument"].filter(pl.col("ticker") == "AAPL").row(0, named=True)
     assert aapl["mean"] == pytest.approx(AAPL_MEAN) and aapl["moments"] == 3
     assert aapl["median"] == pytest.approx(2.5) and not aapl["etf"]
@@ -576,9 +583,71 @@ def test_the_costs_are_summed_up_by_instrument_part_of_day_year_and_event():
     assert checks["event trips measured"] == pytest.approx(3 / 4)
 
 
+def test_the_extreme_minutes_weigh_each_kind_by_its_events_in_the_gym():
+    found = costs.summary(made_up_moments(), made_up_trips(), {"XLF"}, IN_GYM)
+    kinds = {r["kind"]: r for r in found["by_kind"].iter_rows(named=True)}
+    assert kinds[0]["in the gym"] == 30 and kinds[4]["in the gym"] == 10
+    assert kinds[0]["enter"] == pytest.approx(6.0)
+    assert kinds[0]["leave"] == pytest.approx(4.0)
+    every = found["by_time"]["every kind"]
+    assert every["in the gym"] == pytest.approx(40)
+    assert every["events"] == 3
+    assert every["mean"] == pytest.approx((15 * 3 + 15 * 7 + 10 * 7) / 40)
+    assert every["enter"] == pytest.approx((15 * 4 + 15 * 8 + 10 * 9) / 40)
+    assert every["leave"] == pytest.approx((15 * 2 + 15 * 6 + 10 * 5) / 40)
+    assert every["median"] == pytest.approx(7.0)
+    assert every["above"] == pytest.approx(25 / 40)
+    assert every["usual"] == pytest.approx(AAPL_MEAN)
+    opening = found["by_time"]["at the open"]
+    assert opening["in the gym"] == pytest.approx(10) and opening[
+        "mean"
+    ] == pytest.approx(7)
+    later = found["by_time"]["later in the day"]
+    assert later["mean"] == pytest.approx(5.0) and later["median"] == pytest.approx(3.0)
+    assert later["above"] == pytest.approx(0.5)
+
+
+def test_a_narrow_spread_at_entry_keeps_its_share_of_the_gym_s_events():
+    found = costs.summary(made_up_moments(), made_up_trips(), {"XLF"}, IN_GYM)
+    narrow = {r["at most"]: r for r in found["narrow"]}
+    assert list(narrow) == list(costs.NARROW)
+    assert narrow[3]["kept"] == 0.0 and narrow[3]["mean"] is None
+    assert narrow[5]["kept"] == pytest.approx(15 / 40)
+    assert narrow[5]["mean"] == pytest.approx(3.0)
+    assert narrow[5]["leave"] == pytest.approx(2.0)
+    assert narrow[10]["kept"] == pytest.approx(1.0)
+    assert narrow[10]["mean"] == pytest.approx(5.5)
+
+
+def test_orders_fit_by_part_of_the_day_and_at_the_extreme_minutes_entries():
+    found = costs.summary(made_up_moments(), made_up_trips(), {"XLF"}, IN_GYM)
+    parts = {
+        (r["etf"], r["part"]): (r["fits 30000"], r["fits 120000"])
+        for r in found["fits_by_part"].iter_rows(named=True)
+    }
+    assert parts == {
+        (False, "the first 30 minutes"): (1.0, 0.0),
+        (False, "the day between"): (1.0, 1.0),
+        (False, "the last 30 minutes"): (0.0, 0.0),
+        (True, "the first 30 minutes"): (1.0, 1.0),
+        (True, "the day between"): (1.0, 1.0),
+    }
+    assert found["fits_at_entry"] == pytest.approx({30_000: 30 / 40, 120_000: 15 / 40})
+
+
+def test_a_kind_measured_but_not_in_the_gym_is_refused():
+    with pytest.raises(ValueError, match=r"kinds \[4\]"):
+        costs.summary(made_up_moments(), made_up_trips(), {"XLF"}, {0: 30, 1: 5})
+
+
+def test_the_gym_s_events_are_counted_by_kind_never_after_2021(tmp_path):
+    made_up_gym(tmp_path / "kutbit" / "agent" / "real", years=range(2016, 2023))
+    assert costs.kinds_in_gym(tmp_path) == {0: 72} | {k: 24 for k in range(1, 8)}
+
+
 def test_the_page_shows_every_part_and_the_verdict():
     text = costs.page(
-        costs.summary(made_up_moments(), made_up_trips(), {"XLF"}), "a test"
+        costs.summary(made_up_moments(), made_up_trips(), {"XLF"}, IN_GYM), "a test"
     )
     for part in (
         "<h1>a test</h1>",
@@ -590,8 +659,21 @@ def test_the_page_shows_every_part_and_the_verdict():
         "By year",
         "At the first agent's extreme minutes",
         "at the open, QQQ quiet, no headline",
-        "every kind",
+        (
+            "<td>every kind, at the gym&#x27;s mix</td><td class=num>40</td><td class=num>3"
+            "</td><td class=num>6.75</td><td class=num>4.25</td><td class=num>5.50</td><td "
+            "class=num>7.00</td><td class=num>62%</td><td class=num>2.17</td>"
+        ),
+        (
+            "At the first agent's extreme minutes, each kind weighed by its events in the "
+            "gym, a round trip costs 5.50 bps on average: 7.00 at the open and 5.00 later "
+            "in the day, against the gym's 5 bps."
+        ),
+        "If an order goes out only while the spread at entry is narrow",
+        "<td>at most 5 bps</td><td class=num>38%</td><td class=num>3.00</td>",
         "How often an order fits",
+        "<td>stocks, the last 30 minutes</td><td class=num>0%</td><td class=num>0%</td>",
+        "<td>the first agent&#x27;s extreme minutes, at entry</td><td class=num>75%</td>",
         "Checks",
     ):
         assert part in text
@@ -599,6 +681,7 @@ def test_the_page_shows_every_part_and_the_verdict():
         pl.DataFrame(schema=costs.MOMENT_SCHEMA),
         pl.DataFrame(schema=costs.EVENT_SCHEMA),
         set(),
+        {},
     )
     assert "Checks" in costs.page(empty, "nothing yet")
 
@@ -611,3 +694,8 @@ def test_the_page_is_written_from_the_downloads(tmp_path):
     made_up_moments().write_parquet(base / "moments" / "2016-03-15.parquet")
     path = costs.write_page(tmp_path, "trial", "the trial")
     assert path == base / "costs.html" and "XLF (ETF)" in path.read_text()
+    made_up_gym(tmp_path / "kutbit" / "agent" / "real")
+    (base / "events").mkdir()
+    made_up_trips().write_parquet(base / "events" / "2016.parquet")
+    text = costs.write_page(tmp_path, "trial", "the trial").read_text()
+    assert "<td>every kind, at the gym&#x27;s mix</td><td class=num>96</td>" in text
