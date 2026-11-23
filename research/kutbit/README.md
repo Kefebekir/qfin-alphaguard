@@ -20,7 +20,8 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The harness: feeds the agent minute by minute in time order, never an outcome before it is known; chooses its setting on 2019; runs the placebo; measures it once on 2020-2021 against the bars; writes the page of what it did | `harness.py` | done |
 | Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026; design A in `AGENT_GUIDE.md`; `agent.py`, Efe's, checked by `tests/test_kutbit_agent.py` | written by Efe; its trust and each stock's correction count only beyond two standard errors (0026's amendment of 22 November); its placebo passed with no trade; measured once on 2020-2021 it failed, below betting against events without a headline at the open (0026's result); the next variant starts from its page |
 | What a round trip costs: the spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first agent's extreme minutes, and whether an order fits within the size shown | `costs.py` → `data/kutbit/costs/costs.html` | run on 22-23 November: the median stock's round trip 2.80 bps, the median ETF's 1.17, QQQ's 0.62; at the first agent's extreme minutes 4.98, 7.82 at the open and 4.65 later, against the gym's 5 (0024's result) |
-| Efe's network, the ladder's third rung and variant 2: the skill test's target from the same inputs, against the ridge | rules: decision 0027; `net.py`, Efe's, from a guide | next: its data, the harness and the guide, then Efe's `net.py` |
+| Efe's network, the ladder's third rung and variant 2: the skill test's target from the same inputs, against the ridge | rules: decision 0027; `net.py`, Efe's, from a guide | next: the harness and the guide, then Efe's `net.py` |
+| The network's rows: the skill test's, each minute's channels stored once and each window gathered on the GPU, every row checked against the ridge's input | `net_data.py` → `data/kutbit/net/` | built; Efe builds them once |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | once a forecast of the network pays its own costs (decision 0027) |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -140,6 +141,36 @@ uv run --env-file .env python research/kutbit/costs.py moments && uv run --env-f
 
 The page is `data/kutbit/costs/costs.html`. Once downloaded, it is drawn again in seconds, with
 no request, by `uv run python research/kutbit/costs.py page`.
+
+## The network's rows
+
+Efe's network (decision 0027) is given exactly what the skill test's ridge was given, so that
+only the model differs. `net_data.py` takes every day's rows of 2016-2021 from the skill test's
+own code, on the real prices and on its random walks with the same seeds. It stores each
+minute's 8 channels once rather than in 120 windows, and a row's window is gathered when a batch
+is made, with zeros before the session's open. While it builds, it gathers every row's window
+back and checks that it equals the ridge's input bit for bit; a day that differs stops the
+build. Each year is written once, with the SHA-256 of the code that built it, and is built again
+only when that code changes. On the real prices it took 4.5 minutes and 6 GB: 24,458,227 rows of
+2016-2019 and 12,627,628 of 2020-2021, as many as the skill test fitted and measured. With the
+random walks the build takes about ten minutes and 12 GB.
+
+```bash
+uv run python research/kutbit/net_data.py build
+PYTHONPATH=src data/llmenv/bin/python research/kutbit/net_data.py speed
+```
+
+`speed` runs on the GPU. It times how fast batches of 4,096 windows of 2016-2018 are gathered
+and run forward and back through a stand-in network of each width decision 0027 allows, on
+random weights, and from that how long its runs take at the most. It learns nothing and shows
+no score. On Efe's laptop GPU (an RTX 5070 with 8 GB) an epoch of 2016-2018 took 10 seconds at
+a width of 128 and 19 at 512, in 2.8 GB; 0027's choice then takes 2 hours at the most and its
+measurement 1.5, and the placebo as much again. The tests that need PyTorch run in
+`data/llmenv`:
+
+```bash
+PYTHONPATH=src data/llmenv/bin/python -m pytest tests/test_kutbit_net_data.py
+```
 
 ## The hedge study
 
