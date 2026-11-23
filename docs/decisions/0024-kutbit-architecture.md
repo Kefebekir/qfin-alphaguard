@@ -3,7 +3,8 @@
 - **Status:** accepted; the skill test's daily correlation amended on 17 November 2026, after
   its placebo's first run and before any real run (see the amendment at the end); sections 1
   and 5 changed by decision 0025, which makes the hedge a decision; the skill test run on 22
-  November 2026 (see its result at the end)
+  November 2026 and each instrument's cost measured on 23 November (see their results at the
+  end)
 - **Date:** 2026-11-17 (agreed with Efe on 16 November)
 - **Builds on:** decision 0023, which it changes where this record says so. Everything else in
   0023 stands: KUTBIT is separate from the QQQ rule, has its own Guard file and accounts, trades
@@ -149,9 +150,9 @@ month). Nothing is bought before then; at that point the price and Efe's balance
 - Done: the inputs, the labels and the data set (#106), inputs v2 (#107), the target (#108).
 - Next, in order: the skill test; the bank of real paths; the simulator, whose broker, margin
   and stop rules Efe writes; the decision rule, Efe's; Efe's network.
-- Still to check: each instrument's cost, measured from the consolidated tape's quotes by
-  `research/kutbit/costs.py`, whose rules its docstring gives; and the paper account's margin
-  once Efe opens the second one.
+- Measured: each instrument's cost, from the consolidated tape's quotes by
+  `research/kutbit/costs.py`, whose rules its docstring gives (see the result at the end).
+- Still to check: the paper account's margin once Efe opens the second one.
 - Real money stays outside this decision, as in 0023.
 
 ## Amendment of 17 November 2026: the daily correlation
@@ -219,3 +220,84 @@ Efe ran both on 22 November.
   depends on each instrument's real cost, which is still to check. Efe decides whether the
   network is worth building. If it is built, it must beat the ridge's correlation on the same
   years.
+
+## Result of 23 November 2026: what a round trip costs
+
+Efe ran `research/kutbit/costs.py` on the night of 22 to 23 November: 15,451 requests for the
+consolidated tape's quotes of 2016-2021, in 102 minutes.
+
+- **What it measured.** A round trip at market pays the quoted spread of the NBBO, half in and
+  half out, in bps of the mid, before any price improvement. 378,214 moments of 144 sessions,
+  two drawn from each month, every 10 minutes, for every instrument of the day (65 or 66, 92
+  in all); and 2,099 of the first agent's extreme minutes, up to 400 of each kind, at entry
+  and 30 minutes later. 99.89% of the moments had a valid quote; 3.86% of the quotes, locked
+  or crossed, were left out; no spread was under a cent above 1 USD; 0.25% of the sizes were
+  multiples of 100, so the sizes are round lots.
+- **A round trip, each instrument's mean, in bps:**
+
+  | | The first 30 minutes | The day between | The last 30 minutes | All day |
+  | --- | --- | --- | --- | --- |
+  | The median of 76 stocks | 6.00 | 2.65 | 2.16 | 2.80 |
+  | Stocks under 1.89 bps | 2 | 19 | 31 | 13 |
+  | The median of 15 ETFs, QQQ apart | 1.59 | 1.17 | 1.17 | 1.17 |
+  | ETFs under 1.89 bps, QQQ apart | 9 | 14 | 14 | 14 |
+  | QQQ, the hedge | 0.66 | 0.62 | 0.60 | 0.62 |
+
+- **What makes one dearer.** A spread is at least a cent, so a cheap share pays more: GE at
+  13 USD 7.3 bps, BAC at 28 USD 4.0. A dear one is often quoted many cents apart: BKNG at
+  1,873 USD 16.1 bps, CMG 9.3, GOOGL 6.1. The cheapest stocks were large ones between 60 and
+  180 USD: AAPL 0.96, MSFT 1.20, JPM 1.32. For stocks the first 30 minutes cost about twice
+  the rest of the day; for ETFs a fifth more.
+- **At the first agent's extreme minutes**, each kind weighed by its events in the gym over
+  2016-2021 (31,586, of which 3,317 at the open), in bps:
+
+  | | At the open | Later in the day | Every kind |
+  | --- | --- | --- | --- |
+  | The spread at entry | 10.60 | 5.01 | 5.60 |
+  | The spread 30 minutes later | 5.05 | 4.29 | 4.37 |
+  | A round trip | 7.82 | 4.65 | 4.98 |
+  | Its median | 4.95 | 2.59 | 2.66 |
+  | Round trips above 5 bps | 49% | 21% | 24% |
+
+  Betting against events without a headline at the open, the bar the first agent lost to,
+  meets round trips of 7.72 bps when QQQ is quiet and 9.83 when it moved. The page first
+  averaged the events as drawn, 5.68 bps; since at most 400 of a kind were drawn, the open,
+  10.5% of the gym's events, was 37% of those measured. It now weighs each kind by its
+  events in the gym.
+- **The spread at entry is there to see.** Of the extreme minutes at the gym's mix, those
+  whose spread at entry was at most 5 bps are 73%, at 2.36 bps a round trip; at most 3 bps,
+  52% at 1.91; at most 2 bps, 30% at 1.57. What the events left out would have earned is not
+  measured here.
+- **Order size.** How often an order fits within the size shown at the best price, on both
+  sides:
+
+  | | 30,000 USD | 120,000 USD |
+  | --- | --- | --- |
+  | Stocks: the first 30 minutes, the day between, the last 30 minutes | 34%, 55%, 70% | 7%, 14%, 26% |
+  | ETFs: the same | 69%, 87%, 93% | 28%, 49%, 68% |
+  | The extreme minutes, at entry | 43% | 11% |
+
+  The size shown is one market's at the best price, so the depth at that price is at least
+  that. The rest of a larger order fills at worse prices, unless it waits.
+- **What it shows.**
+  - The skill test's strongest 1% earn 1.89 bps a signal before costs at 15-60 minutes. That
+    is below the median stock's round trip in every part of the day, and above the cheapest
+    instruments': 19 stocks in the day between, 31 in the last 30 minutes, and 14 ETFs. Its
+    ETF signals at 30 and 60 minutes earned 2.14 and 3.28 bps before costs, above the median
+    ETF's 1.17, but at a t of only 1.6 and 1.7. How strong its forecasts are on the cheapest
+    stocks alone was not measured.
+  - The gym's 5 bps was right on average and wrong by the hour: 7.82 at the open, 4.65 later
+    in the day. The bar the first agent lost to was charged 5 bps where a round trip costs
+    about 8. The first agent's result stands as it was measured; a later variant's gym needs
+    each event's cost at its hour, not one number.
+  - About a quarter of the extreme minutes, those whose spread at entry is above 5 bps,
+    carry about two thirds of their cost, and that spread is there to see before the order:
+    without them a round trip falls from 4.98 to 2.36 bps.
+  - The hedge is cheap: QQQ's round trip is 0.60-0.66 bps.
+  - At 4x on 30,000 USD, one position of 120,000 USD fits within the size shown at an extreme
+    minute's entry 11% of the time; one of 30,000 USD, 43%.
+- **What it decides** (section 9). At the costs measured, the strongest 1% would pay only on
+  the cheapest instruments, the ETFs and the largest stocks outside the first 30 minutes: on
+  the ETFs at a t of only 1.6 and 1.7, and on those stocks only if the forecasts are as strong
+  there, which is not yet measured. Efe decides whether the network is worth building. If it
+  is built, it must beat the ridge's correlation on the same years.

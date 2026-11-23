@@ -113,11 +113,14 @@ week alongside university.
     against events without a headline at the open (+0.46), with a t of −0.40 over it. It
     bet least where that edge was and most later in the day; its best and worst trades, at
     up to 4x, were all in March 2020 (0026's result). The next variant starts from its page.
-  - What a round trip really costs is measured next (`research/kutbit/costs.py`): the
-    spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first
-    agent's extreme minutes, against the 2 bps the skill test charges and the 5 bps of the
-    gym, and whether an order fits within the size shown. Efe runs it. Whether a forecast
-    as small as the skill test's can pay depends on it.
+  - What a round trip really costs was measured on 23 November from the consolidated
+    tape's quotes of 2016-2021 (`research/kutbit/costs.py`, 0024's result). The median
+    stock's costs 2.80 bps, the median ETF's 1.17 and QQQ's 0.62; for stocks the first 30
+    minutes cost about twice the rest of the day. At the first agent's extreme minutes a
+    round trip costs 4.98 bps, near the gym's 5, but 7.82 at the open and 4.65 later. The
+    skill test's strongest 1%, 1.89 bps before costs, are below the median stock's cost in
+    every part of the day and above that of about a third of the instruments, mostly ETFs
+    and the largest stocks. Efe decides whether the network is worth building.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
