@@ -121,6 +121,14 @@ week alongside university.
     skill test's strongest 1%, 1.89 bps before costs, are below the median stock's cost in
     every part of the day and above that of about a third of the instruments, mostly ETFs
     and the largest stocks. Efe decides whether the network is worth building.
+  - **Next: Efe's network** (decision 0027, variant 2 of 10, agreed on 23 November). It
+    forecasts the skill test's target from the same 971 inputs on the same rows and years,
+    so that only the model differs from the ridge: a linear path with two hidden layers
+    beside it, written from scratch, five seeds, its setting chosen on 2019 and measured
+    once on 2020-2021. It must beat the ridge and a network on shuffled labels, day by day
+    at a t of 2, after a random-walk placebo; the bank of real paths and the simulator come
+    only if its strongest 1% also pay their own costs. Next, in order: its data, the
+    harness, the guide; then Efe writes `research/kutbit/net.py` and runs it.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
