@@ -18,7 +18,7 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The event gym: every extreme minute's 16 numbers, the outcome of all 91 actions, the bars, the placebo's random walks and the shuffled outcomes | `gym.py`, `results_gym.txt` | done |
 | The harness: feeds the agent minute by minute in time order, never an outcome before it is known; chooses its setting on 2019; runs the placebo; measures it once on 2020-2021 against the bars; writes the page of what it did | `harness.py` | done |
 | Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026; design A in `AGENT_GUIDE.md`; `agent.py`, Efe's, checked by `tests/test_kutbit_agent.py` | written by Efe; its trust and each stock's correction count only beyond two standard errors (0026's amendment of 22 November); its placebo passed with no trade; measured once on 2020-2021 it failed, below betting against events without a headline at the open (0026's result); the next variant starts from its page |
-| What a round trip costs: the spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first agent's extreme minutes, and whether an order fits within the size shown | `costs.py` → `data/kutbit/costs/costs.html` | built; Efe runs it |
+| What a round trip costs: the spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first agent's extreme minutes, and whether an order fits within the size shown | `costs.py` → `data/kutbit/costs/costs.html` | run on 22-23 November: the median stock's round trip 2.80 bps, the median ETF's 1.17, QQQ's 0.62; at the first agent's extreme minutes 4.98, 7.82 at the open and 4.65 later, against the gym's 5 (0024's result) |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | next |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -117,24 +117,27 @@ The page is `data/kutbit/skill/skill.html`.
 
 What a round trip at market costs: the bid-ask spread of the consolidated tape's quotes (the
 NBBO of Alpaca's SIP feed, free back to 2016), in bps of the mid. The skill test charges 2 bps a
-round trip and the first agent's gym 5 bps; neither was measured. Two samples, of 2016-2021
-only:
+round trip and the first agent's gym 5 bps; neither was measured before. Two samples, of
+2016-2021 only:
 - two sessions drawn from every month, each measured every 10 minutes from 09:31 and at 15:59,
   for every instrument of that day;
 - up to 400 of the first agent's extreme minutes of each kind, where it would enter and where a
   30-minute hold would leave.
 
-The page also shows how often an order of 30,000 or 120,000 USD fits within the size shown at the
-best price. A trial of January 2016's two sessions took about a minute. The whole download takes
-about an hour and a half. Since the live engine shares Alpaca's limit, the download does not
-start, and stops, from 45 minutes before a session's open to 45 minutes after its close; run
-again, it goes on where it stopped.
+The page weighs each kind of extreme minute by its events in the gym, and shows what they cost
+when only those with a narrow spread at entry are kept. It also shows how often an order of
+30,000 or 120,000 USD fits within the size shown at the best price, by part of the day and at
+the extreme minutes' entries. A trial of January 2016's two sessions took about a minute; the
+whole download took 102 minutes on 22-23 November. Since the live engine shares Alpaca's
+limit, the download does not start, and stops, from 45 minutes before a session's open to 45
+minutes after its close; run again, it goes on where it stopped.
 
 ```bash
 uv run --env-file .env python research/kutbit/costs.py moments && uv run --env-file .env python research/kutbit/costs.py events && uv run python research/kutbit/costs.py page
 ```
 
-The page is `data/kutbit/costs/costs.html`.
+The page is `data/kutbit/costs/costs.html`. Once downloaded, it is drawn again in seconds, with
+no request, by `uv run python research/kutbit/costs.py page`.
 
 ## The hedge study
 
