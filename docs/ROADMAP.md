@@ -132,8 +132,9 @@ week alongside university.
     against the ridge's input, 24,458,227 rows of 2016-2019 and 12,627,628 of 2020-2021. Its
     harness is built (`net_harness.py`) and tested on a stand-in network; on Efe's data the
     ridge it fits again gives the skill test's numbers bit for bit. On Efe's laptop GPU all
-    of 0027's runs take about four hours at the most. Next: the guide, then Efe writes
-    `research/kutbit/net.py` and runs it.
+    of 0027's runs take about four hours at the most. The network (`research/kutbit/net.py`)
+    and its guide (`NETWORK_GUIDE.md`) are written, each step tested. Next, Efe runs the
+    smoke check, the placebo, the choice on 2019 and the measurement once.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
