@@ -198,6 +198,11 @@ OMP_NUM_THREADS=8 PYTHONPATH=src data/llmenv/bin/python research/kutbit/net_harn
 
 The page is `data/kutbit/net/net.html`.
 
+These times turned out short. On 23 November the placebo took 2 h 29 min, the choice 1 h 41
+min and the measurement 30 minutes, at a width of 128 for 10 epochs. The check of speed times
+a stand-in network that takes no Adam step, and Adam's step, written by hand, adds about 1 ms
+a batch. Decision 0027's result records what the runs found.
+
 ## In a minute
 
 A ridge regression on 971 inputs already forecasts the next 1 to 60 minutes of a stock's move

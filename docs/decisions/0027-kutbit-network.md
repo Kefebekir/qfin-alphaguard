@@ -1,6 +1,7 @@
 # 0027: KUTBIT's network, the ladder's third rung
 
-- **Status:** accepted
+- **Status:** accepted; measured once on 23 November 2026 and failed (see the result at the
+  end)
 - **Date:** 2026-11-23 (agreed with Efe on 23 November)
 - **Builds on:** decision 0023 (variants, placebos, who writes what), 0024 (the inputs, the
   target, the ladder, the skill test and its results, the costs) and 0026 (variant 1 and its
@@ -138,3 +139,63 @@ inputs than the ridge does?
 - No promise is made. On data this noisy a network often beats a well-tuned linear model by
   little, or not at all. Even passing every gate, Efe's goal asks about three times the
   ridge's edge.
+
+## Result of 23 November 2026: failed
+
+Efe ran the placebo, the choice and the measurement on 23 November; the three records keep
+the same code's fingerprint. A correlation is each day's, about the means of all the rows,
+averaged over the days; a t is in brackets.
+
+- **The placebo passed.** On the random walks no forecaster reached |t| 3. The largest were
+  1.42 for the network, 2.06 for the ridge, 1.96 for the network on shuffled labels, and 1.84
+  and 2.58 for the two known patterns; the ridge's and the patterns' are those of 0024's
+  placebo. Every gate failed there, as it should: the margin over the ridge was −0.0029
+  (t −0.55), over the network on shuffled labels −0.0032 (t −0.98), and no horizon paid its
+  own cost. The setting kept on the walks' 2019, W 128 with λ 0.1 after 19 epochs, scored
+  +0.0061 there, and −0.0005 to +0.0016 on their 2020-2021 (t −0.32 to +0.52).
+- **The choice on 2019 kept W 128 with λ 0.1, after 10 epochs,** at +0.0155.
+  - All 80 scores were above zero, from +0.0036 to +0.0155, where the walks' highest was
+    +0.0061.
+  - The narrow network beat the wide one, and the strong decay the weak: the four settings'
+    20 epochs averaged +0.0127, +0.0109, +0.0097 and +0.0067. W 512 with λ 0.1 was still
+    rising at epochs 19 and 20 (+0.0141, +0.0124).
+  - From one epoch to the next a score moved by about 0.002, so the epoch kept owes something
+    to luck.
+- **Measured once on 2020-2021, it failed gate 2.** Each day's correlation with `z`:
+
+  | | 1 min | 5 min | 15 min | 30 min | 60 min |
+  | --- | --- | --- | --- | --- | --- |
+  | The network | +0.0037 (5.9) | +0.0078 (6.7) | +0.0098 (5.5) | +0.0114 (5.2) | +0.0134 (3.8) |
+  | The ridge | +0.0061 (7.7) | +0.0092 (6.6) | +0.0122 (5.5) | +0.0140 (4.7) | +0.0160 (3.6) |
+  | The network on shuffled labels | −0.0006 (−0.9) | −0.0004 (−0.5) | +0.0020 (1.5) | +0.0009 (0.5) | +0.0063 (2.2) |
+
+  1. The placebo: passed.
+  2. Its margin over the ridge, 15-60 minutes: −0.0025, t −0.85, where 2 was asked: failed.
+  3. Its margin over the network on shuffled labels: +0.0085, t +3.90: passed.
+  4. Its strongest 1% after their own cost: −1.34 bps at 15 minutes (t −3.0), −0.37 at 30
+     (t −0.5) and +0.91 at 60 (t +0.7): failed.
+
+  As section 8 says, variant 2 is written down as failed and is not used.
+- **What its page showed, for the next variant to start from.**
+  - It forecasts, but less than the ridge: at every horizon; across instruments within each
+    minute (+0.0054 to +0.0108, against the ridge's +0.0104 to +0.0134); in stocks at every
+    horizon; and in ETFs at 15-60 minutes. A curve saw no more in these inputs than the
+    ridge's straight line did.
+  - What it learned is each instrument's own. On labels shuffled within each minute, the same
+    network learned little (−0.0006 to +0.0063), and nothing across instruments within a
+    minute: what a minute's instruments share forecasts little of `z`.
+  - Its forecasts are noisier than the ridge's. The slope of `z` on them is 0.10-0.18, against
+    the ridge's 0.36-0.55: they move more than `z` follows, for less correlation.
+  - Its strongest signals at 30-60 minutes earned more before costs than the ridge's: +2.33
+    and +3.70 bps (t 3.2 and 3.0), against +1.89 and +1.89 (t 1.5 and 1.1). Its thresholds,
+    set on 2019, let through 2.1-2.4% of 2020-2021's rows, against the ridge's 1.4%. About a
+    third of them were ETFs, against a fifth of the ridge's, so they cost less: 2.70-2.79 bps
+    a round trip, against 3.30-3.38. After their own cost they made +0.91 bps at 60 minutes,
+    with a t of 0.7. Seen after the measurement, this is a hint for a next variant, not a
+    result.
+  - The runs took longer than the check of speed said: the placebo 2 h 29 min, the choice
+    1 h 41 min and the measurement 30 minutes, at W 128 for 10 epochs. The check timed a
+    stand-in network's passes forward and back, but not the hand-written Adam step and the
+    standardising, about 1 ms more a batch.
+- **Next.** Decision 0023 allows eight more variants. The bank of real paths and the
+  simulator still wait for a forecast that pays its own costs. Efe decides what variant 3 is.
