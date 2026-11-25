@@ -20,12 +20,12 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | The harness: feeds the agent minute by minute in time order, never an outcome before it is known; chooses its setting on 2019; runs the placebo; measures it once on 2020-2021 against the bars; writes the page of what it did | `harness.py` | done |
 | Efe's first agent: at an extreme minute, follow, bet against or let it be, and how much to hedge | rules: decision 0026; design A in `AGENT_GUIDE.md`; `agent.py`, Efe's, checked by `tests/test_kutbit_agent.py` | written by Efe; its trust and each stock's correction count only beyond two standard errors (0026's amendment of 22 November); its placebo passed with no trade; measured once on 2020-2021 it failed, below betting against events without a headline at the open (0026's result); the next variant starts from its page |
 | What a round trip costs: the spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first agent's extreme minutes, and whether an order fits within the size shown | `costs.py` → `data/kutbit/costs/costs.html` | run on 22-23 November: the median stock's round trip 2.80 bps, the median ETF's 1.17, QQQ's 0.62; at the first agent's extreme minutes 4.98, 7.82 at the open and 4.65 later, against the gym's 5 (0024's result) |
-| Efe's network, the ladder's third rung and variant 2: the skill test's target from the same inputs, against the ridge | rules: decision 0027; `net.py`, step by step in `NETWORK_GUIDE.md`, checked by `tests/test_kutbit_net.py` | written; next Efe runs the smoke check, the placebo, the choice on 2019 and the measurement |
+| Efe's network, the ladder's third rung and variant 2: the skill test's target from the same inputs, against the ridge | rules: decision 0027; `net.py`, step by step in `NETWORK_GUIDE.md`, checked by `tests/test_kutbit_net.py` | run on 23 November: the placebo passed; on 2020-2021 a real forecast at every horizon, but below the ridge's (a margin of −0.0025, t −0.85), so it failed gate 2, and its strongest 1% did not pay their own cost (0027's result) |
 | The network's rows: the skill test's, each minute's channels stored once and each window gathered on the GPU, every row checked against the ridge's input | `net_data.py` → `data/kutbit/net/` | built; Efe builds them once |
-| The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | once a forecast of the network pays its own costs (decision 0027) |
+| The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | once a forecast pays its own costs; variant 2's did not (decision 0027) |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
-| The training harness and its placebos | `net_harness.py` → `data/kutbit/net/net.html` | the network's: built and tested on a stand-in network; Efe designs and trains the networks |
+| The training harness and its placebos | `net_harness.py` → `data/kutbit/net/net.html` | the network's: built, tested on a stand-in network, and run on variant 2 on 23 November; Efe designs and trains the networks |
 
 ```bash
 uv run python research/kutbit/dataset.py
@@ -201,8 +201,10 @@ OMP_NUM_THREADS=8 PYTHONPATH=src data/llmenv/bin/python research/kutbit/net_harn
 OMP_NUM_THREADS=8 PYTHONPATH=src data/llmenv/bin/python research/kutbit/net_harness.py measure
 ```
 
-The page is `data/kutbit/net/net.html`. The tests that learn need PyTorch and run in
-`data/llmenv`, with a stand-in network:
+The page is `data/kutbit/net/net.html`. On 23 November, on Efe's laptop GPU, variant 2's
+placebo took 2 h 29 min, its choice 1 h 41 min and its measurement 30 minutes. That is longer
+than the check of speed said, since its stand-in network has no Adam step to take. The tests
+that learn need PyTorch and run in `data/llmenv`, with a stand-in network:
 
 ```bash
 PYTHONPATH=src data/llmenv/bin/python -m pytest tests/test_kutbit_net_harness.py

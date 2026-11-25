@@ -121,20 +121,21 @@ week alongside university.
     skill test's strongest 1%, 1.89 bps before costs, are below the median stock's cost in
     every part of the day and above that of about a third of the instruments, mostly ETFs
     and the largest stocks. Efe decides whether the network is worth building.
-  - **Next: Efe's network** (decision 0027, variant 2 of 10, agreed on 23 November). It
-    forecasts the skill test's target from the same 971 inputs on the same rows and years,
-    so that only the model differs from the ridge: a linear path with two hidden layers
-    beside it, written from scratch, five seeds, its setting chosen on 2019 and measured
-    once on 2020-2021. It must beat the ridge and a network on shuffled labels, day by day
-    at a t of 2, after a random-walk placebo; the bank of real paths and the simulator come
-    only if its strongest 1% also pay their own costs. Its rows are built
-    (`research/kutbit/net_data.py`): the skill test's, every window checked bit for bit
-    against the ridge's input, 24,458,227 rows of 2016-2019 and 12,627,628 of 2020-2021. Its
-    harness is built (`net_harness.py`) and tested on a stand-in network; on Efe's data the
-    ridge it fits again gives the skill test's numbers bit for bit. On Efe's laptop GPU all
-    of 0027's runs take about four hours at the most. The network (`research/kutbit/net.py`)
-    and its guide (`NETWORK_GUIDE.md`) are written, each step tested. Next, Efe runs the
-    smoke check, the placebo, the choice on 2019 and the measurement once.
+  - Efe's network (decision 0027, variant 2 of 10, agreed on 23 November) forecasts the
+    skill test's target from the same 971 inputs on the same rows and years, so that only
+    the model differs from the ridge: a linear path with two hidden layers beside it,
+    written from scratch, five seeds, its setting chosen on 2019 and measured once on
+    2020-2021. Its rows (`research/kutbit/net_data.py`) are the skill test's, every window
+    checked bit for bit against the ridge's input, and its harness (`net_harness.py`) fits
+    the ridge again to the skill test's numbers bit for bit. Efe ran it on 23 November. The
+    placebo passed, and on 2019 a width of 128 with the stronger decay was kept, after 10
+    epochs. Measured once on 2020-2021, it failed. It forecasts at every horizon (+0.004 to
+    +0.013 a day, at a t of 3.8 to 6.7) and beats the same network on shuffled labels
+    (t 3.90), but falls short of the ridge, by −0.0025 at 15-60 minutes with a t of −0.85.
+    Its strongest 1% earned more than the ridge's before costs at 30-60 minutes, but did not
+    pay their own cost: +0.91 bps at 60 minutes, at a t of 0.7 (0027's result).
+  - **Next: Efe decides what variant 3 is**; eight are left. The bank of real paths and the
+    simulator wait for a forecast that pays its own costs.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
