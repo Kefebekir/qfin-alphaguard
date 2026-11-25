@@ -134,8 +134,14 @@ week alongside university.
     (t 3.90), but falls short of the ridge, by −0.0025 at 15-60 minutes with a t of −0.85.
     Its strongest 1% earned more than the ridge's before costs at 30-60 minutes, but did not
     pay their own cost: +0.91 bps at 60 minutes, at a t of 0.7 (0027's result).
-  - **Next: Efe decides what variant 3 is**; eight are left. The bank of real paths and the
-    simulator wait for a forecast that pays its own costs.
+  - **Next: the sector's move, given to the ridge** (decision 0028, variant 3 of 10, agreed on
+    25 November). Each instrument sees only itself and QQQ. Variant 3 gives the skill test's
+    ridge one more channel: the move apart from QQQ, a minute old, of the sector ETF that the
+    instrument moved with most on 2016-2018, scaled by that correlation. A sector ETF is given
+    its matched instruments' mean. It must beat the skill test's ridge and itself on
+    shuffled labels, day by day at a t of 2, after a random-walk placebo; the bank of real
+    paths and the simulator come only if its strongest 1% also pay their own costs. Next, the
+    match and the channel are built and checked, then the harness, and Efe runs them.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
