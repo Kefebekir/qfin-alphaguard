@@ -3,8 +3,9 @@
 Efe's own intraday model with leverage (decisions [0023](../../docs/decisions/0023-kutbit.md),
 [0024](../../docs/decisions/0024-kutbit-architecture.md),
 [0025](../../docs/decisions/0025-kutbit-hedge.md),
-[0026](../../docs/decisions/0026-kutbit-first-agent.md) and
-[0027](../../docs/decisions/0027-kutbit-network.md)).
+[0026](../../docs/decisions/0026-kutbit-first-agent.md),
+[0027](../../docs/decisions/0027-kutbit-network.md) and
+[0028](../../docs/decisions/0028-kutbit-sector.md)).
 It is separate from the QQQ rule: its own code, its own Guard file and its own accounts.
 
 | Part | Where | State |
@@ -22,6 +23,7 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | What a round trip costs: the spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first agent's extreme minutes, and whether an order fits within the size shown | `costs.py` → `data/kutbit/costs/costs.html` | run on 22-23 November: the median stock's round trip 2.80 bps, the median ETF's 1.17, QQQ's 0.62; at the first agent's extreme minutes 4.98, 7.82 at the open and 4.65 later, against the gym's 5 (0024's result) |
 | Efe's network, the ladder's third rung and variant 2: the skill test's target from the same inputs, against the ridge | rules: decision 0027; `net.py`, step by step in `NETWORK_GUIDE.md`, checked by `tests/test_kutbit_net.py` | run on 23 November: the placebo passed; on 2020-2021 a real forecast at every horizon, but below the ridge's (a margin of −0.0025, t −0.85), so it failed gate 2, and its strongest 1% did not pay their own cost (0027's result) |
 | The network's rows: the skill test's, each minute's channels stored once and each window gathered on the GPU, every row checked against the ridge's input | `net_data.py` → `data/kutbit/net/` | built; Efe builds them once |
+| Variant 3: the skill test's ridge with one more channel, the move apart from QQQ of the instrument's sector ETF a minute before, matched on 2016-2018 | rules: decision 0028 | rules written; next the match and the channel, then the harness |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | once a forecast pays its own costs; variant 2's did not (decision 0027) |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
