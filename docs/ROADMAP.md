@@ -140,8 +140,10 @@ week alongside university.
     instrument moved with most on 2016-2018, scaled by that correlation. A sector ETF is given
     its matched instruments' mean. It must beat the skill test's ridge and itself on
     shuffled labels, day by day at a t of 2, after a random-walk placebo; the bank of real
-    paths and the simulator come only if its strongest 1% also pay their own costs. Next, the
-    match and the channel are built and checked, then the harness, and Efe runs them.
+    paths and the simulator come only if its strongest 1% also pay their own costs. The match
+    and the channel are built (`research/kutbit/sector_data.py`): on Efe's data it matches the
+    69 instruments 0028 lists, and five days of each year are checked again row by row, bit
+    for bit. Next, the harness, and Efe runs them.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
