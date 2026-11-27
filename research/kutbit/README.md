@@ -23,7 +23,7 @@ It is separate from the QQQ rule: its own code, its own Guard file and its own a
 | What a round trip costs: the spread of the consolidated tape's quotes at drawn moments of 2016-2021 and at the first agent's extreme minutes, and whether an order fits within the size shown | `costs.py` → `data/kutbit/costs/costs.html` | run on 22-23 November: the median stock's round trip 2.80 bps, the median ETF's 1.17, QQQ's 0.62; at the first agent's extreme minutes 4.98, 7.82 at the open and 4.65 later, against the gym's 5 (0024's result) |
 | Efe's network, the ladder's third rung and variant 2: the skill test's target from the same inputs, against the ridge | rules: decision 0027; `net.py`, step by step in `NETWORK_GUIDE.md`, checked by `tests/test_kutbit_net.py` | run on 23 November: the placebo passed; on 2020-2021 a real forecast at every horizon, but below the ridge's (a margin of −0.0025, t −0.85), so it failed gate 2, and its strongest 1% did not pay their own cost (0027's result) |
 | The network's rows: the skill test's, each minute's channels stored once and each window gathered on the GPU, every row checked against the ridge's input | `net_data.py` → `data/kutbit/net/` | built; Efe builds them once |
-| Variant 3: the skill test's ridge with one more channel, the move apart from QQQ of the instrument's sector ETF a minute before, matched on 2016-2018 | rules: decision 0028; the match and the channel: `sector_data.py` → `data/kutbit/sector/` | the match and the channel built and checked; Efe builds them once; next the harness |
+| Variant 3: the skill test's ridge with one more channel, the move apart from QQQ of the instrument's sector ETF a minute before, matched on 2016-2018 | rules: decision 0028; the match and the channel: `sector_data.py` → `data/kutbit/sector/` | the match and the channel built and checked; the harness, `sector_harness.py` → `data/kutbit/sector/sector.html`, built and tested; next Efe runs the placebo and the measurement once |
 | The bank of real paths: the shapes of what may follow, in the target's units, with QQQ's path beside each | | once a forecast pays its own costs; variant 2's did not (decision 0027) |
 | The simulator: fills, costs, margin and stops | | to come; its broker rules are Efe's |
 | The decision layer | | to come; its rule is Efe's |
@@ -236,6 +236,31 @@ uv run python research/kutbit/sector_data.py build
 On Efe's data it matched the 69 instruments decision 0028 lists. It builds both sources in
 about 80 seconds, in 6.3 GB of memory and 567 MB of files. A row's 1,091 inputs are the skill
 test's 971 and then the channel's 120-minute window (`inputs_of`).
+
+## The sector's harness
+
+`sector_harness.py` judges variant 3 as decision 0028 wrote before it ran. A run:
+- fits the skill test's ridge again (`net_harness.py`), and stops unless it gives the skill
+  test's own numbers;
+- sums, in one pass over 2016-2019, every product the new ridges need: the 971 inputs and the
+  windows of `sector` and `wrong`, with `z` and with `z` shuffled between the instruments of
+  each minute;
+- chooses each horizon's penalty on 2019 as the skill test did, from the fit on 2016-2018;
+  then fits the ridge with its sector, the ridge with the wrong sector and the ridge with its
+  sector on shuffled labels on 2016-2019 with the penalties kept, each with its thresholds set
+  on its forecasts of 2019;
+- measures every forecaster on 2020-2021 as variant 2's harness did, and applies the gates:
+  the margins over the skill test's ridge and over shuffled labels, day by day at a t of 2,
+  and the strongest 1% after their own cost. The margin over the wrong sector is shown.
+
+`placebo` runs it on the random walks; `measure` runs it once on the real prices, after a
+placebo that passed on the same code. Each takes about 20 minutes and about 10 GB of memory.
+The page is `data/kutbit/sector/sector.html`.
+
+```bash
+OMP_NUM_THREADS=8 uv run python research/kutbit/sector_harness.py placebo
+OMP_NUM_THREADS=8 uv run python research/kutbit/sector_harness.py measure
+```
 
 ## The hedge study
 

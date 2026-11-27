@@ -143,7 +143,9 @@ week alongside university.
     paths and the simulator come only if its strongest 1% also pay their own costs. The match
     and the channel are built (`research/kutbit/sector_data.py`): on Efe's data it matches the
     69 instruments 0028 lists, and five days of each year are checked again row by row, bit
-    for bit. Next, the harness, and Efe runs them.
+    for bit. The harness is built (`sector_harness.py`): it fits the skill test's ridge again
+    and stops unless it gives the skill test's numbers. Next, Efe runs the placebo and the
+    measurement once, about 20 minutes each.
 - **The nightly prices come from Alpaca since 11 November 2026 (decision 0022).** EODHD's
   subscription ended; its history to 10 November is kept as it is and continued each night
   with Alpaca's daily bars and corporate actions. Every stored return is unchanged, and on
