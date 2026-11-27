@@ -158,10 +158,14 @@ def test_the_sums_give_each_ridge_the_moments_of_its_inputs_and_targets(store):
                 at = rows[day]
                 theirs.add(sector_data.inputs_of(net, sector, at, kind), z[at])
             assert mine.n == theirs.n == len(rows)
-            for field in ("s", "q", "r", "t"):
+            for field in ("s", "r", "t"):  # summed in float64
                 assert np.allclose(
-                    getattr(mine, field), getattr(theirs, field), rtol=1e-6, atol=1e-6
+                    getattr(mine, field), getattr(theirs, field), rtol=1e-9, atol=1e-9
                 )
+            # q is summed in float32 a day at a time, as the skill test sums it, so another
+            # shape of the same product may round its last digits otherwise: by up to about
+            # 3e-6 of its largest entry here, and by more on another machine's BLAS
+            assert np.abs(mine.q - theirs.q).max() <= 1e-4 * np.abs(theirs.q).max()
 
 
 def test_the_rows_of_a_year_are_its_days():
