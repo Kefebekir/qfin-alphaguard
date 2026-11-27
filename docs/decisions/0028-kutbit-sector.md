@@ -1,6 +1,6 @@
 # 0028: KUTBIT's third variant: the sector's move, given to the ridge
 
-- **Status:** accepted
+- **Status:** accepted; measured once on 27 November 2026 and failed (see the result at the end)
 - **Date:** 2026-11-25 (agreed with Efe on 25 November)
 - **Builds on:** decision 0023 (variants and placebos), 0024 (the inputs, the target, the skill
   test and its ridge, the costs) and 0027 (variant 2 and its result).
@@ -132,3 +132,55 @@ those of 0024's result of 22 November; if they do not, the run stops.
 - No promise is made. A sector and its stocks move together within a minute, but a lead of one
   over another at this scale is what traders take first, and it may be small or gone.
 - Even passing every gate, Efe's goal asks about three times the ridge's edge (0027's context).
+
+## Result of 27 November 2026: failed
+
+Efe built the channel on 27 November and ran the placebo and the measurement the same day;
+both records keep the same code's fingerprint. A correlation is each day's, about the means of
+all the rows, averaged over the days; a t is in brackets.
+
+- **The channel was built as section 2 found it:** 69 instruments matched, and 10.1%, 10.6%
+  and 13.5% of 2019-2021's rows without a match.
+- **The placebo passed.** On the random walks no forecaster reached |t| 3. The largest were
+  2.06 for the new ridge and for the skill test's, 1.51 for the new ridge on shuffled labels,
+  2.18 for the wrong sector, and 1.84 and 2.58 for the two known patterns. The penalty kept was
+  10 at every horizon. The gates failed there, as they should: the margin over the skill test's
+  ridge was +0.0000 (t +0.25), over shuffled labels −0.0006 (t −0.48), and no horizon paid its
+  own cost. The wrong sector's margin, shown, was +0.0002 at a t of +2.01. Both ridges'
+  forecasts were nearly the same, so even so small a margin is steady from day to day.
+- **The choice on 2019 kept a penalty of 0.1 at every horizon.** On 2019 the new ridge's
+  correlation was above the skill test's from 5 to 60 minutes, by about 0.0016 each: 0.0153
+  against 0.0137 at 5 minutes, and 0.0075 against 0.0057 at 60.
+- **Measured once on 2020-2021, it failed gate 2.** Each day's correlation with `z`:
+
+  | | 1 min | 5 min | 15 min | 30 min | 60 min |
+  | --- | --- | --- | --- | --- | --- |
+  | The ridge with its sector | +0.0068 (8.6) | +0.0111 (8.9) | +0.0131 (6.0) | +0.0145 (4.7) | +0.0144 (3.2) |
+  | The skill test's ridge | +0.0061 (7.7) | +0.0092 (6.6) | +0.0122 (5.5) | +0.0140 (4.7) | +0.0160 (3.6) |
+  | The ridge with its sector, on shuffled labels | +0.0034 (4.7) | +0.0016 (1.2) | +0.0054 (2.2) | +0.0067 (1.9) | +0.0061 (1.2) |
+  | The ridge with the wrong sector | +0.0060 (7.5) | +0.0090 (6.5) | +0.0116 (5.3) | +0.0137 (4.6) | +0.0163 (3.7) |
+
+  1. The placebo: passed.
+  2. Its margin over the skill test's ridge, 15-60 minutes: −0.00008, t −0.07, where 2 was
+     asked: failed.
+  3. Its margin over itself on shuffled labels: +0.0079, t +3.97: passed.
+  4. Its strongest 1% after their own cost: −1.37 bps at 15 minutes (t −2.0), −1.43 at 30
+     (t −1.4) and −1.02 at 60 (t −0.7): failed.
+
+  Shown, not a gate: its margin over the wrong sector, +0.00008 at a t of +0.08. As section 8
+  says, variant 3 is written down as failed and is not used.
+- **What its page showed, for the next variant to start from.**
+  - The sector helps, but only for minutes. At 1, 5 and 15 minutes the new ridge's correlation
+    is above the skill test's, by +0.0007, +0.0019 and +0.0009; at 5 minutes that is a fifth
+    more. Across instruments within each minute it is +0.0150 against +0.0131 at 5 minutes.
+    The wrong sector adds nothing at any horizon.
+  - At 30 minutes the gain is +0.0005, and at 60 it is a loss of −0.0016, which cancels the
+    rest: the average over 15-60 minutes that the gates ask for does not move.
+  - The gain at 15-60 minutes on 2019 did not hold on 2020-2021, while the gain at 5 minutes did:
+    +0.0016 on 2019 and +0.0019 on 2020-2021.
+  - Where it helps, it cannot pay. The strongest 1% earn 0.33 bps at 1 minute and 1.14 at 5,
+    against a round trip of about 3.1. At 15-60 minutes they earn 1.69-1.86 bps, no more than
+    the skill test's 1.89.
+  - The placebo took 18 minutes and the measurement 17.5.
+- **Next.** Decision 0023 allows seven more variants. The bank of real paths and the simulator
+  still wait for a forecast that pays its own costs. Efe decides what comes next.
